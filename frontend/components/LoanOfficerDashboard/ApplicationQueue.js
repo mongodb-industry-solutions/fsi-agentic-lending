@@ -1,99 +1,31 @@
 "use client";
 
-const APPLICATIONS = [
-  {
-    id: 'APP-2026-00001',
-    name: 'Marcus & Sofia Delgado',
-    amount: '$875,000',
-    product: '5yr Fixed',
-    status: 'pending_review',
-    statusLabel: 'Pending Review',
-    statusColor: 'var(--hitl-amber)',
-    score: 72,
-    tier: 'B+',
-    submitted: '10:14 AM',
-  },
-  {
-    id: 'APP-2025-78298',
-    name: 'Marcus Johnson',
-    amount: '$420,000',
-    product: '5yr Fixed (25yr Amort)',
-    status: 'processing',
-    statusLabel: 'Processing',
-    statusColor: 'var(--agent-cyan)',
-    score: null,
-    tier: null,
-    submitted: '9:47 AM',
-  },
-  {
-    id: 'APP-2025-78215',
-    name: 'Elena Rodriguez',
-    amount: '$195,000',
-    product: '3yr Fixed (25yr Amort)',
-    status: 'approved',
-    statusLabel: 'Approved',
-    statusColor: 'var(--success)',
-    score: 88,
-    tier: 'A',
-    submitted: '8:32 AM',
-  },
-  {
-    id: 'APP-2025-78190',
-    name: 'David Kim',
-    amount: '$350,000',
-    product: '5yr Fixed (25yr Amort)',
-    status: 'funded',
-    statusLabel: 'Funded',
-    statusColor: 'var(--mongo)',
-    score: 79,
-    tier: 'B+',
-    submitted: 'Yesterday',
-  },
-  {
-    id: 'APP-2025-78143',
-    name: 'Priya Patel',
-    amount: '$510,000',
-    product: '5yr Variable (25yr Amort)',
-    status: 'processing',
-    statusLabel: 'Underwriting',
-    statusColor: 'var(--tool-blue)',
-    score: null,
-    tier: null,
-    submitted: '7:55 AM',
-  },
-  {
-    id: 'APP-2025-78091',
-    name: 'James Wilson',
-    amount: '$175,000',
-    product: 'Personal',
-    status: 'declined',
-    statusLabel: 'Declined',
-    statusColor: 'var(--danger)',
-    score: 41,
-    tier: 'D',
-    submitted: 'Yesterday',
-  },
-];
+const STATUS_COLORS = {
+  submitted: 'var(--agent-cyan)',
+  processing: 'var(--agent-cyan)',
+  underwriting: 'var(--tool-blue)',
+  review: 'var(--hitl-amber)',
+  pending_review: 'var(--hitl-amber)',
+  approved: 'var(--success)',
+  funded: 'var(--mongo)',
+  declined: 'var(--danger)',
+  error: 'var(--danger)',
+  active: 'var(--mongo)',
+};
 
-export default function ApplicationQueue({ selectedId, onSelect, liveApplications = [] }) {
-  // Merge live applications from backend with hardcoded demo data (deduplicated)
-  const liveIds = new Set(liveApplications.map(a => a.application_id));
-  const allApplications = [
-    ...liveApplications.map(app => ({
-      id: app.application_id,
-      name: app.borrower_names?.join(' & ') || app.primary_name || 'Unknown',
-      amount: `$${(app.loan_amount || 0).toLocaleString()}`,
-      product: app.product || '',
-      status: app.status || 'submitted',
-      statusLabel: (app.status || 'submitted').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-      statusColor: 'var(--agent-cyan)',
-      score: null,
-      tier: null,
-      submitted: 'Live',
-      isLive: true,
-    })),
-    ...APPLICATIONS.filter(app => !liveIds.has(app.id)),
-  ];
+export default function ApplicationQueue({ selectedId, onSelect, applications = [] }) {
+  const formatted = applications.map(app => ({
+    id: app.application_id || app.id,
+    name: app.borrower_names?.join(' & ') || app.name || 'Unknown',
+    amount: typeof app.loan_amount === 'number' ? `$${app.loan_amount.toLocaleString()}` : (app.amount || ''),
+    product: app.product || '',
+    status: app.status || 'submitted',
+    statusLabel: (app.status || 'submitted').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    statusColor: STATUS_COLORS[app.status] || 'var(--text-dim)',
+    score: app.risk_score ?? app.score ?? null,
+    tier: app.risk_tier ?? app.tier ?? null,
+    submitted: app.created_at ? new Date(app.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+  }));
 
   return (
     <div style={{
@@ -110,12 +42,17 @@ export default function ApplicationQueue({ selectedId, onSelect, liveApplication
           Application Queue
         </div>
         <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-          {allApplications.length} applications · {allApplications.filter((a) => a.status === 'pending_review').length} pending review
+          {formatted.length} application{formatted.length !== 1 ? 's' : ''} · {formatted.filter((a) => a.status === 'review' || a.status === 'pending_review').length} pending review
         </div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        {allApplications.map((app) => {
+        {formatted.length === 0 && (
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-dim)', fontSize: 11 }}>
+            No applications yet. Submit one from the Borrower Portal.
+          </div>
+        )}
+        {formatted.map((app) => {
           const isSelected = app.id === selectedId;
           return (
             <button
@@ -144,7 +81,7 @@ export default function ApplicationQueue({ selectedId, onSelect, liveApplication
                   padding: '2px 6px',
                   borderRadius: 8,
                   color: app.statusColor,
-                  background: `color-mix(in srgb, ${app.statusColor} 12%, transparent)`,
+                  background: `${app.statusColor}1a`,
                 }}>
                   {app.statusLabel}
                 </span>
@@ -159,7 +96,7 @@ export default function ApplicationQueue({ selectedId, onSelect, liveApplication
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 3, fontSize: 9, color: 'var(--text-dim)' }}>
                 <span>{app.product}</span>
-                {app.score && <span>· Score: {app.score} ({app.tier})</span>}
+                {app.score != null && <span>· Score: {app.score} ({app.tier})</span>}
                 <span style={{ marginLeft: 'auto' }}>{app.submitted}</span>
               </div>
             </button>
@@ -169,5 +106,3 @@ export default function ApplicationQueue({ selectedId, onSelect, liveApplication
     </div>
   );
 }
-
-export { APPLICATIONS };

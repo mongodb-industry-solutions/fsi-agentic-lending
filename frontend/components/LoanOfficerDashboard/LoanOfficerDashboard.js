@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import ApplicationQueue, { APPLICATIONS } from './ApplicationQueue';
+import ApplicationQueue from './ApplicationQueue';
 import AgentActivityLog from './AgentActivityLog';
 import IntentPreview from './IntentPreview';
 import AutonomyDial from './AutonomyDial';
@@ -1302,9 +1302,8 @@ export default function LoanOfficerDashboard() {
     addToast({ type: 'success', icon: '✅', title: 'Loan Approved', message: `${PAYLOAD.product} @ ${rate} for ${PAYLOAD.applicant}.${suffix}` });
 
     // Also submit to backend if we have a matching live application
-    const selectedAppData = APPLICATIONS.find((a) => a.id === selectedApp);
     const liveApp = liveApplications.find((a) => a.application_id === selectedApp);
-    const appId = liveApp?.application_id || selectedAppData?.id;
+    const appId = liveApp?.application_id || selectedApp;
     if (appId) {
       await apiPost(`/hitl/${appId}/decision`, {
         action: 'approve',
@@ -1326,9 +1325,9 @@ export default function LoanOfficerDashboard() {
   const handleAgentEvent = useCallback(() => {}, []);
 
   const currentWorkflow = WORKFLOW_STAGES[workflowStage] || WORKFLOW_STAGES[WORKFLOW_STAGES.length - 1];
-  const selectedAppData = APPLICATIONS.find((a) => a.id === selectedApp);
+  const selectedAppData = liveApplications.find((a) => a.application_id === selectedApp);
 
-  const isScenarioApp = !isPrimaryApp && ['APP-2025-78215', 'APP-2025-78091', 'APP-2025-78143'].includes(selectedApp);
+  const isScenarioApp = false;
 
   const statusBadge = () => {
     if (!isPrimaryApp) return null;
@@ -1370,7 +1369,7 @@ export default function LoanOfficerDashboard() {
 
       {/* Main content */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-        <ApplicationQueue selectedId={selectedApp} onSelect={setSelectedApp} liveApplications={liveApplications} />
+        <ApplicationQueue selectedId={selectedApp} onSelect={setSelectedApp} applications={liveApplications} />
 
         {/* Center: Workflow Monitor */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
