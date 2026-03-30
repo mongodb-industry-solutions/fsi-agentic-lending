@@ -55,8 +55,8 @@ class HITLDecisionRequest(BaseModel):
 
 
 class VectorSearchRequest(BaseModel):
-    query: str
-    limit: int = 5
+    query: str = Field(..., min_length=1)
+    limit: int = Field(default=5, ge=1, le=100)
 
 
 class AgentActivityEvent(BaseModel):

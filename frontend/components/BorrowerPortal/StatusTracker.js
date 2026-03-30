@@ -288,6 +288,7 @@ export default function StatusTracker({ onNotification, applicationId }) {
       `/applications/${applicationId}/status`,
       (event) => {
         // Mark SSE as connected on first event
+        if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
         setSseConnected(true);
 
         if (event.type === 'status' && event.status) {

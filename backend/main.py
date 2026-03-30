@@ -3,6 +3,7 @@ import asyncio
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -44,4 +45,7 @@ async def health():
         await asyncio.to_thread(db.command, "ping")
         return {"status": "ok", "service": "lendflow-ai", "mongodb": "connected"}
     except Exception as e:
-        return {"status": "degraded", "service": "lendflow-ai", "mongodb": f"error: {str(e)}"}
+        return JSONResponse(
+            status_code=503,
+            content={"status": "degraded", "service": "lendflow-ai", "mongodb": f"error: {str(e)}"}
+        )

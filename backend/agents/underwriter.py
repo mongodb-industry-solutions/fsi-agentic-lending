@@ -55,7 +55,13 @@ def underwriter_node(state: LendFlowState) -> dict:
     monthly_income = combined_income / 12
 
     # Calculate mortgage payment from loan amount and rate
-    annual_rate = float(os.getenv("CURRENT_5YR_FIXED_RATE", "0.0489"))
+    _rate_str = os.getenv("CURRENT_5YR_FIXED_RATE", "0.0489")
+    try:
+        annual_rate = float(_rate_str)
+    except (ValueError, TypeError):
+        log_agent_activity(app_id, "underwriter", "config_warning",
+            f"CURRENT_5YR_FIXED_RATE='{_rate_str}' invalid — using 0.0489")
+        annual_rate = 0.0489
     log_agent_activity(app_id, "underwriter", "rate_lookup", f"Using rate: {annual_rate:.4f} (5yr Fixed)")
     monthly_rate = annual_rate / 12
     n_payments = 25 * 12  # 25yr amortization
@@ -65,7 +71,12 @@ def underwriter_node(state: LendFlowState) -> dict:
     )
 
     # Property costs from application data
-    property_tax_monthly = round(app.get("property", {}).get("annual_tax", 6815) / 12)
+    annual_tax = app.get("property", {}).get("annual_tax") or None
+    if annual_tax is None:
+        log_agent_activity(app_id, "underwriter", "data_gap",
+            "annual_tax missing — using $6,815 regional fallback")
+        annual_tax = 6815
+    property_tax_monthly = round(annual_tax / 12)
     heating_estimate = 250  # Standard heating estimate for Calgary
 
     # Existing debts from credit reports (fetch structured data)

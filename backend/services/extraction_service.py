@@ -2,6 +2,7 @@
 import os
 import json
 import logging
+import re
 from pathlib import Path
 
 import boto3
@@ -79,8 +80,9 @@ def extract_from_pdf(pdf_path: Path, doc_type: str) -> dict:
 
     result_text = response["output"]["message"]["content"][0]["text"]
     # Strip markdown code fences if present
-    if result_text.startswith("```"):
-        result_text = result_text.split("\n", 1)[1].rsplit("```", 1)[0]
+    result_text = result_text.strip()
+    result_text = re.sub(r"^```[a-z]*\n?", "", result_text)
+    result_text = re.sub(r"\n?```$", "", result_text)
 
     try:
         return json.loads(result_text)

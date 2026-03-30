@@ -110,7 +110,7 @@ export default function ApplicationForm({ onSubmit }) {
       </FormSection>
 
       <FormSection title="Loan Details">
-        <Field label="Loan Amount ($)" value={form.loanAmount} onChange={update('loanAmount')} />
+        <Field label="Purchase Price ($)" value={form.loanAmount} onChange={update('loanAmount')} />
         <Field label="Down Payment ($)" value={form.downPayment} onChange={update('downPayment')} />
         <Field label="Purpose" value={form.loanPurpose} onChange={update('loanPurpose')} />
         <Field label="Property Type" value={form.propertyType} onChange={update('propertyType')} />

@@ -451,7 +451,7 @@ function ManualWorkspace({ onApprove, onDecline, addToast }) {
 
 // ─── HITL Review Card ───
 
-function HITLReviewCard({ onApprove, addToast }) {
+function HITLReviewCard({ onApprove, onDecline, addToast }) {
   const [showProvenance, setShowProvenance] = useState(false);
   const [showModify, setShowModify] = useState(false);
   const [fetchingContext, setFetchingContext] = useState(false);
@@ -806,7 +806,7 @@ function HITLReviewCard({ onApprove, addToast }) {
         }}>
           {fetchingContext ? '⏳ Fetching...' : extraContext ? '✓ Context Loaded' : '🔎 Request More Context'}
         </button>
-        <button type="button" style={{
+        <button type="button" onClick={() => onDecline?.()} style={{
           flex: '1 1 auto', padding: 10, borderRadius: 'var(--radius-md)',
           border: '1px solid var(--danger)', background: 'transparent',
           color: 'var(--danger)', fontFamily: 'var(--font-display)',
@@ -1001,6 +1001,21 @@ export default function LoanOfficerDashboard() {
     }
   }, [addToast, selectedApp, liveApplications]);
 
+  const handleDecline = useCallback(async () => {
+    setApproved(true);
+    setApprovalDetails({ mode: 'declined' });
+    addToast({ type: 'warning', icon: '✕', title: 'Application Declined', message: `${PAYLOAD.applicant} — declined after manual review.` });
+
+    const liveApp = liveApplications.find((a) => a.application_id === selectedApp);
+    const appId = liveApp?.application_id || selectedApp;
+    if (appId) {
+      await apiPost(`/hitl/${appId}/decision`, {
+        action: 'decline',
+        officer_notes: 'Declined after manual review',
+      });
+    }
+  }, [addToast, selectedApp, liveApplications]);
+
   const handleRollback = useCallback(() => {
     setApproved(false);
     setApprovalDetails(null);
@@ -1182,7 +1197,7 @@ export default function LoanOfficerDashboard() {
           {/* HITL Review panel */}
           {isPrimaryApp && hitlReached && !approved && autonomyLevel !== 'auto' && (
             <div style={{ padding: 16, borderTop: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '55vh' }}>
-              <HITLReviewCard onApprove={handleApprove} addToast={addToast} />
+              <HITLReviewCard onApprove={handleApprove} onDecline={handleDecline} addToast={addToast} />
             </div>
           )}
 

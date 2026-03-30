@@ -1,6 +1,7 @@
 """Document API routes."""
 import asyncio
 import json
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -16,6 +17,12 @@ from services.application_service import serialize_doc
 from db.mdb import get_db
 
 router = APIRouter(tags=["documents"])
+
+APP_ID_PATTERN = re.compile(r'^APP-[A-Z0-9]{8}$')
+
+def _validate_app_id(app_id: str):
+    if not APP_ID_PATTERN.match(app_id):
+        raise HTTPException(status_code=400, detail=f"Invalid application ID format: {app_id}")
 
 UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "docs" / "uploads"
 
@@ -105,6 +112,7 @@ async def upload_document(
     doc_type: str = Form("unknown"),
 ):
     """Upload a document, extract data via Bedrock Claude, store in MongoDB."""
+    _validate_app_id(app_id)
     # Verify application exists
     db = get_db()
     app = db["applications"].find_one({"application_id": app_id})
