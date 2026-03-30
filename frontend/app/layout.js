@@ -1,6 +1,6 @@
 import "./globals.css";
 import { Providers } from "./providers";
-import { DM_Sans, Manrope, JetBrains_Mono } from 'next/font/google';
+import { DM_Sans, Manrope, JetBrains_Mono, Source_Code_Pro } from 'next/font/google';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -12,14 +12,21 @@ const dmSans = DM_Sans({
 const manrope = Manrope({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700', '800'],
-  variable: '--font-display',
+  variable: '--font-display-fallback',
   display: 'swap',
 });
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
-  variable: '--font-mono',
+  variable: '--font-mono-fallback',
+  display: 'swap',
+});
+
+const sourceCodePro = Source_Code_Pro({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-source-code',
   display: 'swap',
 });
 
@@ -31,7 +38,14 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${manrope.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${dmSans.variable} ${manrope.variable} ${jetbrainsMono.variable} ${sourceCodePro.variable}`}>
+      <head>
+        <link rel="preconnect" href="https://d2va9gm4j17fy9.cloudfront.net" />
+        <link
+          rel="stylesheet"
+          href="https://d2va9gm4j17fy9.cloudfront.net/fonts/euclid-circular-a.css"
+        />
+      </head>
       <body>
         <Providers>{children}</Providers>
       </body>

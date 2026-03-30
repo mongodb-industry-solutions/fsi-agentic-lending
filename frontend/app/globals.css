@@ -1,20 +1,21 @@
 /* ===================== DESIGN TOKENS (CSS Variables) ===================== */
+/* Colors aligned with @leafygreen-ui/palette values */
 :root {
-  --bg-void: #f8fafc;
-  --bg-base: #ffffff;
-  --bg-surface: #f1f5f9;
-  --bg-raised: #e2e8f0;
-  --bg-overlay: #cbd5e1;
-  --border-dim: #e2e8f0;
-  --border-base: #cbd5e1;
-  --border-bright: #94a3b8;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-dim: #94a3b8;
-  --mongo: #00884a;
-  --mongo-dim: rgba(0, 136, 74, 0.06);
-  --mongo-glow: rgba(0, 136, 74, 0.18);
-  --mongo-bright: #00b864;
+  --bg-void: #F9FBFA;       /* palette.gray.light3 */
+  --bg-base: #FFFFFF;        /* palette.white */
+  --bg-surface: #F1F5F9;    /* custom (between light2 and light3) */
+  --bg-raised: #E8EDEB;     /* palette.gray.light2 */
+  --bg-overlay: #C1C7C6;    /* palette.gray.light1 */
+  --border-dim: #E8EDEB;    /* palette.gray.light2 */
+  --border-base: #C1C7C6;   /* palette.gray.light1 */
+  --border-bright: #89979B; /* palette.gray.base */
+  --text-primary: #001E2B;  /* palette.gray.dark3 */
+  --text-secondary: #5C6C75;/* palette.gray.dark1 */
+  --text-dim: #89979B;      /* palette.gray.base */
+  --mongo: #00684A;          /* palette.green.dark1 */
+  --mongo-dim: rgba(0, 104, 74, 0.06);
+  --mongo-glow: rgba(0, 104, 74, 0.18);
+  --mongo-bright: #00ED64;   /* palette.green.base */
   --voyage: #6341e0;
   --voyage-dim: rgba(99, 65, 224, 0.07);
   --voyage-glow: rgba(99, 65, 224, 0.18);
@@ -25,23 +26,24 @@
   --hitl-amber: #d97706;
   --hitl-amber-dim: rgba(217, 119, 6, 0.06);
   --hitl-amber-glow: rgba(217, 119, 6, 0.18);
-  --danger: #dc2626;
-  --danger-dim: rgba(220, 38, 38, 0.06);
-  --success: #059669;
-  --success-dim: rgba(5, 150, 105, 0.07);
-  /* --font-display, --font-body, --font-mono are set by next/font/google
-     via className on <html> in layout.js. No static fallbacks needed. */
+  --danger: #DB3030;         /* palette.red.base */
+  --danger-dim: rgba(219, 48, 48, 0.06);
+  --success: #00684A;        /* palette.green.dark1 */
+  --success-dim: rgba(0, 104, 74, 0.07);
+  /* Override display font to prefer Euclid Circular A (MongoDB standard) */
+  --font-display: 'Euclid Circular A', var(--font-display-fallback, 'Manrope'), sans-serif;
+  --font-mono: 'Source Code Pro', var(--font-mono-fallback, 'JetBrains Mono'), monospace;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
   --radius-xl: 20px;
   --langsmith: #64748b;
-  --canvas-grid: #f1f5f9;
-  --canvas-inactive-stroke: #cbd5e1;
-  --canvas-inactive-fill: #f8fafc;
-  --canvas-text-active: #0f172a;
-  --canvas-text-inactive: #94a3b8;
-  --bg-header: rgba(255, 255, 255, 0.92);
+  --canvas-grid: #F9FBFA;   /* palette.gray.light3 */
+  --canvas-inactive-stroke: #C1C7C6; /* palette.gray.light1 */
+  --canvas-inactive-fill: #F9FBFA;   /* palette.gray.light3 */
+  --canvas-text-active: #001E2B;     /* palette.gray.dark3 */
+  --canvas-text-inactive: #89979B;   /* palette.gray.base */
+  --bg-header: #023430;     /* palette.green.dark2 — dark green header */
   --bg-overlay-alpha: rgba(255, 255, 255, 0.92);
   --bg-backdrop: rgba(241, 245, 249, 0.9);
   --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);

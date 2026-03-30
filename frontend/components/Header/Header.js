@@ -43,9 +43,9 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        background: "var(--bg-header)",
-        backdropFilter: "blur(16px)",
-        borderBottom: "1px solid var(--border-dim)",
+        background: "#023430",
+        backdropFilter: "none",
+        borderBottom: "1px solid rgba(255,255,255,0.1)",
         boxShadow: "var(--shadow-sm)",
       }}
     >
@@ -85,9 +85,10 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
             fontWeight: 700,
             fontSize: 16,
             letterSpacing: -0.3,
+            color: "#FFFFFF",
           }}
         >
-          Lend<em style={{ fontStyle: "normal", color: "var(--mongo)" }}>Flow</em>{" "}
+          Lend<em style={{ fontStyle: "normal", color: "#00ED64" }}>Flow</em>{" "}
           AI
         </span>
       </div>
@@ -114,15 +115,15 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
               gap: 6,
               padding: "7px 14px",
               borderRadius: 20,
-              border: "1px solid var(--border-dim)",
+              border: "1px solid rgba(255,255,255,0.1)",
               background:
                 activeScreen === screen.id
-                  ? "var(--mongo-dim)"
-                  : "var(--bg-raised)",
+                  ? "rgba(0, 237, 100, 0.15)"
+                  : "rgba(255,255,255,0.08)",
               color:
                 activeScreen === screen.id
-                  ? "var(--mongo)"
-                  : "var(--text-dim)",
+                  ? "#00ED64"
+                  : "rgba(255,255,255,0.7)",
               fontFamily: "var(--font-display)",
               fontSize: 12,
               fontWeight: 600,
@@ -143,8 +144,8 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
             onClick={onInfoOpen}
             style={{
               width: 28, height: 28, borderRadius: '50%',
-              border: '1px solid var(--border-dim)', background: 'var(--bg-surface)',
-              color: 'var(--text-dim)', fontFamily: 'var(--font-display)',
+              border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)',
+              color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-display)',
               fontSize: 12, fontWeight: 700, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
@@ -162,7 +163,7 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
               gap: 6,
               fontSize: 11,
               fontFamily: "var(--font-mono)",
-              color: "var(--text-dim)",
+              color: "rgba(255,255,255,0.6)",
             }}
           >
             <span
@@ -170,8 +171,8 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
                 width: 6,
                 height: 6,
                 borderRadius: "50%",
-                background: chip.on ? "var(--mongo)" : "var(--danger)",
-                boxShadow: chip.on ? "0 0 6px var(--mongo-glow)" : "none",
+                background: chip.on ? "#00ED64" : "#DB3030",
+                boxShadow: chip.on ? "0 0 6px rgba(0,237,100,0.4)" : "none",
               }}
             />
             {chip.label}
