@@ -147,22 +147,24 @@ async def applications_ws(websocket: WebSocket):
     - On DB change: server sends {"type": "change", "operation": "insert"|"update", "application": {...}}
     - Client sends "ping" → server responds {"type": "pong"}
     - On error: server sends {"type": "error", "message": "..."} and closes with 1011
-    - Clean disconnect: server closes change stream
+    - Server-side dead-client detection after 60s of no client messages
     """
     await websocket.accept()
     db = get_db()
     stream = None
+    last_client_msg = asyncio.get_event_loop().time()
 
     try:
-        # Send initial snapshot of all applications
-        apps = await asyncio.to_thread(application_service.list_applications)
-        await websocket.send_json({"type": "snapshot", "applications": apps})
-
-        # Open Change Stream on applications collection
+        # Open Change Stream FIRST (before snapshot) to avoid missed-update window
         pipeline = [
             {"$match": {"operationType": {"$in": ["insert", "update", "replace"]}}}
         ]
         stream = db["applications"].watch(pipeline, full_document="updateLookup")
+
+        # THEN send initial snapshot — any changes between stream open and snapshot
+        # read will be captured by the stream and delivered after the snapshot
+        apps = await asyncio.to_thread(application_service.list_applications)
+        await websocket.send_json({"type": "snapshot", "applications": apps})
 
         while True:
             # Poll for MongoDB changes (non-blocking via thread)
@@ -180,10 +182,17 @@ async def applications_ws(websocket: WebSocket):
             # Check for client messages (keepalive ping/pong)
             try:
                 msg = await asyncio.wait_for(websocket.receive_text(), timeout=0.01)
+                last_client_msg = asyncio.get_event_loop().time()
                 if msg == "ping":
                     await websocket.send_json({"type": "pong"})
             except asyncio.TimeoutError:
                 pass
+
+            # Dead client detection — close if no message for 60s
+            if asyncio.get_event_loop().time() - last_client_msg > 60:
+                logger.info("Application queue WS: client silent for 60s, closing")
+                await websocket.close(code=1001)
+                break
 
             if not change:
                 await asyncio.sleep(0.5)

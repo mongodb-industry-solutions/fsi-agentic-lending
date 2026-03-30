@@ -54,9 +54,10 @@ export async function apiUpload(path, file, fields = {}) {
  * WebSocket client with automatic reconnection.
  * Connects directly to the backend (Next.js rewrites don't support WS).
  */
-const WS_BASE = typeof window !== 'undefined'
-  ? `ws://${window.location.hostname}:8000/api`
-  : 'ws://localhost:8000/api';
+const WS_BASE = process.env.NEXT_PUBLIC_WS_BASE
+  ?? (typeof window !== 'undefined'
+    ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8000/api`
+    : 'ws://localhost:8000/api');
 
 export function apiWebSocket(path, { onMessage, onError, onClose, reconnect = true, maxRetries = 5 } = {}) {
   let ws = null;
@@ -78,6 +79,8 @@ export function apiWebSocket(path, { onMessage, onError, onClose, reconnect = tr
     ws.onopen = () => {
       console.info(`[LendFlow WS] Connected: ${path}`);
       retries = 0;
+      // Clear any stale interval from prior connection
+      if (pingInterval) clearInterval(pingInterval);
       // Keepalive ping every 30s
       pingInterval = setInterval(() => {
         if (ws && ws.readyState === WebSocket.OPEN) {

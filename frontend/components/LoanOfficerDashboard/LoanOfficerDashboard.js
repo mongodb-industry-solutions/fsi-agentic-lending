@@ -1162,15 +1162,16 @@ export default function LoanOfficerDashboard() {
   const showPreview = isPrimaryApp && workflowPhase === 'preview' && (autonomyLevel === 'observe' || autonomyLevel === 'suggest');
 
   // Real-time application queue via WebSocket + MongoDB Change Stream
+  const snapshotReceived = useRef(false);
   useEffect(() => {
+    snapshotReceived.current = false;
     const ws = apiWebSocket('/applications/ws', {
       onMessage: (data) => {
         if (data.type === 'snapshot') {
-          // Initial load — full list from backend
-          if (data.applications?.length > 0) {
-            setLiveApplications(data.applications);
-          }
-        } else if (data.type === 'change') {
+          // Initial load — full list from backend (including empty queue)
+          snapshotReceived.current = true;
+          setLiveApplications(data.applications ?? []);
+        } else if (data.type === 'change' && snapshotReceived.current) {
           // Real-time update — insert or update a single application
           const app = data.application;
           if (app) {
