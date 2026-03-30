@@ -1,0 +1,49 @@
+"""
+MongoDB collection definitions for LendFlow AI.
+6 core collections for the lending lifecycle.
+"""
+
+COLLECTIONS = {
+    "borrowers": {
+        "description": "Applicant identity and demographics",
+        "indexes": [
+            {"keys": [("email", 1)], "unique": True},
+        ],
+    },
+    "applications": {
+        "description": "Loan application state machine",
+        "indexes": [
+            {"keys": [("application_id", 1)], "unique": True},
+            {"keys": [("status", 1), ("created_at", -1)]},
+        ],
+    },
+    "documents": {
+        "description": "Uploaded docs with extracted text and structured data",
+        "indexes": [
+            {"keys": [("application_id", 1), ("doc_type", 1)]},
+        ],
+    },
+    "credit_reports": {
+        "description": "Structured credit bureau data",
+        "indexes": [
+            {"keys": [("borrower_id", 1)]},
+        ],
+    },
+    "underwriting_policies": {
+        "description": "RAG-searchable underwriting policy text",
+        "indexes": [
+            {"keys": [("policy_id", 1)], "unique": True},
+        ],
+    },
+    "agent_activity": {
+        "description": "Time-series of agent actions (time-series collection)",
+        "time_series": {
+            "timeField": "timestamp",
+            "metaField": "application_id",
+            "granularity": "seconds",
+        },
+        "indexes": [
+            {"keys": [("application_id", 1), ("timestamp", -1)]},
+        ],
+    },
+}
