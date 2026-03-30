@@ -458,15 +458,20 @@ export default function StatusTracker({ onNotification, applicationId }) {
         )}
       </div>
 
-      {/* Progress bar */}
-      <div style={{ height: 4, background: 'var(--bg-raised)', borderRadius: 2, marginBottom: 24, overflow: 'hidden' }}>
-        <div style={{
-          height: '100%',
-          width: `${((activeStage + 1) / STAGES.length) * 100}%`,
-          background: isActionStage ? 'var(--hitl-amber)' : 'var(--mongo)',
-          borderRadius: 2,
-          transition: 'width 0.6s ease-out, background 0.3s',
-        }} />
+      {/* Segmented progress rail */}
+      <div style={{ display: 'flex', gap: 2, padding: '0 0 24px', flexShrink: 0 }}>
+        {STAGES.map((stage, i) => {
+          const isSegComplete = i < activeStage;
+          const isSegActive = i === activeStage;
+          return (
+            <div key={stage.id} style={{
+              flex: 1, height: 4, borderRadius: 2,
+              background: isSegComplete ? 'var(--mongo)' : isSegActive ? 'var(--hitl-amber)' : 'var(--border-dim)',
+              transition: 'background 0.4s ease',
+              animation: isSegActive ? 'pulse 1.5s infinite' : undefined,
+            }} />
+          );
+        })}
       </div>
 
       {/* Timeline */}

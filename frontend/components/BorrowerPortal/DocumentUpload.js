@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { apiGet, apiUpload } from '../../lib/api';
-import DocumentJsonViewer from '../DocumentJsonViewer';
+import DocumentViewer from '../DocumentViewer';
 
 const INITIAL_DOCUMENTS = [
   {
@@ -180,7 +180,7 @@ function inferDocType(filename) {
   return 'unknown';
 }
 
-function DocCard({ doc, onViewJson }) {
+function DocCard({ doc, onViewDoc }) {
   return (
     <div style={{
       padding: 14,
@@ -208,35 +208,20 @@ function DocCard({ doc, onViewJson }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
           <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)', flex: 1, minWidth: 0 }}>{doc.type}</div>
           {doc.mongoId && (
-            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-              <button
-                type="button"
-                onClick={() => window.open(`/api/backend/documents/${doc.mongoId}/pdf`, '_blank')}
-                title="View PDF"
-                style={{
-                  width: 24, height: 24, borderRadius: 4,
-                  border: '1px solid var(--border-dim)', background: 'var(--bg-surface)',
-                  color: 'var(--text-dim)', fontSize: 12, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                {'\u{1F4C4}'}
-              </button>
-              <button
-                type="button"
-                onClick={() => onViewJson(doc.mongoId)}
-                title="View MongoDB JSON"
-                style={{
-                  width: 24, height: 24, borderRadius: 4,
-                  border: '1px solid var(--border-dim)', background: 'var(--bg-surface)',
-                  color: 'var(--mongo)', fontSize: 10, fontFamily: 'var(--font-mono)',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: 700,
-                }}
-              >
-                {"{}"}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => onViewDoc(doc.mongoId)}
+              title="View document"
+              style={{
+                padding: '3px 8px', borderRadius: 4,
+                border: '1px solid var(--border-dim)', background: 'var(--bg-surface)',
+                color: 'var(--mongo)', fontSize: 9, fontFamily: 'var(--font-display)',
+                fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3,
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ fontSize: 11 }}>📄</span> View
+            </button>
           )}
         </div>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -278,7 +263,7 @@ function DocCard({ doc, onViewJson }) {
 export default function DocumentUpload({ applicationId }) {
   const [dragOver, setDragOver] = useState(false);
   const [documents, setDocuments] = useState(INITIAL_DOCUMENTS);
-  const [viewingJsonId, setViewingJsonId] = useState(null);
+  const [viewingDocId, setViewingDocId] = useState(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -376,7 +361,7 @@ export default function DocumentUpload({ applicationId }) {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
         {documents.map((doc) => (
-          <DocCard key={doc.id} doc={doc} onViewJson={setViewingJsonId} />
+          <DocCard key={doc.id} doc={doc} onViewDoc={setViewingDocId} />
         ))}
       </div>
 
@@ -402,9 +387,7 @@ export default function DocumentUpload({ applicationId }) {
         </div>
       </div>
 
-      {viewingJsonId && (
-        <DocumentJsonViewer docId={viewingJsonId} onClose={() => setViewingJsonId(null)} />
-      )}
+      {viewingDocId && <DocumentViewer docId={viewingDocId} onClose={() => setViewingDocId(null)} />}
     </div>
   );
 }
