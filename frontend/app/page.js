@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Header from "../components/Header/Header";
 import BorrowerPortal from "../components/BorrowerPortal/BorrowerPortal";
 import LoanOfficerDashboard from "../components/LoanOfficerDashboard/LoanOfficerDashboard";
@@ -10,19 +10,6 @@ import InfoWizardPanel from "../components/educational/InfoWizardPanel";
 export default function Home() {
   const [activeScreen, setActiveScreen] = useState("borrower");
   const [infoWizardOpen, setInfoWizardOpen] = useState(false);
-  const [theme, setTheme] = useState(() => {
-    if (typeof document === 'undefined') return 'light';
-    return document.documentElement.getAttribute('data-theme') || 'light';
-  });
-
-  const toggleTheme = () => {
-    setTheme((prev) => {
-      const next = prev === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('lendflow-theme', next);
-      return next;
-    });
-  };
 
   const renderScreen = () => {
     switch (activeScreen) {
@@ -39,7 +26,7 @@ export default function Home() {
 
   return (
     <>
-      <Header activeScreen={activeScreen} onScreenChange={setActiveScreen} onInfoOpen={() => setInfoWizardOpen(true)} theme={theme} onThemeToggle={toggleTheme} />
+      <Header activeScreen={activeScreen} onScreenChange={setActiveScreen} onInfoOpen={() => setInfoWizardOpen(true)} />
       <main className="app-main" style={{ paddingTop: 52 }}>
         <div key={activeScreen} className="screen-content">
           {renderScreen()}
