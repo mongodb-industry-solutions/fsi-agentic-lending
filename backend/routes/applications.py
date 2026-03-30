@@ -32,6 +32,8 @@ async def create_application(req: ApplicationCreateRequest):
 @router.get("/applications")
 async def list_applications(skip: int = 0, limit: int = 50):
     """List all applications."""
+    limit = min(max(limit, 1), 200)
+    skip = max(skip, 0)
     return application_service.list_applications(skip=skip, limit=limit)
 
 

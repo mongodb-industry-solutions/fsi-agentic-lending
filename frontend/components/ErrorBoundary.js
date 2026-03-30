@@ -4,7 +4,7 @@ import React from 'react';
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, resetKey: 0 };
   }
 
   static getDerivedStateFromError(error) {
@@ -31,7 +31,7 @@ class ErrorBoundary extends React.Component {
           </div>
           <button
             type="button"
-            onClick={() => this.setState({ hasError: false, error: null })}
+            onClick={() => this.setState(s => ({ hasError: false, error: null, resetKey: s.resetKey + 1 }))}
             style={{
               padding: '8px 16px', borderRadius: 'var(--radius-sm)',
               border: '1px solid var(--border-base)', background: 'var(--bg-surface)',
@@ -44,7 +44,7 @@ class ErrorBoundary extends React.Component {
         </div>
       );
     }
-    return this.props.children;
+    return <div key={this.state.resetKey}>{this.props.children}</div>;
   }
 }
 

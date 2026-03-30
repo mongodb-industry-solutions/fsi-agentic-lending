@@ -63,6 +63,8 @@ def main():
 
     # Create standard indexes
     for coll_name, coll_config in COLLECTIONS.items():
+        if "time_series" in coll_config:
+            continue  # Time-series indexes managed at collection creation
         for idx in coll_config.get("indexes", []):
             print(f"Creating index on {coll_name}: {idx['keys']}")
             db[coll_name].create_index(

@@ -193,42 +193,36 @@ def get_portfolio_stats() -> dict:
     """Aggregation pipeline that groups payments to get active loan count, total outstanding, delinquency rate."""
     db = _get_db()
     pipeline = [
-        # Get the latest payment per loan
+        # Get all payments
         {"$sort": {"timestamp": -1}},
+        # Group by loan — get latest balance and count late payments
         {"$group": {
             "_id": "$loan_id",
             "latest_balance": {"$first": "$outstanding_balance"},
-            "latest_days_late": {"$first": "$days_late"},
-            "latest_status": {"$first": "$status"},
+            "total_payments": {"$sum": 1},
+            "late_payments": {"$sum": {"$cond": [{"$gt": ["$days_late", 0]}, 1, 0]}},
         }},
-        # Compute portfolio-level stats
+        # Aggregate across all loans
         {"$group": {
             "_id": None,
-            "active_loans": {"$sum": 1},
+            "active_loan_count": {"$sum": 1},
             "total_outstanding": {"$sum": "$latest_balance"},
-            "delinquent_count": {"$sum": {"$cond": [{"$gt": ["$latest_days_late", 0]}, 1, 0]}},
+            "delinquent_loans": {"$sum": {"$cond": [{"$gt": ["$late_payments", 0]}, 1, 0]}},
+            "total_loan_count": {"$sum": 1},
         }},
-        {"$project": {
-            "_id": 0,
-            "active_loans": 1,
-            "total_outstanding": 1,
-            "delinquent_count": 1,
-            "delinquency_rate": {
-                "$cond": [
-                    {"$gt": ["$active_loans", 0]},
-                    {"$multiply": [{"$divide": ["$delinquent_count", "$active_loans"]}, 100]},
-                    0,
-                ]
-            },
+        {"$addFields": {
+            "delinquency_rate": {"$multiply": [
+                {"$divide": ["$delinquent_loans", {"$max": ["$total_loan_count", 1]}]},
+                100,
+            ]},
         }},
     ]
-    results = list(db["payments"].aggregate(pipeline))
-    return results[0] if results else {
-        "active_loans": 0,
-        "total_outstanding": 0,
-        "delinquent_count": 0,
-        "delinquency_rate": 0,
-    }
+    result = list(db["payments"].aggregate(pipeline))
+    if not result:
+        return {"active_loan_count": 0, "total_outstanding": 0, "delinquency_rate": 0}
+    r = result[0]
+    r.pop("_id", None)
+    return r
 
 
 def get_payment_trends(loan_id: str = None) -> list:
@@ -253,7 +247,7 @@ def get_payment_trends(loan_id: str = None) -> list:
                     "window": {"range": [-90, 0], "unit": "day"},
                 },
                 "rolling_payment_count": {
-                    "$count": {},
+                    "$sum": 1,
                     "window": {"range": [-90, 0], "unit": "day"},
                 },
             },

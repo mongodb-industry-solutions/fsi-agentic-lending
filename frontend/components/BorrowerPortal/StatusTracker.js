@@ -175,6 +175,47 @@ export default function StatusTracker({ onNotification, applicationId }) {
     if (onNotification) onNotification({ stage, time, ...extra });
   }, [onNotification]);
 
+  const advanceStageLoop = useCallback(() => {
+    stageIdxRef.current++;
+    if (stageIdxRef.current >= STAGES.length) return;
+
+    const stage = STAGES[stageIdxRef.current];
+    const now = new Date();
+    setActiveStage(stageIdxRef.current);
+    setTimestamps((prev) => [...prev, now]);
+    sendNotification(stage, now);
+
+    // Send intervention sub-notifications for stages with interventions
+    if (stage.interventions) {
+      stage.interventions.forEach((intv, idx) => {
+        setTimeout(() => {
+          sendNotification(
+            { id: `${stage.id}-issue-${idx}`, label: `Issue Detected`, icon: '⚠', detail: intv.issue },
+            new Date(),
+            { subType: 'intervention-issue', parentStage: stage.id }
+          );
+          setTimeout(() => {
+            sendNotification(
+              { id: `${stage.id}-fix-${idx}`, label: `Resolved by AI`, icon: '🔧', detail: intv.resolution },
+              new Date(),
+              { subType: 'intervention-resolved', parentStage: stage.id }
+            );
+          }, 800);
+        }, 600 + idx * 1600);
+      });
+    }
+
+    // Pause at action-required stages
+    if (stage.type === 'action-required') {
+      setActionPaused(true);
+      return;
+    }
+
+    if (stageIdxRef.current < STAGES.length - 1) {
+      timerRef.current = setTimeout(advanceStageLoop, STAGES[stageIdxRef.current + 1].delayMs);
+    }
+  }, [sendNotification]);
+
   const advanceFromAction = useCallback(() => {
     if (!actionPaused) return;
     setActionUploading(true);
@@ -224,47 +265,6 @@ export default function StatusTracker({ onNotification, applicationId }) {
       }
     }, 2000);
   }, [actionPaused, sendNotification, advanceStageLoop]);
-
-  const advanceStageLoop = useCallback(() => {
-    stageIdxRef.current++;
-    if (stageIdxRef.current >= STAGES.length) return;
-
-    const stage = STAGES[stageIdxRef.current];
-    const now = new Date();
-    setActiveStage(stageIdxRef.current);
-    setTimestamps((prev) => [...prev, now]);
-    sendNotification(stage, now);
-
-    // Send intervention sub-notifications for stages with interventions
-    if (stage.interventions) {
-      stage.interventions.forEach((intv, idx) => {
-        setTimeout(() => {
-          sendNotification(
-            { id: `${stage.id}-issue-${idx}`, label: `Issue Detected`, icon: '⚠', detail: intv.issue },
-            new Date(),
-            { subType: 'intervention-issue', parentStage: stage.id }
-          );
-          setTimeout(() => {
-            sendNotification(
-              { id: `${stage.id}-fix-${idx}`, label: `Resolved by AI`, icon: '🔧', detail: intv.resolution },
-              new Date(),
-              { subType: 'intervention-resolved', parentStage: stage.id }
-            );
-          }, 800);
-        }, 600 + idx * 1600);
-      });
-    }
-
-    // Pause at action-required stages
-    if (stage.type === 'action-required') {
-      setActionPaused(true);
-      return;
-    }
-
-    if (stageIdxRef.current < STAGES.length - 1) {
-      timerRef.current = setTimeout(advanceStageLoop, STAGES[stageIdxRef.current + 1].delayMs);
-    }
-  }, [sendNotification]);
 
   useEffect(() => {
     // SSE drives progression when connected — skip timer-based progression

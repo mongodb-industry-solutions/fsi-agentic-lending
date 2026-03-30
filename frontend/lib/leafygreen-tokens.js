@@ -18,9 +18,4 @@ export const colors = {
   headerBg: palette.green.dark2,    // #023430
 };
 
-// LeafyGreen spacing scale (from @leafygreen-ui/tokens)
-export const sp = {
-  0: 0, 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24, 7: 32, 8: 40, 9: 48,
-};
-
 export { palette, spacing };
