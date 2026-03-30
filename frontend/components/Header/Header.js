@@ -46,6 +46,7 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
         background: "var(--bg-header)",
         backdropFilter: "blur(16px)",
         borderBottom: "1px solid var(--border-dim)",
+        boxShadow: "var(--shadow-sm)",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
