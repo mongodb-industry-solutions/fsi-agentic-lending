@@ -25,7 +25,7 @@ export default function Home() {
   return (
     <>
       <Header activeScreen={activeScreen} onScreenChange={setActiveScreen} />
-      <main style={{ paddingTop: 52 }}>
+      <main className="app-main" style={{ paddingTop: 52 }}>
         <div key={activeScreen} className="screen-content">
           {renderScreen()}
         </div>

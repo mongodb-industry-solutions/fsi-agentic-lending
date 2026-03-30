@@ -41,12 +41,14 @@ function FormSection({ title, children }) {
 }
 
 function Field({ label, value, onChange, type = 'text', span2 = false, readOnly = false }) {
+  const fieldId = `field-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-$/, '')}`;
   return (
     <div style={{ gridColumn: span2 ? 'span 2' : undefined }}>
-      <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block', marginBottom: 3 }}>
+      <label htmlFor={fieldId} style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block', marginBottom: 3 }}>
         {label}
       </label>
       <input
+        id={fieldId}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}

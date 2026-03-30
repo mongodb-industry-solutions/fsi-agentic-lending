@@ -29,9 +29,8 @@
   --danger-dim: rgba(220, 38, 38, 0.06);
   --success: #059669;
   --success-dim: rgba(5, 150, 105, 0.07);
-  --font-display: "Manrope", sans-serif;
-  --font-body: "DM Sans", sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  /* --font-display, --font-body, --font-mono are set by next/font/google
+     via className on <html> in layout.js. No static fallbacks needed. */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;

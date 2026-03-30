@@ -11,14 +11,16 @@ export function useCountUp(target, duration = 1500, enabled = true) {
       return;
     }
     let start = null;
+    let frameId;
     const step = (timestamp) => {
       if (!start) start = timestamp;
       const elapsed = timestamp - start;
       const progress = Math.min(elapsed / duration, 1);
       setValue(Math.round(progress * target));
-      if (progress < 1) requestAnimationFrame(step);
+      if (progress < 1) frameId = requestAnimationFrame(step);
     };
-    requestAnimationFrame(step);
+    frameId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frameId);
   }, [target, duration, enabled]);
 
   return value;

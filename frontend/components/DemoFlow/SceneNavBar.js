@@ -28,7 +28,7 @@ export default function SceneNavBar({
         flexWrap: 'wrap',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 0, flex: 1, minWidth: 0 }}>
+      <div aria-label="Demo stages" style={{ display: 'flex', alignItems: 'center', gap: 0, flex: 1, minWidth: 0 }}>
         {SCENE_META.map((s, i) => {
           const active = i === currentScene;
           const visited = i < currentScene;
@@ -36,6 +36,7 @@ export default function SceneNavBar({
             <div key={s.key} style={{ display: 'flex', alignItems: 'center' }}>
               <button
                 type="button"
+                aria-current={active ? "step" : undefined}
                 onClick={() => onGoToScene(i)}
                 style={{
                   display: 'flex',
