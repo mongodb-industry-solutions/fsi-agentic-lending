@@ -171,6 +171,52 @@ def create_policies(db):
     print(f"  Upserted {len(policies)} underwriting policies")
 
 
+def create_payment_history(db):
+    """Insert 36 monthly payment records for loan L-00001."""
+    from dateutil.relativedelta import relativedelta
+
+    # Idempotency check
+    if db["payments"].count_documents({"loan_id": "L-00001"}) > 0:
+        print("  Payment history already exists, skipping")
+        return
+
+    loan_amount = 700000
+    annual_rate = 0.0489
+    monthly_rate = annual_rate / 12
+    amort_months = 300  # 25 years
+    monthly_payment = 4047.39
+
+    outstanding = loan_amount
+    start_date = datetime(2023, 7, 1, tzinfo=timezone.utc)
+    records = []
+
+    for month in range(1, 37):
+        interest = round(outstanding * monthly_rate, 2)
+        principal = round(monthly_payment - interest, 2)
+        outstanding = round(outstanding - principal, 2)
+
+        # Month 32 is late
+        days_late = 47 if month == 32 else 0
+        status = "late" if days_late > 0 else "on_time"
+
+        ts = start_date + relativedelta(months=month - 1)
+
+        records.append({
+            "loan_id": "L-00001",
+            "payment_number": month,
+            "amount": monthly_payment,
+            "principal": principal,
+            "interest": interest,
+            "outstanding_balance": max(outstanding, 0),
+            "days_late": days_late,
+            "status": status,
+            "timestamp": ts,
+        })
+
+    db["payments"].insert_many(records)
+    print(f"  Inserted {len(records)} payment records for L-00001")
+
+
 def main():
     # Initialize
     db_connector = MongoDBConnector()
@@ -263,6 +309,12 @@ def main():
     print("=" * 60)
     create_policies(db)
 
+    # Step 6: Insert payment history
+    print("\n" + "=" * 60)
+    print("STEP 6: Inserting payment history")
+    print("=" * 60)
+    create_payment_history(db)
+
     # Summary
     print("\n" + "=" * 60)
     print("INGESTION COMPLETE")
@@ -272,6 +324,7 @@ def main():
     print(f"  Documents: {db['documents'].count_documents({})}")
     print(f"  Credit Reports: {db['credit_reports'].count_documents({})}")
     print(f"  Policies: {db['underwriting_policies'].count_documents({})}")
+    print(f"  Payments: {db['payments'].count_documents({})}")
 
 
 if __name__ == "__main__":

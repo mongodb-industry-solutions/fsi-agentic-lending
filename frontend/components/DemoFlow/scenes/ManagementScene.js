@@ -7,8 +7,9 @@ import WorkflowCanvas from '../WorkflowCanvas';
 import AnnotationOverlay from '../AnnotationOverlay';
 import DataSourceStrip from '../DataSourceStrip';
 import PipelineTimeline from '../PipelineTimeline';
+import { apiGet } from '../../../lib/api';
 
-const STATS = [
+const DEFAULT_STATS = [
   { label: 'Active Loans', value: 4287, format: (v) => v.toLocaleString(), color: 'var(--mongo)' },
   { label: 'Portfolio Value', value: 1.2, format: (v) => `$${v.toFixed(1)}B`, color: 'var(--agent-cyan)' },
   { label: 'Delinquency Rate', value: 2.4, format: (v) => `${v.toFixed(1)}%`, color: 'var(--hitl-amber)' },
@@ -23,7 +24,7 @@ const EWS_SIGNALS = [
   { signal: 'External event', status: 'green', detail: 'No adverse events detected', icon: '✓' },
 ];
 
-const MONTHLY_DATA = [
+const DEFAULT_MONTHLY_DATA = [
   { month: 'Jan', value: 42 }, { month: 'Feb', value: 38 }, { month: 'Mar', value: 45 },
   { month: 'Apr', value: 52 }, { month: 'May', value: 48 }, { month: 'Jun', value: 55 },
   { month: 'Jul', value: 61 }, { month: 'Aug', value: 58 }, { month: 'Sep', value: 63 },
@@ -293,6 +294,44 @@ export default function ManagementScene({ sceneStep, currentStepData }) {
   const [hoveredNode, setHoveredNode] = useState(null);
   const [timelineHighlight, setTimelineHighlight] = useState(null);
 
+  const [liveStats, setLiveStats] = useState(null);
+  const [liveMonthly, setLiveMonthly] = useState(null);
+
+  useEffect(() => {
+    if (sceneStep < 0) return;
+    let cancelled = false;
+
+    async function fetchPortfolioData() {
+      try {
+        const [statsRes, paymentsRes] = await Promise.all([
+          apiGet('/api/backend/portfolio/stats'),
+          apiGet('/api/backend/portfolio/payments?loan_id=L-00001'),
+        ]);
+        if (cancelled) return;
+
+        if (statsRes && statsRes.active_loans !== undefined) {
+          setLiveStats(statsRes);
+        }
+        if (Array.isArray(paymentsRes) && paymentsRes.length > 0) {
+          const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          const mapped = paymentsRes
+            .slice()
+            .reverse()
+            .map((p) => {
+              const d = new Date(p.timestamp);
+              return { month: MONTH_NAMES[d.getMonth()], value: Math.round(p.amount / 100) };
+            });
+          setLiveMonthly(mapped);
+        }
+      } catch {
+        // Keep fallback data on error
+      }
+    }
+
+    fetchPortfolioData();
+    return () => { cancelled = true; };
+  }, [sceneStep]);
+
   const handleNodeHover = useCallback((nodeId) => setHoveredNode(nodeId), []);
   const handleTimelineHover = useCallback((nodeId) => setTimelineHighlight(nodeId), []);
 
@@ -328,13 +367,21 @@ export default function ManagementScene({ sceneStep, currentStepData }) {
           />
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-              {STATS.map((s) => <AnimatedStat key={s.label} stat={s} />)}
+              {(liveStats
+                ? [
+                    { label: 'Active Loans', value: liveStats.active_loans, format: (v) => v.toLocaleString(), color: 'var(--mongo)' },
+                    { label: 'Total Outstanding', value: liveStats.total_outstanding, format: (v) => `$${(v / 1000).toFixed(0)}K`, color: 'var(--agent-cyan)' },
+                    { label: 'Delinquency Rate', value: liveStats.delinquency_rate, format: (v) => `${v.toFixed(1)}%`, color: 'var(--hitl-amber)' },
+                    { label: 'EWS Alerts', value: liveStats.delinquent_count || 0, format: (v) => `${Math.round(v)} active`, color: 'var(--danger)' },
+                  ]
+                : DEFAULT_STATS
+              ).map((s) => <AnimatedStat key={s.label} stat={s} />)}
             </div>
 
             {showEWS && <EWSPanel highlightAlert={showAlertHighlight} />}
             {showPSI && <PSIHealthIndicator />}
 
-            <BarChart data={MONTHLY_DATA} label="Monthly Payment Volume ($M)" badge="Time Series" />
+            <BarChart data={liveMonthly || DEFAULT_MONTHLY_DATA} label="Monthly Payment Volume ($M)" badge="Time Series &middot; $setWindowFields" />
             <LiveEventFeed sceneStep={sceneStep} />
 
             {showRenewalAgent && <RenewalInterventionCard sceneStep={sceneStep} />}

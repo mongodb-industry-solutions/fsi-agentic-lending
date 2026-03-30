@@ -189,6 +189,96 @@ def run_risk_aggregation(application_id: str) -> dict:
     return result
 
 
+def get_portfolio_stats() -> dict:
+    """Aggregation pipeline that groups payments to get active loan count, total outstanding, delinquency rate."""
+    db = _get_db()
+    pipeline = [
+        # Get the latest payment per loan
+        {"$sort": {"timestamp": -1}},
+        {"$group": {
+            "_id": "$loan_id",
+            "latest_balance": {"$first": "$outstanding_balance"},
+            "latest_days_late": {"$first": "$days_late"},
+            "latest_status": {"$first": "$status"},
+        }},
+        # Compute portfolio-level stats
+        {"$group": {
+            "_id": None,
+            "active_loans": {"$sum": 1},
+            "total_outstanding": {"$sum": "$latest_balance"},
+            "delinquent_count": {"$sum": {"$cond": [{"$gt": ["$latest_days_late", 0]}, 1, 0]}},
+        }},
+        {"$project": {
+            "_id": 0,
+            "active_loans": 1,
+            "total_outstanding": 1,
+            "delinquent_count": 1,
+            "delinquency_rate": {
+                "$cond": [
+                    {"$gt": ["$active_loans", 0]},
+                    {"$multiply": [{"$divide": ["$delinquent_count", "$active_loans"]}, 100]},
+                    0,
+                ]
+            },
+        }},
+    ]
+    results = list(db["payments"].aggregate(pipeline))
+    return results[0] if results else {
+        "active_loans": 0,
+        "total_outstanding": 0,
+        "delinquent_count": 0,
+        "delinquency_rate": 0,
+    }
+
+
+def get_payment_trends(loan_id: str = None) -> list:
+    """Uses $setWindowFields with a rolling 90-day window for average days_late and payment count."""
+    db = _get_db()
+
+    match_stage = {}
+    if loan_id:
+        match_stage = {"$match": {"loan_id": loan_id}}
+
+    pipeline = []
+    if match_stage:
+        pipeline.append(match_stage)
+
+    pipeline.extend([
+        {"$setWindowFields": {
+            "partitionBy": "$loan_id",
+            "sortBy": {"timestamp": 1},
+            "output": {
+                "rolling_avg_days_late": {
+                    "$avg": "$days_late",
+                    "window": {"range": [-90, 0], "unit": "day"},
+                },
+                "rolling_payment_count": {
+                    "$count": {},
+                    "window": {"range": [-90, 0], "unit": "day"},
+                },
+            },
+        }},
+        {"$sort": {"timestamp": -1}},
+        {"$limit": 12},
+        {"$project": {
+            "_id": 0,
+            "loan_id": 1,
+            "payment_number": 1,
+            "amount": 1,
+            "principal": 1,
+            "interest": 1,
+            "outstanding_balance": 1,
+            "days_late": 1,
+            "status": 1,
+            "timestamp": 1,
+            "rolling_avg_days_late": 1,
+            "rolling_payment_count": 1,
+        }},
+    ])
+
+    return list(db["payments"].aggregate(pipeline))
+
+
 def update_application_status(application_id: str, status: str, detail: str = ""):
     """Update application status."""
     db = _get_db()

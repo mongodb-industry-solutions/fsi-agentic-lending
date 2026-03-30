@@ -42,6 +42,25 @@ def main():
         else:
             raise
 
+    # Create time-series collection for payments
+    print("Creating payments time-series collection...")
+    ts_payments_config = COLLECTIONS["payments"]["time_series"]
+    try:
+        db.create_collection(
+            "payments",
+            timeseries={
+                "timeField": ts_payments_config["timeField"],
+                "metaField": ts_payments_config["metaField"],
+                "granularity": ts_payments_config["granularity"],
+            },
+        )
+        print("  Created payments time-series collection")
+    except Exception as e:
+        if "already exists" in str(e):
+            print("  payments already exists, skipping")
+        else:
+            raise
+
     # Create standard indexes
     for coll_name, coll_config in COLLECTIONS.items():
         for idx in coll_config.get("indexes", []):

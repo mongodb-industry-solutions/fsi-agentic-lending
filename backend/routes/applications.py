@@ -35,6 +35,24 @@ async def list_applications():
     return application_service.list_applications()
 
 
+@router.get("/portfolio/stats")
+async def portfolio_stats():
+    from agents.tools import get_portfolio_stats
+    result = await asyncio.to_thread(get_portfolio_stats)
+    return result
+
+
+@router.get("/portfolio/payments")
+async def portfolio_payments(loan_id: str = None):
+    from agents.tools import get_payment_trends
+    results = await asyncio.to_thread(get_payment_trends, loan_id)
+    # Serialize timestamps
+    for r in results:
+        if hasattr(r.get("timestamp"), "isoformat"):
+            r["timestamp"] = r["timestamp"].isoformat()
+    return results
+
+
 @router.get("/applications/{app_id}")
 async def get_application(app_id: str):
     """Get full application with documents and credit reports."""

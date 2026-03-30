@@ -46,4 +46,15 @@ COLLECTIONS = {
             {"keys": [("application_id", 1), ("timestamp", -1)]},
         ],
     },
+    "payments": {
+        "description": "Time-series of loan payment history",
+        "time_series": {
+            "timeField": "timestamp",
+            "metaField": "loan_id",
+            "granularity": "hours",
+        },
+        "indexes": [
+            {"keys": [("loan_id", 1), ("timestamp", -1)]},
+        ],
+    },
 }
