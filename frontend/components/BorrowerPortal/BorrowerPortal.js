@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from 'react';
+import { spacing } from '@leafygreen-ui/tokens';
 import ApplicationForm from './ApplicationForm';
 import DocumentUpload from './DocumentUpload';
 import StatusTracker from './StatusTracker';

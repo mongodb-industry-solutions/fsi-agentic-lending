@@ -223,7 +223,7 @@ export default function StatusTracker({ onNotification, applicationId }) {
         }
       }
     }, 2000);
-  }, [actionPaused, sendNotification]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [actionPaused, sendNotification, advanceStageLoop]);
 
   const advanceStageLoop = useCallback(() => {
     stageIdxRef.current++;
