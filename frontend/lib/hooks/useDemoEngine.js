@@ -13,6 +13,7 @@ export function useDemoEngine() {
   const [speed, setSpeed] = useState(1);
   const [hitlWaiting, setHitlWaiting] = useState(false);
   const [hitlApproved, setHitlApproved] = useState(false);
+  const [hitlDeclined, setHitlDeclined] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
 
   const stepTimerRef = useRef(null);
@@ -200,6 +201,8 @@ export function useDemoEngine() {
       setCurrentScene(idx);
       setSceneStep(-1);
       setHitlWaiting(false);
+      setHitlApproved(false);
+      setHitlDeclined(false);
     },
     [pause],
   );
@@ -218,6 +221,7 @@ export function useDemoEngine() {
     setSceneStep(-1);
     setHitlWaiting(false);
     setHitlApproved(false);
+    setHitlDeclined(false);
     setElapsedMs(0);
     startTimeRef.current = 0;
   }, [pause]);
@@ -230,6 +234,11 @@ export function useDemoEngine() {
       setSceneStep(sceneStep + 1);
     }
   }, [currentScene, sceneStep]);
+
+  const declineHitl = useCallback(() => {
+    setHitlWaiting(false);
+    setHitlDeclined(true);
+  }, []);
 
   return {
     sceneMeta: SCENE_META,
@@ -245,6 +254,7 @@ export function useDemoEngine() {
     setSpeed,
     hitlWaiting,
     hitlApproved,
+    hitlDeclined,
     elapsedMs,
     activeFeatures,
     play,
@@ -255,5 +265,6 @@ export function useDemoEngine() {
     nextScene,
     prevScene,
     approveHitl,
+    declineHitl,
   };
 }

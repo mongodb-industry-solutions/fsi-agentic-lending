@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { APPROVAL_STEPS } from '../engine/demoScenes';
 import { mergeCanvasState } from '../engine/canvasUtils';
 import WorkflowCanvas from '../WorkflowCanvas';
@@ -52,9 +52,14 @@ const DISCLOSURES = [
   { rule: 'Fair Lending — ECOA / Reg B', met: true },
 ];
 
-export default function ApprovalScene({ sceneStep, hitlWaiting, hitlApproved, onApprove, onDecline, elapsedMs, currentStepData }) {
+export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, onApprove, onDecline, currentStepData }) {
   const [hoveredNode, setHoveredNode] = useState(null);
   const [timelineHighlight, setTimelineHighlight] = useState(null);
+  const [modifyMsg, setModifyMsg] = useState(false);
+
+  useEffect(() => {
+    setModifyMsg(false);
+  }, [hitlApproved, hitlDeclined]);
 
   const handleNodeHover = useCallback((nodeId) => setHoveredNode(nodeId), []);
   const handleTimelineHover = useCallback((nodeId) => setTimelineHighlight(nodeId), []);
@@ -134,6 +139,72 @@ export default function ApprovalScene({ sceneStep, hitlWaiting, hitlApproved, on
             </div>
           </div>
 
+          <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: 16 }}>
+            <PipelineTimeline
+              steps={APPROVAL_STEPS}
+              stepIndex={sceneStep}
+              onEntryHover={handleTimelineHover}
+              highlightNodeId={hoveredNode}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (hitlDeclined) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+        <DataSourceStrip sceneKey="approval" sceneStep={sceneStep} totalSteps={APPROVAL_STEPS.length} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', flex: 1, minHeight: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <WorkflowCanvas
+                activeNodes={canvasState.activeNodes}
+                activeEdges={canvasState.activeEdges}
+                pulsingNodes={canvasState.pulsingNodes}
+                completedNodes={canvasState.completedNodes}
+                currentScene="approval"
+                onNodeHover={handleNodeHover}
+                highlightNode={timelineHighlight}
+              />
+            </div>
+            <AnnotationOverlay
+              currentStep={currentStepData}
+              sceneTitle="Approval"
+              stepIndex={sceneStep}
+              totalSteps={APPROVAL_STEPS.length}
+            />
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: 16 }}>
+              <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>❌</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 22, color: 'var(--danger)', marginBottom: 4 }}>LOAN DECLINED</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  Application {PAYLOAD.applicationId} — {PAYLOAD.applicant}
+                </div>
+              </div>
+              <div style={{ padding: 16, background: 'var(--danger-dim)', borderRadius: 'var(--radius-md)', border: '1px solid var(--danger)', marginBottom: 16 }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--danger)', marginBottom: 8 }}>Decision Summary</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                  The loan officer has declined this application after manual review. The workflow state has been persisted to MongoDB via MongoDBSaver. An adverse action notice will be generated per ECOA/Reg B requirements.
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>Risk Score</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700, color: 'var(--danger)' }}>{PAYLOAD.riskScore}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>Loan Amount</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700 }}>{PAYLOAD.loanAmount}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>Reason</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>{PAYLOAD.triggerReason}</div>
+                </div>
+              </div>
+            </div>
+          </div>
           <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: 16 }}>
             <PipelineTimeline
               steps={APPROVAL_STEPS}
@@ -262,13 +333,27 @@ export default function ApprovalScene({ sceneStep, hitlWaiting, hitlApproved, on
               <button type="button" onClick={onApprove} style={{ flex: 1, padding: 14, borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--mongo)', color: '#ffffff', fontFamily: 'var(--font-display)', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
                 ✓ Approve Loan
               </button>
-              <button type="button" onClick={onApprove} style={{ flex: 1, padding: 14, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-base)', background: 'var(--bg-raised)', color: 'var(--text-primary)', fontFamily: 'var(--font-display)', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
+              <button type="button" onClick={() => setModifyMsg(true)} style={{ flex: 1, padding: 14, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-base)', background: 'var(--bg-raised)', color: 'var(--text-primary)', fontFamily: 'var(--font-display)', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
                 ✎ Modify Terms
               </button>
               <button type="button" onClick={onDecline} style={{ flex: 1, padding: 14, borderRadius: 'var(--radius-md)', border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', fontFamily: 'var(--font-display)', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
                 ✕ Decline
               </button>
             </div>
+            {modifyMsg && (
+              <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--hitl-amber-dim)', borderRadius: 'var(--radius-md)', border: '1px solid var(--hitl-amber)', fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 14 }}>ℹ️</span>
+                <span>Terms modification is not available in this demo. Approve or decline to continue.</span>
+                <button
+                  type="button"
+                  onClick={() => setModifyMsg(false)}
+                  style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 14, padding: 4 }}
+                  aria-label="Dismiss"
+                >
+                  ×
+                </button>
+              </div>
+            )}
 
             <div style={{ marginTop: 16, fontSize: 11, color: 'var(--text-dim)', textAlign: 'center' }}>
               Workflow will resume from this checkpoint — no data lost

@@ -79,11 +79,10 @@ export default function Demo() {
         return (
           <ApprovalScene
             sceneStep={engine.sceneStep}
-            hitlWaiting={engine.hitlWaiting}
             hitlApproved={engine.hitlApproved}
+            hitlDeclined={engine.hitlDeclined}
             onApprove={engine.approveHitl}
-            onDecline={engine.reset}
-            elapsedMs={engine.elapsedMs}
+            onDecline={engine.declineHitl}
             currentStepData={engine.currentStepData}
           />
         );
