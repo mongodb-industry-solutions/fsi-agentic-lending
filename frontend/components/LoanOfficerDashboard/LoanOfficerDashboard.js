@@ -8,7 +8,7 @@ import AutonomyDial from './AutonomyDial';
 import WorkflowCanvas from '../DemoFlow/WorkflowCanvas';
 import NotificationToast, { useToasts } from '../NotificationToast/NotificationToast';
 import BeforeAfterStat from '../educational/BeforeAfterStat';
-import { apiPost, apiGet, apiSSE } from '../../lib/api';
+import { apiPost, apiGet, apiSSE, apiWebSocket } from '../../lib/api';
 
 const WORKFLOW_STAGES = [
   {
@@ -1161,14 +1161,36 @@ export default function LoanOfficerDashboard() {
   const isPrimaryApp = selectedApp === 'APP-2026-00001';
   const showPreview = isPrimaryApp && workflowPhase === 'preview' && (autonomyLevel === 'observe' || autonomyLevel === 'suggest');
 
-  // Fetch real applications from backend (supplementary to hardcoded demo data)
+  // Real-time application queue via WebSocket + MongoDB Change Stream
   useEffect(() => {
-    apiGet('/applications').then((apps) => {
-      if (apps && apps.length > 0) {
-        console.log('[LoanOfficer] Loaded', apps.length, 'applications from backend');
-        setLiveApplications(apps);
-      }
+    const ws = apiWebSocket('/applications/ws', {
+      onMessage: (data) => {
+        if (data.type === 'snapshot') {
+          // Initial load — full list from backend
+          if (data.applications?.length > 0) {
+            setLiveApplications(data.applications);
+          }
+        } else if (data.type === 'change') {
+          // Real-time update — insert or update a single application
+          const app = data.application;
+          if (app) {
+            setLiveApplications((prev) => {
+              const idx = prev.findIndex((a) => a.application_id === app.application_id);
+              if (idx >= 0) {
+                // Update existing
+                const next = [...prev];
+                next[idx] = app;
+                return next;
+              }
+              // Insert new at top
+              return [app, ...prev];
+            });
+          }
+        }
+      },
     });
+
+    return () => ws.close();
   }, []);
 
   // Reactive dashboard stats
