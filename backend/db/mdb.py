@@ -21,7 +21,15 @@ class MongoDBConnector:
         self.uri = uri or os.getenv("MONGODB_URI")
         self.database_name = database_name or os.getenv("DATABASE_NAME")
         self.appname = appname or os.getenv("APP_NAME")
-        self.client = MongoClient(self.uri, appname=self.appname)
+        self.client = MongoClient(
+            self.uri,
+            appname=self.appname,
+            retryWrites=True,
+            retryReads=True,
+            serverSelectionTimeoutMS=5000,
+            connectTimeoutMS=5000,
+            maxPoolSize=50,
+        )
         self.db = self.client[self.database_name]
 
     def get_collection(self, collection_name):

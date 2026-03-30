@@ -2,6 +2,8 @@
 import asyncio
 import json
 import logging
+import re
+import time
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from models.schemas import ApplicationCreateRequest
@@ -11,6 +13,13 @@ from db.mdb import get_db
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["applications"])
+
+APP_ID_PATTERN = re.compile(r'^APP-[A-Z0-9]{8}$')
+
+
+def _validate_app_id(app_id: str):
+    if not APP_ID_PATTERN.match(app_id):
+        raise HTTPException(status_code=400, detail=f"Invalid application ID format: {app_id}")
 
 
 @router.post("/applications")
@@ -29,6 +38,7 @@ async def list_applications():
 @router.get("/applications/{app_id}")
 async def get_application(app_id: str):
     """Get full application with documents and credit reports."""
+    _validate_app_id(app_id)
     app = application_service.get_application(app_id)
     if not app:
         raise HTTPException(status_code=404, detail=f"Application {app_id} not found")
@@ -38,6 +48,7 @@ async def get_application(app_id: str):
 @router.get("/applications/{app_id}/activity")
 async def stream_activity(app_id: str):
     """SSE endpoint — streams agent activity via MongoDB Change Stream."""
+    _validate_app_id(app_id)
 
     async def event_generator():
         db = get_db()
@@ -84,6 +95,7 @@ async def stream_activity(app_id: str):
 @router.get("/applications/{app_id}/status")
 async def stream_status(app_id: str):
     """SSE endpoint — streams application status changes via Change Stream."""
+    _validate_app_id(app_id)
 
     async def event_generator():
         db = get_db()
@@ -152,7 +164,7 @@ async def applications_ws(websocket: WebSocket):
     await websocket.accept()
     db = get_db()
     stream = None
-    last_client_msg = asyncio.get_event_loop().time()
+    last_client_msg = time.monotonic()
 
     try:
         # Open Change Stream FIRST (before snapshot) to avoid missed-update window
@@ -182,14 +194,14 @@ async def applications_ws(websocket: WebSocket):
             # Check for client messages (keepalive ping/pong)
             try:
                 msg = await asyncio.wait_for(websocket.receive_text(), timeout=0.01)
-                last_client_msg = asyncio.get_event_loop().time()
+                last_client_msg = time.monotonic()
                 if msg == "ping":
                     await websocket.send_json({"type": "pong"})
             except asyncio.TimeoutError:
                 pass
 
             # Dead client detection — close if no message for 60s
-            if asyncio.get_event_loop().time() - last_client_msg > 60:
+            if time.monotonic() - last_client_msg > 60:
                 logger.info("Application queue WS: client silent for 60s, closing")
                 await websocket.close(code=1001)
                 break

@@ -28,13 +28,11 @@ def loan_app_node(state: LendFlowState) -> dict:
     credit_reports = get_credit_reports(app_id)
     credit_pulled = len(credit_reports) > 0
 
-    primary_score = None
-    co_score = None
-    if credit_reports:
-        primary_score = credit_reports[0].get("score")
+    primary_score = credit_reports[0].get("score") if len(credit_reports) > 0 else None
+    co_score = credit_reports[1].get("score") if len(credit_reports) > 1 else None
+    if primary_score is not None:
         log_agent_activity(app_id, "loan_app_agent", "credit_pull", f"Primary borrower credit score: {primary_score}")
-    if len(credit_reports) > 1:
-        co_score = credit_reports[1].get("score")
+    if co_score is not None:
         log_agent_activity(app_id, "loan_app_agent", "credit_pull", f"Co-applicant credit score: {co_score}")
 
     # Get application summary

@@ -82,4 +82,8 @@ def extract_from_pdf(pdf_path: Path, doc_type: str) -> dict:
     if result_text.startswith("```"):
         result_text = result_text.split("\n", 1)[1].rsplit("```", 1)[0]
 
-    return json.loads(result_text)
+    try:
+        return json.loads(result_text)
+    except (json.JSONDecodeError, ValueError) as e:
+        logging.getLogger(__name__).warning(f"JSON parse failed for {doc_type}: {e}")
+        return {"error": str(e), "text_summary": result_text, "raw_response": result_text[:2000]}

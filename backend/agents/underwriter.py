@@ -1,4 +1,6 @@
 """Underwriting Agent — calculates risk, GDS/TDS, and makes lending decisions."""
+import os
+
 from agents.state import LendFlowState
 from agents.tools import (
     get_application_summary,
@@ -9,6 +11,11 @@ from agents.tools import (
 )
 from agents.prompts import UNDERWRITER_PROMPT
 from bedrock.anthropic_chat_completions import BedrockAnthropicChatCompletions
+
+DECLINE_RISK_SCORE = int(os.getenv("DECLINE_RISK_SCORE", "80"))
+ESCALATE_PURCHASE_PRICE = int(os.getenv("ESCALATE_PURCHASE_PRICE", "500000"))
+ESCALATE_GDS = float(os.getenv("ESCALATE_GDS", "0.36"))
+ESCALATE_TDS = float(os.getenv("ESCALATE_TDS", "0.41"))
 
 
 def underwriter_node(state: LendFlowState) -> dict:
@@ -48,7 +55,8 @@ def underwriter_node(state: LendFlowState) -> dict:
     monthly_income = combined_income / 12
 
     # Calculate mortgage payment from loan amount and rate
-    annual_rate = 0.0489  # Current rate for 5yr Fixed
+    annual_rate = float(os.getenv("CURRENT_5YR_FIXED_RATE", "0.0489"))
+    log_agent_activity(app_id, "underwriter", "rate_lookup", f"Using rate: {annual_rate:.4f} (5yr Fixed)")
     monthly_rate = annual_rate / 12
     n_payments = 25 * 12  # 25yr amortization
     estimated_mortgage_payment = round(
@@ -80,6 +88,23 @@ def underwriter_node(state: LendFlowState) -> dict:
 
     log_agent_activity(app_id, "underwriter", "ratio_calc", f"GDS: {gds:.1%}, TDS: {tds:.1%}")
 
+    # OSFI B-20 Stress Test
+    stress_rate = max(annual_rate + 0.02, 0.0525)
+    stress_monthly_rate = stress_rate / 12
+    stress_payment = round(
+        (loan_amount * stress_monthly_rate * (1 + stress_monthly_rate)**n_payments)
+        / ((1 + stress_monthly_rate)**n_payments - 1)
+    )
+    stress_gds = (stress_payment + property_tax_monthly + heating_estimate) / monthly_income
+    stress_tds = (stress_payment + property_tax_monthly + heating_estimate + existing_debt_payments) / monthly_income
+
+    log_agent_activity(app_id, "underwriter", "stress_test",
+        f"Stress rate: {stress_rate:.2%}, Stress GDS: {stress_gds:.1%}, Stress TDS: {stress_tds:.1%}")
+
+    # Use stress-test ratios for decision if they exceed limits
+    effective_gds = max(gds, stress_gds)
+    effective_tds = max(tds, stress_tds)
+
     # Risk scoring
     primary_score = state.get("primary_credit_score", 0)
     co_score = state.get("co_applicant_credit_score", 0)
@@ -87,19 +112,15 @@ def underwriter_node(state: LendFlowState) -> dict:
 
     log_agent_activity(app_id, "underwriter", "ltv_calc", f"LTV: {ltv:.1f}% ({loan_amount:,.0f} / {purchase_price:,.0f})")
 
-    # Stress test at qualifying rate
-    stress_rate = max(annual_rate + 0.02, 0.0525)
-    log_agent_activity(app_id, "underwriter", "stress_test", f"Qualifying at stress rate {stress_rate:.2%}")
-
     # Simple risk score (0-100, lower is better risk)
     risk_score = 100
     if primary_score >= 750: risk_score -= 25
     elif primary_score >= 700: risk_score -= 15
     elif primary_score >= 680: risk_score -= 5
     if co_score >= 750: risk_score -= 10
-    if gds <= 0.32: risk_score -= 15
-    elif gds <= 0.39: risk_score -= 5
-    if tds <= 0.40: risk_score -= 10
+    if effective_gds <= 0.32: risk_score -= 15
+    elif effective_gds <= 0.39: risk_score -= 5
+    if effective_tds <= 0.40: risk_score -= 10
     if ltv <= 80: risk_score -= 15
     risk_score = max(0, min(100, risk_score))
 
@@ -138,25 +159,25 @@ Risk Tier: {risk_tier}
     analysis = llm.predict_with_system(analysis_input, prompt)
 
     # Decision logic based on ratios and risk
-    if risk_score > 80 or risk_tier == "D":
+    if risk_score > DECLINE_RISK_SCORE or risk_tier == "D":
         decision = "decline"
         decision_reasoning = f"Risk score {risk_score}/100 ({risk_tier}) exceeds acceptable threshold."
-    elif purchase_price > 500000 or gds > 0.36 or tds > 0.41 or risk_tier in ("B", "C"):
+    elif purchase_price > ESCALATE_PURCHASE_PRICE or effective_gds > ESCALATE_GDS or effective_tds > ESCALATE_TDS or risk_tier in ("B", "C"):
         decision = "escalate"
         decision_reasoning = "Officer review required: "
         reasons = []
-        if purchase_price > 500000:
-            reasons.append(f"property value ${purchase_price:,.0f} exceeds $500K threshold (policy \u00a73.1.4)")
-        if gds > 0.36:
-            reasons.append(f"GDS {gds:.1%} approaching 39% limit")
-        if tds > 0.41:
-            reasons.append(f"TDS {tds:.1%} approaching 44% limit")
+        if purchase_price > ESCALATE_PURCHASE_PRICE:
+            reasons.append(f"property value ${purchase_price:,.0f} exceeds ${ESCALATE_PURCHASE_PRICE:,} threshold (policy \u00a73.1.4)")
+        if effective_gds > ESCALATE_GDS:
+            reasons.append(f"GDS {effective_gds:.1%} approaching 39% limit")
+        if effective_tds > ESCALATE_TDS:
+            reasons.append(f"TDS {effective_tds:.1%} approaching 44% limit")
         if risk_tier in ("B", "C"):
             reasons.append(f"risk tier {risk_tier} requires review")
         decision_reasoning += "; ".join(reasons) + "."
     else:
         decision = "approve"
-        decision_reasoning = f"Auto-approved: GDS {gds:.1%}, TDS {tds:.1%}, Risk {risk_score}/100 ({risk_tier})."
+        decision_reasoning = f"Auto-approved: GDS {effective_gds:.1%}, TDS {effective_tds:.1%}, Risk {risk_score}/100 ({risk_tier})."
 
     log_agent_activity(app_id, "underwriter", "decision", decision_reasoning)
 

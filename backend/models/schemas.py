@@ -1,7 +1,20 @@
 """Pydantic request/response models for the LendFlow API."""
+from enum import Enum
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
+
+
+class ApplicationStatus(str, Enum):
+    submitted = "submitted"
+    processing = "processing"
+    underwriting = "underwriting"
+    review = "review"
+    approved = "approved"
+    declined = "declined"
+    funded = "funded"
+    active = "active"
+    error = "error"
 
 
 class ApplicationCreateRequest(BaseModel):
@@ -16,6 +29,7 @@ class ApplicationCreateRequest(BaseModel):
     combined_income: float
     primary_income: float
     co_applicant_income: Optional[float] = None
+    annual_property_tax: float = 0
 
 
 class ApplicationResponse(BaseModel):

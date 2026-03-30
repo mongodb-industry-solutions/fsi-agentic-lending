@@ -5,6 +5,8 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
+from bson import ObjectId
+from bson.errors import InvalidId
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from models.schemas import VectorSearchRequest
@@ -20,6 +22,13 @@ UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "docs" / "uploads"
 VALID_DOC_TYPES = set(EXTRACTION_PROMPTS.keys()) | {"unknown"}
 
 
+def _validate_doc_id(doc_id: str):
+    try:
+        ObjectId(doc_id)
+    except (InvalidId, Exception):
+        raise HTTPException(status_code=400, detail=f"Invalid document ID format: {doc_id}")
+
+
 @router.get("/applications/{app_id}/documents")
 async def list_documents(app_id: str):
     """List all documents for an application."""
@@ -29,6 +38,7 @@ async def list_documents(app_id: str):
 @router.get("/documents/{doc_id}")
 async def get_document(doc_id: str):
     """Get a single document."""
+    _validate_doc_id(doc_id)
     doc = document_service.get_document(doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -54,6 +64,7 @@ def _find_pdf(filename):
 @router.get("/documents/{doc_id}/pdf")
 async def serve_document_pdf(doc_id: str):
     """Serve the original PDF file for in-browser viewing."""
+    _validate_doc_id(doc_id)
     doc = document_service.get_document(doc_id)
     if not doc or not doc.get("filename"):
         raise HTTPException(status_code=404, detail="Document not found")
@@ -68,6 +79,7 @@ async def serve_document_pdf(doc_id: str):
 @router.get("/documents/{doc_id}/json")
 async def get_document_json(doc_id: str):
     """Return the full MongoDB document with all extracted data."""
+    _validate_doc_id(doc_id)
     doc = document_service.get_document(doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")

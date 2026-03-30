@@ -1,8 +1,12 @@
 """Application service — handles CRUD and aggregation for loan applications."""
+import logging
 import os
 from datetime import datetime, timezone
 from bson import ObjectId
 from db.mdb import get_db as _get_db
+from models.schemas import ApplicationStatus
+
+logger = logging.getLogger(__name__)
 
 
 def serialize_doc(doc):
@@ -62,6 +66,7 @@ def create_application(data: dict) -> dict:
             "address": data["property_address"],
             "type": data.get("property_type", "Detached Home"),
             "purchase_price": data["purchase_price"],
+            "annual_tax": data.get("annual_property_tax", 0),
         },
         "income_summary": {
             "combined_gross": data["combined_income"],
@@ -77,6 +82,7 @@ def create_application(data: dict) -> dict:
     }
 
     db["applications"].insert_one(application)
+    logger.info(f"Created application {application_id}")
 
     # Update borrowers with application_id
     db["borrowers"].update_many(
@@ -94,6 +100,7 @@ def get_application(application_id: str) -> dict | None:
     app = db["applications"].find_one({"application_id": application_id})
     if not app:
         return None
+    logger.info(f"Fetched application {application_id}")
 
     app = serialize_doc(app)
 
@@ -124,11 +131,19 @@ def list_applications() -> list[dict]:
             "created_at": 1,
         },
     ).sort("created_at", -1)
-    return [serialize_doc(a) for a in apps]
+    result = [serialize_doc(a) for a in apps]
+    logger.info(f"Listed {len(result)} applications")
+    return result
 
 
 def update_application_status(application_id: str, status: str, detail: str = "") -> bool:
     """Update application status and append to history."""
+    # Validate status
+    try:
+        ApplicationStatus(status)
+    except ValueError:
+        raise ValueError(f"Invalid application status: {status}")
+    logger.info(f"Updating application {application_id} status to '{status}'")
     db = _get_db()
     now = datetime.now(timezone.utc)
     result = db["applications"].update_one(

@@ -1,6 +1,9 @@
 """Vector search service — uses Atlas autoEmbed for semantic queries."""
+import logging
 from db.mdb import get_db as _get_db
 from services.application_service import serialize_doc
+
+logger = logging.getLogger(__name__)
 
 
 def search_documents(query: str, application_id: str = None, limit: int = 5) -> list[dict]:
@@ -37,7 +40,9 @@ def search_documents(query: str, application_id: str = None, limit: int = 5) -> 
         pipeline[0]["$vectorSearch"]["filter"] = {"application_id": application_id}
 
     results = db["documents"].aggregate(pipeline)
-    return [serialize_doc(r) for r in results]
+    docs = [serialize_doc(r) for r in results]
+    logger.info(f"search_documents query='{query}' app_id={application_id} returned {len(docs)} results")
+    return docs
 
 
 def search_policies(query: str, limit: int = 5) -> list[dict]:
@@ -66,4 +71,6 @@ def search_policies(query: str, limit: int = 5) -> list[dict]:
     ]
 
     results = db["underwriting_policies"].aggregate(pipeline)
-    return [serialize_doc(r) for r in results]
+    docs = [serialize_doc(r) for r in results]
+    logger.info(f"search_policies query='{query}' returned {len(docs)} results")
+    return docs
