@@ -86,10 +86,13 @@ def underwriter_node(state: LendFlowState) -> dict:
     log_agent_activity(app_id, "underwriter", "rate_lookup", f"Using rate: {annual_rate:.4f} (5yr Fixed)")
     monthly_rate = annual_rate / 12
     n_payments = 25 * 12  # 25yr amortization
-    estimated_mortgage_payment = round(
-        (loan_amount * monthly_rate * (1 + monthly_rate)**n_payments)
-        / ((1 + monthly_rate)**n_payments - 1)
-    )
+    if monthly_rate == 0:
+        estimated_mortgage_payment = round(loan_amount / n_payments) if n_payments > 0 else 0
+    else:
+        estimated_mortgage_payment = round(
+            (loan_amount * monthly_rate * (1 + monthly_rate)**n_payments)
+            / ((1 + monthly_rate)**n_payments - 1)
+        )
 
     # Property costs from application data
     annual_tax = app.get("property", {}).get("annual_tax")
@@ -123,10 +126,13 @@ def underwriter_node(state: LendFlowState) -> dict:
     # OSFI B-20 Stress Test
     stress_rate = max(annual_rate + 0.02, 0.0525)
     stress_monthly_rate = stress_rate / 12
-    stress_payment = round(
-        (loan_amount * stress_monthly_rate * (1 + stress_monthly_rate)**n_payments)
-        / ((1 + stress_monthly_rate)**n_payments - 1)
-    )
+    if stress_monthly_rate == 0:
+        stress_payment = round(loan_amount / n_payments) if n_payments > 0 else 0
+    else:
+        stress_payment = round(
+            (loan_amount * stress_monthly_rate * (1 + stress_monthly_rate)**n_payments)
+            / ((1 + stress_monthly_rate)**n_payments - 1)
+        )
     stress_gds = (stress_payment + property_tax_monthly + heating_estimate) / monthly_income
     stress_tds = (stress_payment + property_tax_monthly + heating_estimate + existing_debt_payments) / monthly_income
 
@@ -144,7 +150,7 @@ def underwriter_node(state: LendFlowState) -> dict:
 
     # Risk scoring — use aggregation pipeline results as base
     primary_score = agg_result["primary_credit_score"] if agg_result.get("primary_credit_score") is not None else state.get("primary_credit_score")
-    co_score = agg_result["co_credit_score"] if agg_result.get("co_credit_score") is not None else state.get("co_applicant_credit_score", 0)
+    co_score = agg_result["co_credit_score"] if agg_result.get("co_credit_score") is not None else state.get("co_applicant_credit_score")
 
     if primary_score is None:
         log_agent_activity(app_id, "underwriter", "error", "Primary credit score unavailable — cannot underwrite")
@@ -199,7 +205,7 @@ Combined Income: ${combined_income:,.0f}/yr
 GDS Ratio: {gds:.1%}
 TDS Ratio: {tds:.1%}
 Primary Credit Score: {primary_score}
-Co-Applicant Credit Score: {co_score}
+Co-Applicant Credit Score: {co_score if co_score is not None else 'N/A'}
 Risk Score: {risk_score}/100
 Risk Tier: {risk_tier}
 """
@@ -242,6 +248,9 @@ Risk Tier: {risk_tier}
         return {
             "gds_ratio": round(gds, 4),
             "tds_ratio": round(tds, 4),
+            "stress_gds": round(stress_gds, 4),
+            "stress_tds": round(stress_tds, 4),
+            "stress_rate": round(stress_rate, 4),
             "risk_score": float(risk_score),
             "risk_tier": risk_tier,
             "policy_citations": [p.get("policy_id", "") for p in policies],

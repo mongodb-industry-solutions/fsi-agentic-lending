@@ -49,4 +49,4 @@ class LendFlowState(TypedDict):
 
     # HITL observe mode tracking
     hitl_approved_nodes: list[str]
-    _pending_node: Optional[str]
+    pending_node: Optional[str]

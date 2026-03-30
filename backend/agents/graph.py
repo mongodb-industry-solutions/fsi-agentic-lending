@@ -69,15 +69,17 @@ def hitl_gate(state: LendFlowState) -> dict:
     }
 
     # Record approved node to prevent re-gating in observe mode
-    pending = state.get("_pending_node")
+    pending = state.get("pending_node")
     if pending:
         approved = list(state.get("hitl_approved_nodes", []))
         approved.append(pending)
         state_updates["hitl_approved_nodes"] = approved
-        state_updates["_pending_node"] = None
+        state_updates["pending_node"] = None
 
     if action == "modify_and_continue":
         state_updates["risk_score"] = None
+        state_updates["decision"] = None
+        state_updates["hitl_approved_nodes"] = []  # Reset for re-underwriting
 
     # Apply officer overrides
     if overrides.get("risk_tier"):

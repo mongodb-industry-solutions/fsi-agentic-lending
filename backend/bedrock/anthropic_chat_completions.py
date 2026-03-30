@@ -164,6 +164,8 @@ class BedrockAnthropicChatCompletions(BedrockClient):
                     time.sleep(wait)
                     continue
                 raise RuntimeError(f"Bedrock converse failed after {attempt + 1} attempts: {e}") from e
+            except Exception as e:
+                raise RuntimeError(f"Bedrock converse failed: {e}") from e
         raise RuntimeError("Bedrock converse failed after retries")
 
     @traceable(name="bedrock_predict_messages")

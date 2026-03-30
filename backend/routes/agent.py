@@ -59,6 +59,7 @@ def _make_initial_state(app_id: str, autonomy_level: str) -> dict:
         "stress_tds": None,
         "stress_rate": None,
         "hitl_approved_nodes": [],
+        "pending_node": None,
     }
 
 
@@ -180,18 +181,16 @@ async def run_and_stream(app_id: str, autonomy_level: str = "bounded"):
     Eliminates the race condition between run and stream endpoints."""
     _validate_app_id(app_id)
 
+    app = application_service.get_application(app_id)
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    application_service.update_application_status(app_id, "processing", "Agent pipeline started")
+
     with _running_lock:
         if app_id in _running_apps:
             raise HTTPException(status_code=409, detail="Pipeline already running for this application")
         _running_apps.add(app_id)
-
-    app = application_service.get_application(app_id)
-    if not app:
-        with _running_lock:
-            _running_apps.discard(app_id)
-        raise HTTPException(status_code=404, detail="Application not found")
-
-    application_service.update_application_status(app_id, "processing", "Agent pipeline started")
 
     async def event_generator():
         graph = get_graph()

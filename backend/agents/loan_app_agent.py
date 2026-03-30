@@ -1,4 +1,6 @@
 """Loan Application Agent — processes documents, verifies identity, pulls credit."""
+import json
+
 from agents.state import LendFlowState
 from agents.tools import (
     get_application_documents,
@@ -68,7 +70,7 @@ def loan_app_node(state: LendFlowState) -> dict:
         credit_pulled=credit_pulled,
     )
 
-    credit_repr = str(credit_reports)[:2000]
+    credit_repr = json.dumps(credit_reports, default=str)[:2000]
     analysis = llm.predict_with_system(
         f"Application summary: {app_summary}\n\nDocuments:\n{doc_summary_text}\n\nCredit reports: {credit_repr}",
         prompt,
