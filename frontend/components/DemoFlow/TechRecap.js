@@ -1,9 +1,11 @@
 "use client";
 
-export default function TechRecap({ elapsedMs }) {
+export default function TechRecap({ elapsedMs, activeFeatures }) {
+  const featuresUsed = activeFeatures?.length ?? 6;
+
   const stats = [
     { label: 'Total Time', value: `${(elapsedMs / 1000).toFixed(2)}s`, color: 'var(--mongo)' },
-    { label: 'MongoDB Features', value: '6', color: 'var(--text-primary)' },
+    { label: 'Features Used', value: String(featuresUsed), color: 'var(--text-primary)' },
     { label: 'Agent Steps', value: '7', color: 'var(--agent-cyan)' },
     { label: 'Checkpoints', value: '4', color: 'var(--hitl-amber)' },
     { label: 'MongoDB Ops', value: '34', color: 'var(--voyage)' },
@@ -128,7 +130,7 @@ export default function TechRecap({ elapsedMs }) {
           marginTop: 8,
         }}
       >
-        6 capabilities · 1 platform · Zero data shipping
+        {featuresUsed} capabilities · 1 platform · Zero data shipping
       </p>
     </div>
   );

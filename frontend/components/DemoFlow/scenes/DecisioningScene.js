@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { DECISIONING_STEPS } from '../engine/demoScenes';
 import { mergeCanvasState } from '../engine/canvasUtils';
 import WorkflowCanvas from '../WorkflowCanvas';
@@ -11,6 +11,7 @@ import DataSourceStrip from '../DataSourceStrip';
 import PipelineTimeline from '../PipelineTimeline';
 import StatCard from '../../visualizations/StatCard';
 import FicoRing from '../../visualizations/FicoRing';
+import { apiGet } from '../../../lib/api';
 
 const FACTORS = [
   { label: 'Income Stability', points: 42, color: 'var(--mongo)' },
@@ -217,6 +218,17 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
   const fraudTakeover = currentStepData?.id === 'd-4';
   const [hoveredNode, setHoveredNode] = useState(null);
   const [timelineHighlight, setTimelineHighlight] = useState(null);
+  const [pipelineData, setPipelineData] = useState(null);
+
+  useEffect(() => {
+    apiGet('/applications/APP-2026-00001/risk-pipeline').then((data) => {
+      if (data?.application_id) {
+        setPipelineData(data);
+      }
+    });
+  }, []);
+
+  const displayRiskScore = pipelineData?.risk_score ?? 72;
 
   const handleNodeHover = useCallback((nodeId) => setHoveredNode(nodeId), []);
   const handleTimelineHover = useCallback((nodeId) => setTimelineHighlight(nodeId), []);
@@ -267,7 +279,7 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
           />
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
-              <StatCard label="Risk Score" value={sceneStep >= 1 ? 72 : 0} suffix="/100" color="var(--hitl-amber)" />
+              <StatCard label="Risk Score" value={sceneStep >= 1 ? displayRiskScore : 0} suffix="/100" color="var(--hitl-amber)" />
               <StatCard label="Risk Tier" value={sceneStep >= 2 ? 'B+' : '—'} color="var(--tool-blue)" animate={false} />
               <StatCard label="Fraud Scan" value={sceneStep >= 4 ? 'CLEAR' : 'Pending'} color={sceneStep >= 4 ? 'var(--success)' : 'var(--text-dim)'} animate={false} />
               <StatCard label="Factors" value={sceneStep >= 1 ? 7 : 0} color="var(--agent-cyan)" />
@@ -342,9 +354,23 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
 
           {showFinalScore && (
             <div style={{ padding: 16, background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', border: '2px solid var(--mongo)', marginBottom: 16, animation: 'slideDown 0.3s ease-out' }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, color: 'var(--mongo)', marginBottom: 12 }}>Risk Assessment Complete</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, color: 'var(--mongo)' }}>Risk Assessment Complete</div>
+                {pipelineData && (
+                  <span style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                    background: 'rgba(0,200,100,0.1)',
+                    color: 'var(--success, #00c864)',
+                  }}>
+                    Live · 7-stage Aggregation
+                  </span>
+                )}
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <RiskRing score={72} tier="B+" fico={784} />
+                <RiskRing score={displayRiskScore} tier="B+" fico={784} />
                 <FicoRing score={784} size={80} strokeWidth={6} />
               </div>
               <div style={{ marginTop: 12 }}>
