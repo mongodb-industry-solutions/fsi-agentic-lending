@@ -5,9 +5,12 @@ import Header from "../components/Header/Header";
 import BorrowerPortal from "../components/BorrowerPortal/BorrowerPortal";
 import LoanOfficerDashboard from "../components/LoanOfficerDashboard/LoanOfficerDashboard";
 import DemoFlow from "../components/DemoFlow/DemoFlow";
+import InfoWizardPanel from "../components/educational/InfoWizardPanel";
 
 export default function Home() {
   const [activeScreen, setActiveScreen] = useState("borrower");
+  const [infoWizardOpen, setInfoWizardOpen] = useState(false);
+  const [infoScrollTo, setInfoScrollTo] = useState(null);
 
   const renderScreen = () => {
     switch (activeScreen) {
@@ -24,12 +27,18 @@ export default function Home() {
 
   return (
     <>
-      <Header activeScreen={activeScreen} onScreenChange={setActiveScreen} />
+      <Header activeScreen={activeScreen} onScreenChange={setActiveScreen} onInfoOpen={() => setInfoWizardOpen(true)} />
       <main style={{ paddingTop: 52 }}>
         <div key={activeScreen} className="screen-content">
           {renderScreen()}
         </div>
       </main>
+      <InfoWizardPanel
+        isOpen={infoWizardOpen}
+        onClose={() => { setInfoWizardOpen(false); setInfoScrollTo(null); }}
+        activeScreen={activeScreen}
+        scrollToSection={infoScrollTo}
+      />
     </>
   );
 }

@@ -12,7 +12,7 @@ const STATUS_CHIPS = [
   { label: "LangSmith", on: true },
 ];
 
-export default function Header({ activeScreen, onScreenChange }) {
+export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
   return (
     <header
       style={{
@@ -118,6 +118,31 @@ export default function Header({ activeScreen, onScreenChange }) {
       </nav>
 
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        {onInfoOpen && (
+          <button
+            type="button"
+            onClick={onInfoOpen}
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: '50%',
+              border: '1px solid var(--border-dim)',
+              background: 'var(--bg-surface)',
+              color: 'var(--text-dim)',
+              fontFamily: 'var(--font-display)',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+            }}
+            aria-label="Open technology reference panel"
+          >
+            i
+          </button>
+        )}
         {STATUS_CHIPS.map((chip) => (
           <span
             key={chip.label}

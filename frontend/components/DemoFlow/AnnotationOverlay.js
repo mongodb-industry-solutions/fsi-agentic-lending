@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import FeatureBadge from '../FeatureBadge/FeatureBadge';
+import CapabilityPopover from '../educational/CapabilityPopover';
 import { CAPABILITIES } from '../../lib/data/capabilities';
 
 const FEATURE_MAP = Object.fromEntries(CAPABILITIES.map((c) => [c.id, c]));
@@ -13,6 +15,26 @@ export default function AnnotationOverlay({
   totalSteps = 0,
 }) {
   const [reasoningExpanded, setReasoningExpanded] = useState(false);
+  const [activePopover, setActivePopover] = useState(null);
+  const [popoverPos, setPopoverPos] = useState(null);
+  const badgeRefs = useRef({});
+
+  useEffect(() => {
+    setActivePopover(null);
+  }, [currentStep]);
+
+  const openPopover = useCallback((fId) => {
+    if (activePopover === fId) {
+      setActivePopover(null);
+      return;
+    }
+    const el = badgeRefs.current[fId];
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      setPopoverPos({ top: rect.bottom + 4, left: Math.max(8, rect.left) });
+    }
+    setActivePopover(fId);
+  }, [activePopover]);
 
   if (!currentStep) {
     return (
@@ -116,16 +138,26 @@ export default function AnnotationOverlay({
           const cap = FEATURE_MAP[fId];
           if (!cap) return null;
           return (
-            <FeatureBadge
-              key={fId}
-              icon={cap.icon}
-              label={cap.label}
-              colorVar={cap.colorVar}
-              active
-              small
-            />
+            <span key={fId} ref={(el) => { badgeRefs.current[fId] = el; }}>
+              <FeatureBadge
+                icon={cap.icon}
+                label={cap.label}
+                colorVar={cap.colorVar}
+                active
+                small
+                onClick={() => openPopover(fId)}
+              />
+            </span>
           );
         })}
+        {activePopover && popoverPos && createPortal(
+          <CapabilityPopover
+            capabilityId={activePopover}
+            onClose={() => setActivePopover(null)}
+            style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left }}
+          />,
+          document.body,
+        )}
         {ops.length > 0 && (
           <span style={{
             fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
