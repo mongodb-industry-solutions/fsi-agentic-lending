@@ -49,9 +49,10 @@ class ApplicationResponse(BaseModel):
 
 
 class HITLDecisionRequest(BaseModel):
-    action: str = Field(..., pattern="^(approve|decline)$")
+    action: str = Field(..., pattern="^(approve|decline|modify_and_continue)$")
     officer_notes: str = ""
     conditions: list[str] = []
+    overrides: dict = {}
 
 
 class VectorSearchRequest(BaseModel):

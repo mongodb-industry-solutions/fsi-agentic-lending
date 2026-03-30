@@ -13,6 +13,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+try:
+    from langsmith import traceable
+except ImportError:
+    def traceable(**kwargs):
+        def decorator(fn):
+            return fn
+        return decorator
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -43,6 +51,7 @@ class BedrockAnthropicChatCompletions(BedrockClient):
         self.temperature = 0.00001
         self.bedrock_client = self._get_bedrock_client()
 
+    @traceable(name="bedrock_predict")
     def predict(self, text: str):
         """ Predict a chat completion based on the input text.
 
@@ -94,6 +103,7 @@ class BedrockAnthropicChatCompletions(BedrockClient):
 
         return response_text
 
+    @traceable(name="bedrock_predict_with_system")
     def predict_with_system(self, text: str, system_prompt: str) -> str:
         """Generate response with a system prompt.
 
@@ -133,6 +143,7 @@ class BedrockAnthropicChatCompletions(BedrockClient):
         model_response = json.loads(response["body"].read())
         return model_response["content"][0]["text"]
 
+    @traceable(name="bedrock_predict_messages")
     def predict_messages(self, messages: list, system_prompt: str = None) -> str:
         """Generate response from a full message history.
 

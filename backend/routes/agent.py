@@ -1,5 +1,6 @@
 """Agent execution routes — triggers LangGraph and streams results."""
 import json
+import re
 import asyncio
 import logging
 import threading
@@ -10,6 +11,14 @@ from db.mdb import get_db as _get_db
 from services import application_service
 from agents.graph import get_graph
 from agents.tools import log_agent_activity, update_application_status
+
+logger = logging.getLogger(__name__)
+
+APP_ID_PATTERN = re.compile(r'^APP-[A-Z0-9]{8}$')
+
+def _validate_app_id(app_id: str):
+    if not APP_ID_PATTERN.match(app_id):
+        raise HTTPException(status_code=400, detail=f"Invalid application ID format: {app_id}")
 
 try:
     from langgraph.errors import GraphInterrupt
@@ -154,4 +163,86 @@ async def stream_agent(app_id: str):
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
         },
+    )
+
+
+@router.get("/agent/{app_id}/run-stream")
+async def run_and_stream(app_id: str, autonomy_level: str = "bounded"):
+    """Combined endpoint: starts graph execution AND streams events via SSE.
+    Eliminates the race condition between run and stream endpoints."""
+    _validate_app_id(app_id)
+
+    app = application_service.get_application(app_id)
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    application_service.update_application_status(app_id, "processing", "Agent pipeline started")
+
+    async def event_generator():
+        graph = get_graph()
+        initial_state = {
+            "messages": [],
+            "application_id": app_id,
+            "current_agent": "supervisor",
+            "autonomy_level": autonomy_level,
+            "documents_verified": False,
+            "document_count": 0,
+            "extraction_summary": "",
+            "credit_pulled": False,
+            "primary_credit_score": None,
+            "co_applicant_credit_score": None,
+            "gds_ratio": None,
+            "tds_ratio": None,
+            "risk_score": None,
+            "risk_tier": None,
+            "policy_citations": [],
+            "decision": None,
+            "decision_reasoning": "",
+            "officer_notes": None,
+            "activity_log": [],
+            "last_error": None,
+            "retry_count": 0,
+        }
+        config = {
+            "configurable": {"thread_id": app_id},
+            "metadata": {"application_id": app_id},
+            "tags": ["mortgage"],
+        }
+
+        yield f"data: {json.dumps({'type': 'started', 'application_id': app_id, 'autonomy_level': autonomy_level})}\n\n"
+
+        try:
+            async for event in graph.astream_events(initial_state, config=config, version="v2"):
+                kind = event.get("event", "")
+                name = event.get("name", "")
+
+                if kind == "on_chain_start" and name in ("supervisor", "loan_app", "underwriter", "hitl_gate", "complete"):
+                    yield f"data: {json.dumps({'type': 'node_start', 'agent': name})}\n\n"
+
+                elif kind == "on_chain_end" and name in ("loan_app", "underwriter", "supervisor", "hitl_gate", "complete"):
+                    output = event.get("data", {}).get("output", {})
+                    # Serialize output (remove non-JSON-serializable fields)
+                    safe_output = {}
+                    for k, v in (output or {}).items():
+                        if k == "messages":
+                            continue  # Skip messages (large)
+                        if isinstance(v, (str, int, float, bool, list)) or v is None:
+                            safe_output[k] = v
+                    yield f"data: {json.dumps({'type': 'node_complete', 'agent': name, 'output': safe_output})}\n\n"
+
+                    # Check for HITL interrupt
+                    if name == "hitl_gate" and output and output.get("decision") is None:
+                        yield f"data: {json.dumps({'type': 'hitl_waiting', 'application_id': app_id})}\n\n"
+                        break  # Stream ends; client reconnects after officer decision
+
+            yield f"data: {json.dumps({'type': 'complete', 'application_id': app_id})}\n\n"
+
+        except Exception as e:
+            logger.error(f"Stream error for {app_id}: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)[:500]})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
     )

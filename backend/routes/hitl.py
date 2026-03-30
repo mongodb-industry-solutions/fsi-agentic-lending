@@ -63,7 +63,12 @@ async def submit_hitl_decision(app_id: str, req: HITLDecisionRequest):
         graph = get_graph()
         await asyncio.to_thread(
             graph.invoke,
-            Command(resume={"action": req.action, "notes": req.officer_notes}),
+            Command(resume={
+                "action": req.action,
+                "notes": req.officer_notes,
+                "conditions": req.conditions,
+                "overrides": req.overrides,
+            }),
             {"configurable": {"thread_id": app_id}},
         )
         graph_succeeded = True
