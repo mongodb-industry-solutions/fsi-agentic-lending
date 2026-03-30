@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { apiSSE } from '../../lib/api';
 
 const ACTIVITY_TEMPLATES = [
@@ -209,49 +209,20 @@ const FILTERS = [
   { id: 'hitl', label: 'HITL' },
 ];
 
-export default function AgentActivityLog({ autoPlay = true, onEvent, applicationId }) {
+export default function AgentActivityLog({ onEvent, applicationId }) {
   const [entries, setEntries] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const counterRef = useRef(0);
-  const timerRef = useRef(null);
 
+  // SSE connection for live agent events when applicationId is provided
   useEffect(() => {
-    if (!autoPlay) {
-      counterRef.current = 0;
+    if (!applicationId) {
       setEntries([]);
       return;
     }
 
-    const addEntry = () => {
-      if (counterRef.current >= ACTIVITY_TEMPLATES.length) {
-        clearInterval(timerRef.current);
-        return;
-      }
-      const template = ACTIVITY_TEMPLATES[counterRef.current];
-      counterRef.current++;
-      const entry = { ...template, id: counterRef.current, time: new Date().toLocaleTimeString() };
-      setEntries((prev) => [entry, ...prev]);
-      if (onEvent) onEvent(entry);
-    };
-
-    addEntry();
-    timerRef.current = setInterval(addEntry, 1800);
-    return () => clearInterval(timerRef.current);
-  }, [autoPlay]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // SSE connection for live agent events when applicationId is provided
-  useEffect(() => {
-    if (!applicationId) return;
-
-    // Stop timer-based playback when we have a live application
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    counterRef.current = ACTIVITY_TEMPLATES.length; // Prevent further timer entries
-    setEntries([]); // Clear hardcoded entries for live mode
+    setEntries([]); // Clear entries for new application
 
     const source = apiSSE(
       `/agent/${applicationId}/stream`,
@@ -266,14 +237,17 @@ export default function AgentActivityLog({ autoPlay = true, onEvent, application
               : 'loanapp',
             action: event.action || '',
             op: '', // Live events don't have a separate op field
-            latency: '—',
-            icon: event.agent === 'underwriter' ? '📊' : event.agent === 'supervisor' ? '🧭' : '📝',
+            latency: '\u2014',
+            icon: event.agent === 'underwriter' ? '\ud83d\udcca' : event.agent === 'supervisor' ? '\ud83e\udded' : '\ud83d\udcdd',
             reasoning: event.detail || '',
             details: null,
             time: new Date(event.timestamp || Date.now()).toLocaleTimeString(),
             isLive: true,
           };
-          setEntries((prev) => [liveEntry, ...prev]);
+          setEntries((prev) => {
+            const next = [liveEntry, ...prev];
+            return next.length > 100 ? next.slice(0, 100) : next;
+          });
           if (onEvent) onEvent(liveEntry);
         }
         if (event.type === 'complete') {
@@ -284,6 +258,30 @@ export default function AgentActivityLog({ autoPlay = true, onEvent, application
 
     return () => source?.close();
   }, [applicationId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // If no applicationId, show empty state
+  if (!applicationId) {
+    return (
+      <div style={{
+        width: 360,
+        borderLeft: '1px solid var(--border-dim)',
+        background: 'var(--bg-base)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        flexShrink: 0,
+      }}>
+        <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--border-dim)' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13 }}>
+            Agent Activity Log
+          </div>
+        </div>
+        <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)', fontSize: 11, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          Select a live application to view agent activity
+        </div>
+      </div>
+    );
+  }
 
   const filtered = useMemo(() => {
     let result = entries;

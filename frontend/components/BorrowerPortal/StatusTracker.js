@@ -142,14 +142,18 @@ const STAGES = [
 
 // Maps backend status values to STAGES indices for SSE-driven progression
 const STATUS_TO_STAGE = {
-  submitted: 0,     // received
-  processing: 1,    // docs
-  underwriting: 4,  // underwriting
-  review: 6,        // officer review stage
-  approved: 7,      // approved
-  declined: 7,      // declined (same position, different rendering)
-  active: 8,        // active
-  error: -1,        // show error
+  submitted: 0,      // received
+  processing: 1,     // docs
+  action_required: 2, // action-required (note underscore vs hyphen)
+  credit: 3,         // credit
+  underwriting: 4,   // underwriting
+  decision: 5,       // decision
+  review: 6,         // officer review
+  approved: 7,       // approved
+  declined: 7,       // declined (same position, could add distinct visual)
+  funded: 8,         // active/funded
+  active: 8,         // active
+  error: -1,         // error state
 };
 
 function formatTime(date) {
@@ -162,6 +166,7 @@ export default function StatusTracker({ onNotification, applicationId }) {
   const [expandedStage, setExpandedStage] = useState(null);
   const [actionPaused, setActionPaused] = useState(false);
   const [actionUploading, setActionUploading] = useState(false);
+  const [sseConnected, setSseConnected] = useState(false);
   const timerRef = useRef(null);
   const stageIdxRef = useRef(0);
 
@@ -261,6 +266,9 @@ export default function StatusTracker({ onNotification, applicationId }) {
   }, [sendNotification]);
 
   useEffect(() => {
+    // SSE drives progression when connected — skip timer-based progression
+    if (sseConnected) return;
+
     stageIdxRef.current = 0;
     setTimestamps([new Date()]);
     sendNotification(STAGES[0], new Date());
@@ -270,7 +278,7 @@ export default function StatusTracker({ onNotification, applicationId }) {
     }
 
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sseConnected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // SSE connection for real-time backend status (supplementary to timer-based stages)
   useEffect(() => {
@@ -279,6 +287,9 @@ export default function StatusTracker({ onNotification, applicationId }) {
     const source = apiSSE(
       `/applications/${applicationId}/status`,
       (event) => {
+        // Mark SSE as connected on first event
+        setSseConnected(true);
+
         if (event.type === 'status' && event.status) {
           console.log('[StatusTracker] Real-time status:', event.status);
           const targetIdx = STATUS_TO_STAGE[event.status];
@@ -296,10 +307,6 @@ export default function StatusTracker({ onNotification, applicationId }) {
             }
             setActiveStage(targetIdx);
             setTimestamps((prev) => [...prev, ...newTimestamps]);
-            // If there are still stages ahead, resume timer-based progression
-            if (stageIdxRef.current < STAGES.length - 1) {
-              timerRef.current = setTimeout(advanceStageLoop, STAGES[stageIdxRef.current + 1].delayMs);
-            }
           }
         }
       }
@@ -359,6 +366,11 @@ export default function StatusTracker({ onNotification, applicationId }) {
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+      {applicationId && !sseConnected && (
+        <div style={{ padding: '6px 12px', background: 'var(--hitl-amber-dim)', borderRadius: 'var(--radius-sm)', fontSize: 10, color: 'var(--hitl-amber)', marginBottom: 8 }}>
+          Connecting to backend...
+        </div>
+      )}
       {/* Summary card */}
       <div style={{
         padding: 16,

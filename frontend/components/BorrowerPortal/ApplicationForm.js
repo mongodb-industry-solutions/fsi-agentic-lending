@@ -14,6 +14,10 @@ const INITIAL_DATA = {
   jobTitle: 'Senior Software Engineer',
   yearsEmployed: '8',
   annualIncome: '128500',
+  coApplicantName: 'Sofia Delgado',
+  coApplicantIncome: '94200',
+  propertyAddress: '4718 Coronation Drive SW, Calgary, AB T3E 4Y2',
+  annualPropertyTax: '6815',
   loanAmount: '875000',
   loanPurpose: 'Purchase',
   propertyType: 'Detached Home',
@@ -93,6 +97,11 @@ export default function ApplicationForm({ onSubmit }) {
         <Field label="Address" value={form.address} onChange={update('address')} span2 />
       </FormSection>
 
+      <FormSection title="Co-Applicant">
+        <Field label="Co-Applicant Name" value={form.coApplicantName} onChange={update('coApplicantName')} />
+        <Field label="Co-Applicant Income ($)" value={form.coApplicantIncome} onChange={update('coApplicantIncome')} />
+      </FormSection>
+
       <FormSection title="Employment">
         <Field label="Employer" value={form.employer} onChange={update('employer')} />
         <Field label="Job Title" value={form.jobTitle} onChange={update('jobTitle')} />
@@ -107,6 +116,8 @@ export default function ApplicationForm({ onSubmit }) {
         <Field label="Property Type" value={form.propertyType} onChange={update('propertyType')} />
         <Field label="Product Type" value={form.productType} onChange={update('productType')} />
         <Field label="Credit Score (est.)" value={form.creditScore} onChange={update('creditScore')} readOnly />
+        <Field label="Property Address" value={form.propertyAddress} onChange={update('propertyAddress')} span2 />
+        <Field label="Annual Property Tax ($)" value={form.annualPropertyTax} onChange={update('annualPropertyTax')} />
       </FormSection>
 
       <FormSection title="Financial Summary">

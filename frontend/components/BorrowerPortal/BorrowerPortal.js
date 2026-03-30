@@ -34,26 +34,25 @@ export default function BorrowerPortal() {
 
   const handleSubmit = useCallback(async (formData) => {
     setPhase('tracking');
-    addToast({ type: 'info', icon: '📝', title: 'Application Submitted', message: 'Your application is now being processed by our AI assistant.' });
+    addToast({ type: 'info', icon: '📝', title: 'Application Submitted', message: 'Your application is now being processed.' });
 
-    // Attempt to submit to real backend (falls back gracefully if unavailable)
     const result = await apiPost('/applications', {
-      primary_name: `${formData?.firstName || 'Marcus'} ${formData?.lastName || 'Delgado'}`,
-      co_applicant_name: 'Sofia Delgado',
-      loan_amount: 700000,
-      purchase_price: 875000,
-      down_payment: 175000,
-      product: '5yr Fixed (25yr Amort)',
-      property_address: '4718 Coronation Drive SW, Calgary, AB T3E 4Y2',
-      property_type: 'Detached Home',
-      combined_income: 222700,
-      primary_income: 128500,
-      co_applicant_income: 94200,
+      primary_name: `${formData.firstName} ${formData.lastName}`,
+      co_applicant_name: formData.coApplicantName || null,
+      loan_amount: parseFloat(formData.loanAmount) - parseFloat(formData.downPayment || 0),
+      purchase_price: parseFloat(formData.loanAmount),
+      down_payment: parseFloat(formData.downPayment || 0),
+      product: formData.productType || '5yr Fixed (25yr Amort)',
+      property_address: formData.propertyAddress || formData.address || '',
+      property_type: formData.propertyType || 'Detached Home',
+      combined_income: parseFloat(formData.annualIncome || 0) + parseFloat(formData.coApplicantIncome || 0),
+      primary_income: parseFloat(formData.annualIncome || 0),
+      co_applicant_income: parseFloat(formData.coApplicantIncome || 0),
+      annual_property_tax: parseFloat(formData.annualPropertyTax || 0),
     });
 
     if (result?.application_id) {
       setApplicationId(result.application_id);
-      // Trigger agent pipeline
       await apiPost(`/agent/${result.application_id}/run`);
     }
   }, [addToast]);
