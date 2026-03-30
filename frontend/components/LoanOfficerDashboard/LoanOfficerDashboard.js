@@ -88,68 +88,7 @@ const AUDIT_STAGES = [
   { label: 'HITL Review', duration: '1.5s', decisions: ['3 policy triggers detected — normally escalates', 'Full Auto override: auto-applied conditional approval', 'Rate set at 4.89% per B+ tier schedule'] },
 ];
 
-// ─── Scenario data for non-primary applications ───
-
-const ELENA_AUDIT = {
-  name: 'Elena Rodriguez',
-  appId: 'APP-2025-78215',
-  amount: '$195,000',
-  product: '15yr Fixed',
-  score: 88,
-  tier: 'A',
-  rate: '5.625%',
-  mode: 'Act Within Limits',
-  stages: [
-    { label: 'Origination', duration: '2.9s', status: 'passed', note: 'All documents verified, no discrepancies' },
-    { label: 'Decisioning', duration: '3.2s', status: 'passed', note: 'Score 88 A-tier — all thresholds cleared' },
-    { label: 'HITL Review', duration: '0s', status: 'skipped', note: 'No policy triggers — auto-approved within bounds' },
-  ],
-  decisions: [
-    'Credit score 780, 12-year history, 0 derogatory marks',
-    'DTI 24% — well within auto-approve threshold of 36%',
-    'Loan amount $195K below $250K officer review threshold',
-    'Auto-approved per bounded policy — no escalation needed',
-  ],
-  totalTokens: 4120,
-  totalCost: '$0.035',
-  totalLatency: '6.1s',
-};
-
-const JAMES_DECLINE = {
-  name: 'James Wilson',
-  appId: 'APP-2025-78091',
-  amount: '$175,000',
-  product: 'Personal Loan',
-  score: 41,
-  tier: 'D',
-  violations: [
-    { policy: '§5.1.1', label: 'DTI ratio at 54% exceeds maximum threshold of 50%', severity: 'critical' },
-    { policy: '§5.2.3', label: '2 derogatory marks within last 24 months', severity: 'critical' },
-    { policy: '§3.3.1', label: 'Insufficient verified income — stated income exceeds Plaid deposits by 28%', severity: 'high' },
-    { policy: '§4.1.2', label: 'Employment tenure < 1 year at current employer', severity: 'moderate' },
-  ],
-  agentNote: 'Application auto-declined by underwriting agent. Score of 41 (D-tier) falls below minimum threshold of 50 for all loan products. 2 critical policy violations prevent manual override without VP-level exception.',
-  declinedAt: '9:12 AM',
-};
-
-const PRIYA_PROGRESS = {
-  name: 'Priya Patel',
-  appId: 'APP-2025-78143',
-  amount: '$510,000',
-  product: 'ARM 7/1',
-  currentStage: 1,
-  completedStages: [
-    { label: 'Origination', duration: '4.2s', note: '5 documents processed, 2 flagged for multi-page extraction' },
-  ],
-  activeStage: { label: 'Decisioning', elapsed: '2.1s', progress: 60, currentOp: 'Running 7-stage aggregation pipeline...' },
-  logEntries: [
-    { agent: 'Supervisor', action: 'Routing to Loan Application Agent', time: '7:55 AM' },
-    { agent: 'Voyage AI', action: 'Multimodal embedding: tax returns (3 pages)', time: '7:55 AM' },
-    { agent: 'Loan App Agent', action: 'Credit bureau pull: TransUnion', time: '7:56 AM' },
-    { agent: 'Supervisor', action: 'Routing to Underwriting Agent', time: '7:56 AM' },
-    { agent: 'Underwriting Agent', action: 'Aggregation pipeline: 7-stage risk scoring...', time: '7:57 AM' },
-  ],
-};
+// (Scenario data removed — app details now fetched from backend)
 
 // ─── Modified Parameters Badge ───
 
@@ -368,269 +307,7 @@ function AutoAuditSummary({ stageTimestamps, approvalDetails, onRollback, onAcce
   );
 }
 
-// ─── Elena Audit Summary (completed, auto-approved) ───
-
-function ElenaAuditView() {
-  return (
-    <div style={{ padding: 20, overflowY: 'auto', height: '100%' }}>
-      <div style={{
-        padding: 16, background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)',
-        border: '1px solid var(--success)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <span style={{
-            padding: '4px 10px', borderRadius: 12,
-            background: 'var(--success-dim)', color: 'var(--success)',
-            fontWeight: 700, fontSize: 11,
-          }}>
-            ✅ Auto-Approved
-          </span>
-          <span style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-            {ELENA_AUDIT.mode} · 8:32 AM
-          </span>
-        </div>
-
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14,
-          padding: 10, background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)',
-        }}>
-          {[
-            { label: 'Score', value: `${ELENA_AUDIT.score} (${ELENA_AUDIT.tier})`, color: 'var(--success)' },
-            { label: 'Rate', value: ELENA_AUDIT.rate, color: 'var(--mongo)' },
-            { label: 'Amount', value: ELENA_AUDIT.amount },
-            { label: 'Product', value: ELENA_AUDIT.product },
-          ].map((m) => (
-            <div key={m.label}>
-              <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600, marginBottom: 1 }}>{m.label}</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: m.color || 'var(--text-primary)' }}>{m.value}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
-          Stage Audit
-        </div>
-        {ELENA_AUDIT.stages.map((s, i) => (
-          <div key={i} style={{
-            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6,
-            padding: '6px 10px', background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)',
-          }}>
-            <span style={{
-              fontSize: 10, fontWeight: 700,
-              color: s.status === 'passed' ? 'var(--success)' : s.status === 'skipped' ? 'var(--text-dim)' : 'var(--agent-cyan)',
-            }}>
-              {s.status === 'passed' ? '✓' : s.status === 'skipped' ? '—' : '⏳'}
-            </span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-primary)' }}>{s.label}</div>
-              <div style={{ fontSize: 9, color: 'var(--text-secondary)' }}>{s.note}</div>
-            </div>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--mongo)' }}>{s.duration}</span>
-          </div>
-        ))}
-
-        <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 12, marginBottom: 6 }}>
-          Key Decisions
-        </div>
-        {ELENA_AUDIT.decisions.map((d, i) => (
-          <div key={i} style={{ fontSize: 9, color: 'var(--text-secondary)', lineHeight: 1.6 }}>• {d}</div>
-        ))}
-
-        <div style={{
-          display: 'flex', gap: 12, marginTop: 12, padding: '6px 10px',
-          background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)', fontSize: 9, color: 'var(--text-dim)',
-        }}>
-          <span>Tokens: <span style={{ fontWeight: 700, color: 'var(--voyage)' }}>{ELENA_AUDIT.totalTokens.toLocaleString()}</span></span>
-          <span>Cost: <span style={{ fontWeight: 700, color: 'var(--mongo)' }}>{ELENA_AUDIT.totalCost}</span></span>
-          <span>Time: <span style={{ fontWeight: 700, color: 'var(--agent-cyan)' }}>{ELENA_AUDIT.totalLatency}</span></span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── James Decline Card ───
-
-function JamesDeclineView() {
-  return (
-    <div style={{ padding: 20, overflowY: 'auto', height: '100%' }}>
-      <div style={{
-        padding: 16, background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)',
-        border: '1px solid var(--danger)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <span style={{
-            padding: '4px 10px', borderRadius: 12,
-            background: 'var(--danger-dim)', color: 'var(--danger)',
-            fontWeight: 700, fontSize: 11,
-          }}>
-            ✕ Application Declined
-          </span>
-          <span style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-            Auto-declined · {JAMES_DECLINE.declinedAt}
-          </span>
-        </div>
-
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14,
-          padding: 10, background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)',
-        }}>
-          {[
-            { label: 'Score', value: `${JAMES_DECLINE.score} (${JAMES_DECLINE.tier})`, color: 'var(--danger)' },
-            { label: 'Amount', value: JAMES_DECLINE.amount },
-            { label: 'Product', value: JAMES_DECLINE.product },
-            { label: 'Status', value: 'Declined', color: 'var(--danger)' },
-          ].map((m) => (
-            <div key={m.label}>
-              <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600, marginBottom: 1 }}>{m.label}</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: m.color || 'var(--text-primary)' }}>{m.value}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
-          Policy Violations
-        </div>
-        {JAMES_DECLINE.violations.map((v, i) => (
-          <div key={i} style={{
-            padding: '6px 10px', marginBottom: 6,
-            background: v.severity === 'critical' ? 'var(--danger-dim)' : 'var(--bg-raised)',
-            borderRadius: 'var(--radius-sm)',
-            border: `1px solid ${v.severity === 'critical' ? 'var(--danger)' : 'var(--border-dim)'}`,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{
-                fontFamily: 'var(--font-mono)', fontSize: 8, fontWeight: 700,
-                padding: '1px 4px', borderRadius: 3,
-                background: v.severity === 'critical' ? 'var(--danger)' : v.severity === 'high' ? 'var(--hitl-amber)' : 'var(--text-dim)',
-                color: '#fff',
-              }}>
-                {v.severity.toUpperCase()}
-              </span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)' }}>{v.policy}</span>
-            </div>
-            <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 3 }}>{v.label}</div>
-          </div>
-        ))}
-
-        <div style={{
-          padding: '10px 12px', marginTop: 8,
-          background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)',
-          borderLeft: '2px solid var(--danger)',
-        }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
-            Agent Assessment
-          </div>
-          <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-            {JAMES_DECLINE.agentNote}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Priya In-Progress View ───
-
-function PriyaProgressView() {
-  return (
-    <div style={{ padding: 20, overflowY: 'auto', height: '100%' }}>
-      <div style={{
-        padding: 16, background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)',
-        border: '1px solid var(--tool-blue)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <span style={{
-            padding: '4px 10px', borderRadius: 12,
-            background: 'var(--tool-blue-dim)', color: 'var(--tool-blue)',
-            fontWeight: 700, fontSize: 11,
-          }}>
-            ⏳ Processing — Underwriting
-          </span>
-          <span style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-            {PRIYA_PROGRESS.appId}
-          </span>
-        </div>
-
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14,
-          padding: 10, background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)',
-        }}>
-          {[
-            { label: 'Amount', value: PRIYA_PROGRESS.amount },
-            { label: 'Product', value: PRIYA_PROGRESS.product },
-            { label: 'Current Stage', value: 'Decisioning', color: 'var(--tool-blue)' },
-          ].map((m) => (
-            <div key={m.label}>
-              <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600, marginBottom: 1 }}>{m.label}</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: m.color || 'var(--text-primary)' }}>{m.value}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Stage progress */}
-        <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
-          Stage Progress
-        </div>
-        {PRIYA_PROGRESS.completedStages.map((s, i) => (
-          <div key={i} style={{
-            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6,
-            padding: '6px 10px', background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)',
-          }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--success)' }}>✓</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-primary)' }}>{s.label}</div>
-              <div style={{ fontSize: 9, color: 'var(--text-secondary)' }}>{s.note}</div>
-            </div>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--mongo)' }}>{s.duration}</span>
-          </div>
-        ))}
-
-        {/* Active stage with progress bar */}
-        <div style={{
-          padding: '8px 10px', marginBottom: 10,
-          background: 'var(--tool-blue-dim)', borderRadius: 'var(--radius-sm)',
-          border: '1px solid var(--tool-blue)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--tool-blue)' }}>
-              ⏳ {PRIYA_PROGRESS.activeStage.label}
-            </div>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)' }}>
-              {PRIYA_PROGRESS.activeStage.elapsed} elapsed
-            </span>
-          </div>
-          <div style={{ fontSize: 9, color: 'var(--text-secondary)', marginBottom: 6 }}>
-            {PRIYA_PROGRESS.activeStage.currentOp}
-          </div>
-          <div style={{ height: 3, borderRadius: 2, background: 'var(--bg-raised)', overflow: 'hidden' }}>
-            <div style={{
-              width: `${PRIYA_PROGRESS.activeStage.progress}%`,
-              height: '100%', borderRadius: 2,
-              background: 'var(--tool-blue)',
-              transition: 'width 0.3s',
-            }} />
-          </div>
-        </div>
-
-        {/* Recent log entries */}
-        <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
-          Recent Activity
-        </div>
-        {PRIYA_PROGRESS.logEntries.map((e, i) => (
-          <div key={i} style={{
-            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4,
-            padding: '4px 8px', fontSize: 9, color: 'var(--text-secondary)',
-          }}>
-            <span style={{ fontWeight: 600, color: 'var(--text-primary)', minWidth: 100 }}>{e.agent}</span>
-            <span style={{ flex: 1 }}>{e.action}</span>
-            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-dim)', fontSize: 8 }}>{e.time}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+// (Scenario view components removed — app details now fetched from backend)
 
 // ─── Manual Review Workspace ───
 
@@ -1157,6 +834,7 @@ export default function LoanOfficerDashboard() {
   const stageTimestampsRef = useRef([]);
   const { toasts, addToast, removeToast } = useToasts();
   const [liveApplications, setLiveApplications] = useState([]);
+  const [selectedAppDetail, setSelectedAppDetail] = useState(null);
 
   const isPrimaryApp = selectedApp === 'APP-2026-00001';
   const showPreview = isPrimaryApp && workflowPhase === 'preview' && (autonomyLevel === 'observe' || autonomyLevel === 'suggest');
@@ -1193,6 +871,17 @@ export default function LoanOfficerDashboard() {
 
     return () => ws.close();
   }, []);
+
+  // Fetch selected application detail from backend
+  useEffect(() => {
+    if (!selectedApp) {
+      setSelectedAppDetail(null);
+      return;
+    }
+    apiGet(`/applications/${selectedApp}`).then((data) => {
+      setSelectedAppDetail(data);
+    });
+  }, [selectedApp]);
 
   // Reactive dashboard stats
   const dashboardStats = useMemo(() => {
@@ -1326,8 +1015,6 @@ export default function LoanOfficerDashboard() {
 
   const currentWorkflow = WORKFLOW_STAGES[workflowStage] || WORKFLOW_STAGES[WORKFLOW_STAGES.length - 1];
   const selectedAppData = liveApplications.find((a) => a.application_id === selectedApp);
-
-  const isScenarioApp = false;
 
   const statusBadge = () => {
     if (!isPrimaryApp) return null;
@@ -1463,23 +1150,30 @@ export default function LoanOfficerDashboard() {
               </>
             ) : isPrimaryApp && workflowPhase === 'manual' ? (
               <ManualWorkspace onApprove={handleApprove} addToast={addToast} />
-            ) : selectedApp === 'APP-2025-78215' ? (
-              <ElenaAuditView />
-            ) : selectedApp === 'APP-2025-78091' ? (
-              <JamesDeclineView />
-            ) : selectedApp === 'APP-2025-78143' ? (
-              <PriyaProgressView />
             ) : !isPrimaryApp ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-dim)', fontSize: 13 }}>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>
-                    {selectedAppData?.name} — {selectedAppData?.statusLabel}
-                  </div>
-                  <div style={{ fontSize: 11, marginTop: 4 }}>
-                    {selectedAppData?.amount} · {selectedAppData?.product}
-                    {selectedAppData?.score && ` · Score: ${selectedAppData.score} (${selectedAppData.tier})`}
-                  </div>
+                  {selectedAppDetail ? (
+                    <>
+                      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>
+                        {selectedAppDetail.primary_name || selectedAppData?.name || 'Application'} — {selectedAppDetail.status || selectedAppData?.statusLabel || 'Unknown'}
+                      </div>
+                      <div style={{ fontSize: 11, marginTop: 4 }}>
+                        {selectedAppDetail.loan_amount ? `$${Number(selectedAppDetail.loan_amount).toLocaleString()}` : selectedAppData?.amount} · {selectedAppDetail.product || selectedAppData?.product || ''}
+                        {selectedAppDetail.risk_score && ` · Score: ${selectedAppDetail.risk_score}`}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>
+                        {selectedAppData?.name || 'Loading...'}
+                      </div>
+                      <div style={{ fontSize: 11, marginTop: 4 }}>
+                        {selectedAppData?.amount} · {selectedAppData?.product}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             ) : null}
@@ -1522,7 +1216,6 @@ export default function LoanOfficerDashboard() {
         </div>
 
         <AgentActivityLog
-          autoPlay={!liveApplications.find((a) => a.application_id === selectedApp) && isPrimaryApp && (workflowPhase === 'executing' || workflowPhase === 'observe-step')}
           onEvent={handleAgentEvent}
           applicationId={liveApplications.find((a) => a.application_id === selectedApp)?.application_id || null}
         />

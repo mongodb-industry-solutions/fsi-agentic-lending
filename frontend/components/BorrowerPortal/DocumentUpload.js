@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { apiGet } from '../../lib/api';
+import { useState, useEffect, useRef } from 'react';
+import { apiGet, apiUpload } from '../../lib/api';
 import DocumentJsonViewer from '../DocumentJsonViewer';
 
 const INITIAL_DOCUMENTS = [
@@ -161,6 +161,25 @@ const INITIAL_DOCUMENTS = [
   },
 ];
 
+function inferDocType(filename) {
+  const name = filename.toLowerCase();
+  if (name.includes('id') || name.includes('government')) return 'government_id';
+  if (name.includes('employment')) return 'employment_letter';
+  if (name.includes('paystub') || name.includes('pay_stub')) return 'paystubs';
+  if (name.includes('tax') && !name.includes('property')) return 'income_tax';
+  if (name.includes('bank')) return 'bank_statements';
+  if (name.includes('purchase') || name.includes('agreement')) return 'purchase_agreement';
+  if (name.includes('invest')) return 'investment_statements';
+  if (name.includes('property') && name.includes('doc')) return 'other_property_docs';
+  if (name.includes('mortgage') || name.includes('application')) return 'mortgage_application';
+  if (name.includes('utility') || name.includes('bill')) return 'utility_bills';
+  if (name.includes('credit')) return 'credit_report';
+  if (name.includes('car') || name.includes('loan')) return 'car_loan_statement';
+  if (name.includes('property') && name.includes('tax')) return 'property_tax';
+  if (name.includes('inspection')) return 'property_inspection';
+  return 'unknown';
+}
+
 function DocCard({ doc, onViewJson }) {
   return (
     <div style={{
@@ -228,7 +247,12 @@ function DocCard({ doc, onViewJson }) {
           <span>·</span>
           <span>{doc.pages} page{doc.pages > 1 ? 's' : ''}</span>
           <span>·</span>
-          <span style={{ color: 'var(--success)', fontWeight: 600 }}>✓ Uploaded</span>
+          <span style={{
+            color: doc.status === 'error' ? 'var(--danger)' : doc.status === 'uploading' ? 'var(--hitl-amber)' : 'var(--success)',
+            fontWeight: 600,
+          }}>
+            {doc.status === 'uploading' ? '⏳ Uploading...' : doc.status === 'error' ? '✕ Error' : '✓ Uploaded'}
+          </span>
         </div>
         <div style={{
           marginTop: 6,
@@ -255,6 +279,7 @@ export default function DocumentUpload({ applicationId }) {
   const [dragOver, setDragOver] = useState(false);
   const [documents, setDocuments] = useState(INITIAL_DOCUMENTS);
   const [viewingJsonId, setViewingJsonId] = useState(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (!applicationId) return;
@@ -268,6 +293,42 @@ export default function DocumentUpload({ applicationId }) {
     });
   }, [applicationId]);
 
+  const handleFiles = async (files) => {
+    if (!files.length || !applicationId) return;
+
+    for (const file of files) {
+      const docType = inferDocType(file.name);
+
+      // Update card to show uploading state
+      setDocuments(prev => prev.map(d =>
+        d.docType === docType ? { ...d, status: 'uploading' } : d
+      ));
+
+      const result = await apiUpload(
+        `/applications/${applicationId}/documents/upload`,
+        file,
+        { doc_type: docType }
+      );
+
+      if (result) {
+        setDocuments(prev => prev.map(d =>
+          d.docType === docType ? { ...d, status: 'uploaded', mongoId: result._id } : d
+        ));
+      } else {
+        setDocuments(prev => prev.map(d =>
+          d.docType === docType ? { ...d, status: 'error' } : d
+        ));
+      }
+    }
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const files = Array.from(e.dataTransfer?.files || []);
+    await handleFiles(files);
+  };
+
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', borderLeft: '1px solid var(--border-dim)' }}>
       <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 20, marginBottom: 4, color: 'var(--text-primary)' }}>
@@ -277,11 +338,22 @@ export default function DocumentUpload({ applicationId }) {
         Upload income verification, bank statements, and identification.
       </div>
 
+      {/* Hidden file input for keyboard accessibility */}
+      <input
+        type="file"
+        multiple
+        accept=".pdf"
+        style={{ display: 'none' }}
+        ref={fileInputRef}
+        onChange={(e) => handleFiles(Array.from(e.target.files))}
+      />
+
       {/* Drop zone */}
       <div
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => { e.preventDefault(); setDragOver(false); }}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
         style={{
           padding: 24,
           borderRadius: 'var(--radius-md)',
@@ -295,7 +367,7 @@ export default function DocumentUpload({ applicationId }) {
       >
         <div style={{ fontSize: 28, marginBottom: 6 }}>📂</div>
         <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)', marginBottom: 2 }}>
-          Drag & drop files here
+          Drag & drop files here or click to browse
         </div>
         <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
           PDF, JPG, PNG up to 10MB each
