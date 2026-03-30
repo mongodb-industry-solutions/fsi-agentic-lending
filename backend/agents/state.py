@@ -1,0 +1,37 @@
+"""LendFlow agent state definition for LangGraph."""
+from typing import TypedDict, Annotated, Literal, Optional
+from langgraph.graph.message import add_messages
+
+
+class LendFlowState(TypedDict):
+    """State shared across all agents in the lending workflow."""
+    messages: Annotated[list, add_messages]
+    application_id: str
+    current_agent: str
+
+    # Document processing
+    documents_verified: bool
+    document_count: int
+    extraction_summary: str
+
+    # Credit
+    credit_pulled: bool
+    primary_credit_score: Optional[int]
+    co_applicant_credit_score: Optional[int]
+
+    # Underwriting
+    gds_ratio: Optional[float]
+    tds_ratio: Optional[float]
+    risk_score: Optional[float]
+    risk_tier: Optional[str]
+    policy_citations: list[str]
+
+    # Decision
+    decision: Optional[str]  # approve / decline / escalate
+    decision_reasoning: str
+
+    # HITL
+    officer_notes: Optional[str]
+
+    # Activity tracking
+    activity_log: list[dict]
