@@ -1,2 +1,233 @@
-@import "tailwindcss";
+/* ===================== DESIGN TOKENS (CSS Variables) ===================== */
+:root {
+  --bg-void: #f8fafc;
+  --bg-base: #ffffff;
+  --bg-surface: #f1f5f9;
+  --bg-raised: #e2e8f0;
+  --bg-overlay: #cbd5e1;
+  --border-dim: #e2e8f0;
+  --border-base: #cbd5e1;
+  --border-bright: #94a3b8;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-dim: #94a3b8;
+  --mongo: #00884a;
+  --mongo-dim: rgba(0, 136, 74, 0.06);
+  --mongo-glow: rgba(0, 136, 74, 0.18);
+  --mongo-bright: #00b864;
+  --voyage: #6341e0;
+  --voyage-dim: rgba(99, 65, 224, 0.07);
+  --voyage-glow: rgba(99, 65, 224, 0.18);
+  --agent-cyan: #0891b2;
+  --agent-cyan-dim: rgba(8, 145, 178, 0.07);
+  --tool-blue: #2563eb;
+  --tool-blue-dim: rgba(37, 99, 235, 0.07);
+  --hitl-amber: #d97706;
+  --hitl-amber-dim: rgba(217, 119, 6, 0.06);
+  --hitl-amber-glow: rgba(217, 119, 6, 0.18);
+  --danger: #dc2626;
+  --danger-dim: rgba(220, 38, 38, 0.06);
+  --success: #059669;
+  --success-dim: rgba(5, 150, 105, 0.07);
+  --font-display: "Manrope", sans-serif;
+  --font-body: "DM Sans", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --langsmith: #64748b;
+  --canvas-grid: #f1f5f9;
+  --canvas-inactive-stroke: #cbd5e1;
+  --canvas-inactive-fill: #f8fafc;
+  --canvas-text-active: #0f172a;
+  --canvas-text-inactive: #94a3b8;
+  --bg-header: rgba(255, 255, 255, 0.92);
+  --bg-overlay-alpha: rgba(255, 255, 255, 0.92);
+  --bg-backdrop: rgba(241, 245, 249, 0.9);
+}
 
+/* ===================== BASE RESETS ===================== */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 14px;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-void);
+  color: var(--text-primary);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===================== SCROLLBAR ===================== */
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+/* ===================== SCREEN TRANSITIONS ===================== */
+.screen-content {
+  animation: screenEnter 0.35s ease-out forwards;
+}
+
+@keyframes screenEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===================== SCENE TRANSITIONS ===================== */
+.scene-content {
+  animation: sceneEnter 0.4s ease-out forwards;
+}
+
+@keyframes sceneEnter {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes sceneTitleEnter {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes toastEnter {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes toastExit {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+}
+
+@keyframes logoShine {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+/* ===================== RESPONSIVE ===================== */
+@media (max-width: 1024px) {
+  .app-main .screen-content {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+@media (max-width: 900px) {
+  .scene-grid-2col {
+    grid-template-columns: 1fr !important;
+  }
+  .scene-stats-row {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0 12px;
+  }
+  .app-header .header-right {
+    display: none;
+  }
+  .app-main .screen-content {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .demo-layout {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto auto 280px !important;
+  }
+  .scene-stats-row {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+/* ===================== REDUCED MOTION ===================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,282 @@
+"use client";
+
+import { useMemo, useState, useEffect, useCallback } from 'react';
+import { FUNDING_STEPS } from '../engine/demoScenes';
+import { mergeCanvasState } from '../engine/canvasUtils';
+import WorkflowCanvas from '../WorkflowCanvas';
+import AnnotationOverlay from '../AnnotationOverlay';
+import DataSourceStrip from '../DataSourceStrip';
+import PipelineTimeline from '../PipelineTimeline';
+
+const TIMELINE_EVENTS = [
+  { icon: '📡', label: 'Change Stream fires', detail: 'watch() detects status → "approved"', status: 'active', feature: 'Change Streams' },
+  { icon: '⚡', label: 'Funding workflow initiated', detail: 'Event-driven automation starts', status: 'active', feature: 'Change Streams' },
+  { icon: '💰', label: 'Ledger entry created', detail: '$285,000 disbursed to borrower', status: 'funded', feature: 'Document Model' },
+  { icon: '✅', label: 'Loan activated', detail: 'Live financial object in MongoDB', status: 'active', feature: 'Document Model' },
+];
+
+const ACCOUNTING = [
+  { entry: 'Loan Disbursement', debit: '$285,000.00', credit: '—', balance: '$285,000.00', type: 'debit' },
+  { entry: 'Escrow Reserve', debit: '$4,275.00', credit: '—', balance: '$289,275.00', type: 'debit' },
+  { entry: 'Origination Fee', debit: '—', credit: '$2,850.00', balance: '$286,425.00', type: 'credit' },
+];
+
+const DOC_STAGES = [
+  {
+    label: 'Origination',
+    color: 'var(--agent-cyan)',
+    fields: `"applicationId": "APP-2025-78342",
+"applicant": {
+  "name": "Sarah M. Chen",
+  "income": 142380.00,
+  "fico": 742
+},
+"documents": [{ "type": "W-2", "verified": true }]`,
+  },
+  {
+    label: 'Decisioning',
+    color: 'var(--tool-blue)',
+    fields: `"riskScore": 72,
+"riskTier": "B+",
+"rate": 6.875,
+"fraudScan": "CLEAR",
+"policyMatch": "30yr_fixed_standard"`,
+  },
+  {
+    label: 'Approval',
+    color: 'var(--hitl-amber)',
+    fields: `"decision": "APPROVED",
+"terms": {
+  "type": "30-Year Fixed",
+  "apr": 6.875,
+  "monthlyPayment": 1870
+},
+"disclosures": ["TILA", "RESPA", "CFPB"]`,
+  },
+  {
+    label: 'Funding',
+    color: 'var(--mongo)',
+    fields: `"disbursement": {
+  "amount": 285000.00,
+  "date": "2025-01-28",
+  "method": "ACH"
+},
+"balance": {
+  "outstanding": 285000.00,
+  "escrow": 4275.00
+},
+"status": "active"`,
+  },
+];
+
+function syntaxHighlight(text) {
+  return text
+    .replace(/"([^"]+)":/g, '<span style="color:var(--agent-cyan)">"$1"</span>:')
+    .replace(/: "([^"]+)"/g, ': <span style="color:var(--mongo)">"$1"</span>')
+    .replace(/: (\d+\.?\d*)/g, ': <span style="color:var(--voyage)">$1</span>')
+    .replace(/: (true|false)/g, ': <span style="color:var(--hitl-amber)">$1</span>')
+    .replace(/\["([^"]+)"(?:,\s*"([^"]+)")*(?:,\s*"([^"]+)")?\]/g, (match) => {
+      return match.replace(/"([^"]+)"/g, '<span style="color:var(--mongo)">"$1"</span>');
+    });
+}
+
+function StatusBadge({ status }) {
+  const colors = {
+    approved: { bg: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)' },
+    funded: { bg: 'var(--success-dim)', color: 'var(--success)' },
+    active: { bg: 'var(--mongo-dim)', color: 'var(--mongo)' },
+  };
+  const c = colors[status] || colors.approved;
+  return (
+    <span style={{ padding: '4px 10px', borderRadius: 12, background: c.bg, color: c.color, fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>
+      {status}
+    </span>
+  );
+}
+
+export default function FundingScene({ sceneStep, currentStepData }) {
+  const started = sceneStep >= 0;
+  const [currentStatus, setCurrentStatus] = useState('approved');
+  const [hoveredNode, setHoveredNode] = useState(null);
+  const [timelineHighlight, setTimelineHighlight] = useState(null);
+
+  const handleNodeHover = useCallback((nodeId) => setHoveredNode(nodeId), []);
+  const handleTimelineHover = useCallback((nodeId) => setTimelineHighlight(nodeId), []);
+
+  useEffect(() => {
+    if (sceneStep >= 3) setCurrentStatus('active');
+    else if (sceneStep >= 2) setCurrentStatus('funded');
+    else setCurrentStatus('approved');
+  }, [sceneStep]);
+
+  const canvasState = useMemo(
+    () => mergeCanvasState(FUNDING_STEPS, sceneStep),
+    [sceneStep],
+  );
+
+  const visibleDocStages = DOC_STAGES.filter((_, i) => {
+    if (i <= 2) return true;
+    if (i === 3) return sceneStep >= 2;
+    return false;
+  });
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <DataSourceStrip sceneKey="funding" sceneStep={sceneStep} totalSteps={FUNDING_STEPS.length} />
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <WorkflowCanvas
+              activeNodes={canvasState.activeNodes}
+              activeEdges={canvasState.activeEdges}
+              pulsingNodes={canvasState.pulsingNodes}
+              completedNodes={canvasState.completedNodes}
+              currentScene="funding"
+              onNodeHover={handleNodeHover}
+              highlightNode={timelineHighlight}
+            />
+          </div>
+          <AnnotationOverlay
+            currentStep={currentStepData}
+            sceneTitle="Funding"
+            stepIndex={sceneStep}
+            totalSteps={FUNDING_STEPS.length}
+          />
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: 16 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            <div style={{ flex: 1, padding: '8px 10px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--danger)', borderLeftWidth: 3 }}>
+              <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>Traditional</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 800, color: 'var(--danger)' }}>T+3 to T+5</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Batch settlement</div>
+            </div>
+            <div style={{ flex: 1, padding: '8px 10px', background: 'var(--mongo-dim)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--mongo)', borderLeftWidth: 3 }}>
+              <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>Agentic</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 800, color: 'var(--mongo)' }}>Event-driven</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Instant settlement</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13 }}>Funding Timeline</div>
+            <StatusBadge status={currentStatus} />
+          </div>
+
+          <div style={{ position: 'relative', paddingLeft: 20, marginBottom: 20 }}>
+            <div style={{ position: 'absolute', left: 8, top: 0, bottom: 0, width: 2, background: 'var(--border-dim)' }} />
+            {TIMELINE_EVENTS.map((event, i) => {
+              const reached = sceneStep >= i;
+              return (
+                <div key={i} style={{ position: 'relative', paddingLeft: 20, paddingBottom: 16, opacity: reached ? 1 : 0.4, transition: 'opacity 0.4s' }}>
+                  <div style={{ position: 'absolute', left: 0, top: 4, width: 16, height: 16, borderRadius: '50%', background: reached ? 'var(--bg-surface)' : 'var(--bg-raised)', border: `2px solid ${reached ? 'var(--mongo)' : 'var(--border-dim)'}`, zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8 }}>
+                    {reached ? '✓' : ''}
+                  </div>
+                  <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 2 }}>{event.icon} {event.label}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{event.detail}</div>
+                  <span style={{ fontSize: 9, color: 'var(--agent-cyan)', padding: '1px 6px', background: 'var(--bg-raised)', borderRadius: 3, marginTop: 4, display: 'inline-block' }}>{event.feature}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {sceneStep >= 1 && (
+            <>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Accounting Entries</div>
+              <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', overflow: 'hidden', marginBottom: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', padding: '8px 10px', borderBottom: '1px solid var(--border-dim)', textTransform: 'uppercase' }}>
+                  <span>Entry</span><span>Debit</span><span>Credit</span><span>Balance</span>
+                </div>
+                {ACCOUNTING.map((row) => (
+                  <div key={row.entry} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', fontSize: 11, padding: '8px 10px', borderBottom: '1px solid var(--border-dim)', fontFamily: 'var(--font-mono)' }}>
+                    <span style={{ fontFamily: 'var(--font-body)', fontWeight: 500 }}>{row.entry}</span>
+                    <span style={{ color: row.type === 'debit' ? 'var(--danger)' : 'var(--text-dim)' }}>{row.debit}</span>
+                    <span style={{ color: row.type === 'credit' ? 'var(--success)' : 'var(--text-dim)' }}>{row.credit}</span>
+                    <span style={{ fontWeight: 600 }}>{row.balance}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {sceneStep >= 1 && (
+            <div style={{ padding: 10, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', marginBottom: 14, animation: 'slideDown 0.3s ease-out' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>Funding Rails</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[
+                  { label: 'ACH', active: true },
+                  { label: 'Wire', active: false },
+                  { label: 'Real-Time Payments (RTP)', active: false },
+                ].map((r) => (
+                  <span key={r.label} style={{
+                    fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 10,
+                    background: r.active ? 'var(--mongo-dim)' : 'var(--bg-raised)',
+                    color: r.active ? 'var(--mongo)' : 'var(--text-dim)',
+                    border: r.active ? '1px solid var(--mongo)' : '1px solid var(--border-dim)',
+                  }}>
+                    {r.active && '✓ '}{r.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, marginBottom: 4 }}>MongoDB Document Evolution</div>
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.6 }}>
+            One document grows through each lifecycle stage. No ETL — just <strong style={{ color: 'var(--mongo)' }}>MongoDB's flexible document model</strong>.
+          </div>
+
+          {visibleDocStages.map((stage, i) => (
+            <div key={stage.label} style={{ marginBottom: 10, animation: i === visibleDocStages.length - 1 && sceneStep >= 2 ? 'sceneEnter 0.4s ease-out' : undefined }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: stage.color }} />
+                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, color: stage.color }}>{stage.label}</span>
+                {i < visibleDocStages.length - 1 && (
+                  <span style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>✓</span>
+                )}
+              </div>
+              <pre
+                style={{
+                  padding: 8,
+                  background: 'var(--bg-surface)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: `1px solid ${i === visibleDocStages.length - 1 ? stage.color + '44' : 'var(--border-dim)'}`,
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9,
+                  lineHeight: 1.5,
+                  overflowX: 'auto',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  opacity: i === visibleDocStages.length - 1 ? 1 : 0.7,
+                }}
+                dangerouslySetInnerHTML={{ __html: syntaxHighlight(stage.fields) }}
+              />
+            </div>
+          ))}
+
+          {sceneStep >= 3 && (
+            <div style={{ marginTop: 12, padding: 14, background: 'var(--mongo-dim)', borderRadius: 'var(--radius-md)', border: '1px solid var(--mongo)', textAlign: 'center' }}>
+              <div style={{ fontSize: 20, marginBottom: 6 }}>🍃</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, color: 'var(--mongo)', marginBottom: 4 }}>One Document. One Platform.</div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                Application → Risk → Decision → Disbursement — all in a single MongoDB document. Zero data shipping.
+              </div>
+              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--mongo)', fontWeight: 600 }}>
+                Zero schema migrations. The loan document grew from 12 fields (origination) to 47 fields (funded) — all in one collection.
+              </div>
+            </div>
+          )}
+          </div>
+        </div>
+
+        <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: 16 }}>
+          <PipelineTimeline
+            steps={FUNDING_STEPS}
+            stepIndex={sceneStep}
+            onEntryHover={handleTimelineHover}
+            highlightNodeId={hoveredNode}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}

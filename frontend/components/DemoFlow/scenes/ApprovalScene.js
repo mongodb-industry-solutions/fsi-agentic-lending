@@ -1,0 +1,291 @@
+"use client";
+
+import { useMemo, useState, useCallback } from 'react';
+import { APPROVAL_STEPS } from '../engine/demoScenes';
+import { mergeCanvasState } from '../engine/canvasUtils';
+import WorkflowCanvas from '../WorkflowCanvas';
+import AnnotationOverlay from '../AnnotationOverlay';
+import DataSourceStrip from '../DataSourceStrip';
+import PipelineTimeline from '../PipelineTimeline';
+
+const CHECKPOINT_DATA = {
+  checkpointId: 'cp-7g8h9i',
+  thread: 'thr-78342',
+  step: 'hitl_gate',
+  savedAt: '2025-01-28T14:23:01.520Z',
+};
+
+const PAYLOAD = {
+  applicant: 'Sarah Chen',
+  applicationId: 'APP-2025-78342',
+  loanAmount: '$285,000',
+  product: '30-Year Fixed',
+  riskScore: 72,
+  riskTier: 'B+',
+  proposedRate: '6.875%',
+  monthlyPayment: '$1,870',
+  dti: 0.31,
+  ltv: 71.3,
+  triggerReason: '3 recent hard inquiries per policy §4.2.1',
+};
+
+const LOAN_TERMS = {
+  type: '30-Year Fixed Mortgage',
+  apr: '6.875%',
+  monthlyPayment: '$1,870',
+  totalInterest: '$387,200',
+  totalCost: '$672,200',
+  firstPayment: 'March 1, 2025',
+  maturity: 'February 28, 2055',
+};
+
+const AMORTIZATION = [
+  { month: 1, payment: '$1,870.00', principal: '$235.94', interest: '$1,634.06', balance: '$284,764.06' },
+  { month: 2, payment: '$1,870.00', principal: '$237.30', interest: '$1,632.70', balance: '$284,526.76' },
+  { month: 3, payment: '$1,870.00', principal: '$238.66', interest: '$1,631.34', balance: '$284,288.10' },
+];
+
+const DISCLOSURES = [
+  { rule: 'TILA — Truth in Lending Act', met: true },
+  { rule: 'RESPA — Real Estate Settlement Procedures', met: true },
+  { rule: 'CFPB — Consumer Financial Protection', met: true },
+  { rule: 'Fair Lending — ECOA / Reg B', met: true },
+];
+
+export default function ApprovalScene({ sceneStep, hitlWaiting, hitlApproved, onApprove, onDecline, elapsedMs, currentStepData }) {
+  const [hoveredNode, setHoveredNode] = useState(null);
+  const [timelineHighlight, setTimelineHighlight] = useState(null);
+
+  const handleNodeHover = useCallback((nodeId) => setHoveredNode(nodeId), []);
+  const handleTimelineHover = useCallback((nodeId) => setTimelineHighlight(nodeId), []);
+
+  const canvasState = useMemo(
+    () => mergeCanvasState(APPROVAL_STEPS, sceneStep),
+    [sceneStep],
+  );
+
+  if (hitlApproved) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+        <DataSourceStrip sceneKey="approval" sceneStep={sceneStep} totalSteps={APPROVAL_STEPS.length} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', flex: 1, minHeight: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <WorkflowCanvas
+                activeNodes={canvasState.activeNodes}
+                activeEdges={canvasState.activeEdges}
+                pulsingNodes={canvasState.pulsingNodes}
+                completedNodes={canvasState.completedNodes}
+                currentScene="approval"
+                onNodeHover={handleNodeHover}
+                highlightNode={timelineHighlight}
+              />
+            </div>
+            <AnnotationOverlay
+              currentStep={currentStepData}
+              sceneTitle="Approval"
+              stepIndex={sceneStep}
+              totalSteps={APPROVAL_STEPS.length}
+            />
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: 16 }}>
+              <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>✅</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 22, color: 'var(--mongo)', marginBottom: 4 }}>LOAN APPROVED</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  {LOAN_TERMS.type} @ {LOAN_TERMS.apr} · {LOAN_TERMS.monthlyPayment}/mo
+                </div>
+              </div>
+
+              <div style={{ padding: 16, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', marginBottom: 16 }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: 10 }}>Loan Terms</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  {Object.entries(LOAN_TERMS).map(([key, val]) => (
+                    <div key={key}>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>{key.replace(/([A-Z])/g, ' $1').trim()}</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: key === 'apr' || key === 'monthlyPayment' ? 'var(--mongo)' : 'var(--text-primary)' }}>{val}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: 10 }}>Repayment Schedule Preview</div>
+              <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', overflow: 'hidden', marginBottom: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', padding: '8px 10px', borderBottom: '1px solid var(--border-dim)', textTransform: 'uppercase' }}>
+                  <span>Month</span><span>Payment</span><span>Principal</span><span>Interest</span><span>Balance</span>
+                </div>
+                {AMORTIZATION.map((row) => (
+                  <div key={row.month} style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', fontSize: 10, padding: '7px 10px', borderBottom: '1px solid var(--border-dim)', fontFamily: 'var(--font-mono)' }}>
+                    <span>{row.month}</span>
+                    <span>{row.payment}</span>
+                    <span style={{ color: 'var(--mongo)' }}>{row.principal}</span>
+                    <span style={{ color: 'var(--text-dim)' }}>{row.interest}</span>
+                    <span>{row.balance}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: 10 }}>Regulatory Disclosures</div>
+              {DISCLOSURES.map((d) => (
+                <div key={d.rule} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--border-dim)', fontSize: 12 }}>
+                  <span style={{ color: 'var(--success)', fontSize: 14 }}>✓</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{d.rule}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: 16 }}>
+            <PipelineTimeline
+              steps={APPROVAL_STEPS}
+              stepIndex={sceneStep}
+              onEntryHover={handleTimelineHover}
+              highlightNodeId={hoveredNode}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <DataSourceStrip sceneKey="approval" sceneStep={sceneStep} totalSteps={APPROVAL_STEPS.length} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', flex: 1, minHeight: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <WorkflowCanvas
+              activeNodes={canvasState.activeNodes}
+              activeEdges={canvasState.activeEdges}
+              pulsingNodes={canvasState.pulsingNodes}
+              completedNodes={canvasState.completedNodes}
+              currentScene="approval"
+              onNodeHover={handleNodeHover}
+              highlightNode={timelineHighlight}
+            />
+          </div>
+          <AnnotationOverlay
+            currentStep={currentStepData}
+            sceneTitle="Approval"
+            stepIndex={sceneStep}
+            totalSteps={APPROVAL_STEPS.length}
+          />
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: 16 }}>
+            <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12 }}>Routing Decision</div>
+              <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'var(--mongo-dim)', color: 'var(--mongo)' }}>
+                Auto-decisioning rate: 70–83%
+              </span>
+            </div>
+            {[
+              { tier: 1, label: 'Low Risk (score > 85)', action: 'Auto-approve — no human review', active: false },
+              { tier: 2, label: 'Medium Risk (score 60–85)', action: 'Junior officer review', active: true },
+              { tier: 3, label: 'High Risk (score < 60)', action: 'Senior underwriter escalation', active: false },
+            ].map((t) => (
+              <div key={t.tier} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 'var(--radius-sm)', background: t.active ? 'var(--hitl-amber-dim)' : 'transparent', border: t.active ? '1px solid var(--hitl-amber)' : '1px solid transparent', marginBottom: 4 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: t.active ? 'var(--hitl-amber)' : 'var(--text-dim)', flexShrink: 0 }}>
+                  Tier {t.tier}
+                </span>
+                <span style={{ fontSize: 10, color: 'var(--text-secondary)', flex: 1 }}>{t.label}</span>
+                <span style={{ fontSize: 10, fontWeight: 600, color: t.active ? 'var(--hitl-amber)' : 'var(--text-dim)' }}>
+                  {t.action} {t.active && '← THIS APPLICATION'}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ padding: 28, background: 'var(--bg-surface)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border-base)', boxShadow: '0 12px 40px rgba(0,0,0,0.06)' }}>
+            <div style={{ padding: '10px 14px', background: 'var(--hitl-amber-dim)', borderRadius: 'var(--radius-md)', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 18 }}>💾</span>
+              <div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--hitl-amber)' }}>State saved to MongoDB — MongoDBSaver</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
+                  checkpoint({CHECKPOINT_DATA.checkpointId}) · thread: {CHECKPOINT_DATA.thread} · step: {CHECKPOINT_DATA.step}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ padding: '6px 12px', background: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)', borderRadius: 20, fontSize: 12, fontWeight: 700, display: 'inline-block', marginBottom: 12 }}>
+                ⏸ Human Review Required
+              </div>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18 }}>LangGraph interrupt() triggered</div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>{PAYLOAD.triggerReason}</div>
+            </div>
+
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6, padding: 10, background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)', marginBottom: 16 }}>
+              The agent workflow is paused at this node. All state is persisted to MongoDB via MongoDBSaver. The loan officer reviews and decides.
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Risk Score</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--hitl-amber)' }}>{PAYLOAD.riskScore} <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>/ 100</span></div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Loan Amount</div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{PAYLOAD.loanAmount}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Proposed Rate</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--mongo)' }}>{PAYLOAD.proposedRate}</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 20, padding: 12, background: 'var(--bg-raised)', borderRadius: 'var(--radius-md)' }}>
+              {[
+                { label: 'Applicant', value: PAYLOAD.applicant },
+                { label: 'Product', value: PAYLOAD.product },
+                { label: 'DTI', value: PAYLOAD.dti },
+                { label: 'LTV', value: `${PAYLOAD.ltv}%` },
+              ].map((item) => (
+                <div key={item.label}>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>{item.label}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600 }}>{item.value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', marginBottom: 16 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: 8 }}>Generated Loan Terms</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: 11 }}>
+                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>TYPE</div><div style={{ fontWeight: 600 }}>30yr Fixed</div></div>
+                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>APR</div><div style={{ fontWeight: 600, color: 'var(--mongo)' }}>6.875%</div></div>
+                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>MONTHLY</div><div style={{ fontWeight: 600 }}>$1,870</div></div>
+                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>TOTAL INTEREST</div><div style={{ fontWeight: 600 }}>$387,200</div></div>
+                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>FIRST PAYMENT</div><div style={{ fontWeight: 600 }}>Mar 1, 2025</div></div>
+                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>MATURITY</div><div style={{ fontWeight: 600 }}>Feb 2055</div></div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button type="button" onClick={onApprove} style={{ flex: 1, padding: 14, borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--mongo)', color: '#ffffff', fontFamily: 'var(--font-display)', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+                ✓ Approve Loan
+              </button>
+              <button type="button" onClick={onApprove} style={{ flex: 1, padding: 14, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-base)', background: 'var(--bg-raised)', color: 'var(--text-primary)', fontFamily: 'var(--font-display)', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
+                ✎ Modify Terms
+              </button>
+              <button type="button" onClick={onDecline} style={{ flex: 1, padding: 14, borderRadius: 'var(--radius-md)', border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', fontFamily: 'var(--font-display)', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
+                ✕ Decline
+              </button>
+            </div>
+
+            <div style={{ marginTop: 16, fontSize: 11, color: 'var(--text-dim)', textAlign: 'center' }}>
+              Workflow will resume from this checkpoint — no data lost
+            </div>
+          </div>
+          </div>
+        </div>
+
+        <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: 16 }}>
+          <PipelineTimeline
+            steps={APPROVAL_STEPS}
+            stepIndex={sceneStep}
+            onEntryHover={handleTimelineHover}
+            highlightNodeId={hoveredNode}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
