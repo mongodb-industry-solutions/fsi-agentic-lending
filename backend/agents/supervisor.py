@@ -1,8 +1,6 @@
 """Supervisor agent — routes work to specialized agents."""
-import os
 from agents.state import LendFlowState
 from agents.tools import log_agent_activity
-from bedrock.anthropic_chat_completions import BedrockAnthropicChatCompletions
 
 
 def supervisor_node(state: LendFlowState) -> dict:

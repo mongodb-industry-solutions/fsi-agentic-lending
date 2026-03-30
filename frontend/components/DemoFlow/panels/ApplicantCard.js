@@ -4,7 +4,7 @@ import { APPLICANT, DOCUMENTS } from '../../../lib/data/applicant';
 
 function docStatusForStep(stepIndex, docId) {
   if (stepIndex < 0) return 'pending';
-  const order = ['doc-w2', 'doc-bank', 'doc-credit', 'doc-appraisal'];
+  const order = ['doc-employment', 'doc-bank', 'doc-credit', 'doc-tax'];
   const idx = order.indexOf(docId);
   if (idx < 0) return 'pending';
   if (stepIndex >= 5) return 'verified';

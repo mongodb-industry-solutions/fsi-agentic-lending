@@ -1,4 +1,5 @@
 """Human-in-the-Loop decision routes."""
+import asyncio
 import logging
 from fastapi import APIRouter, HTTPException
 from langgraph.types import Command
@@ -20,14 +21,16 @@ async def get_hitl_context(app_id: str):
     db = _get_db()
 
     # Get recent agent activity
-    activity = list(
-        db["agent_activity"]
-        .find(
-            {"application_id": app_id},
-            {"_id": 0, "agent": 1, "action": 1, "detail": 1, "timestamp": 1},
+    activity = await asyncio.to_thread(
+        lambda: list(
+            db["agent_activity"]
+            .find(
+                {"application_id": app_id},
+                {"_id": 0, "agent": 1, "action": 1, "detail": 1, "timestamp": 1},
+            )
+            .sort("timestamp", -1)
+            .limit(20)
         )
-        .sort("timestamp", -1)
-        .limit(20)
     )
 
     # Serialize timestamps
@@ -55,16 +58,19 @@ async def submit_hitl_decision(app_id: str, req: HITLDecisionRequest):
         raise HTTPException(status_code=404, detail="Application not found")
 
     # Resume LangGraph from checkpoint first
+    graph_succeeded = False
     try:
         graph = get_graph()
-        graph.invoke(
+        await asyncio.to_thread(
+            graph.invoke,
             Command(resume={"action": req.action, "notes": req.officer_notes}),
-            config={"configurable": {"thread_id": app_id}},
+            {"configurable": {"thread_id": app_id}},
         )
+        graph_succeeded = True
     except Exception as e:
         logging.getLogger(__name__).warning(f"LangGraph resume failed: {e}")
 
-    # Then update status (graph's hitl_gate already updates status, but this is a safety net)
-    application_service.update_application_status(app_id, new_status, detail)
+    if not graph_succeeded:
+        application_service.update_application_status(app_id, new_status, detail)
 
     return {"application_id": app_id, "status": new_status, "detail": detail}

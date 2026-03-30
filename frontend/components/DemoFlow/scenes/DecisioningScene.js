@@ -297,7 +297,7 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
               <div style={{ padding: 14, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--agent-cyan-dim)', marginBottom: 16 }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--agent-cyan)', marginBottom: 8 }}>Counterfactual Analysis</div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                  If credit utilization were below <strong style={{ color: 'var(--text-primary)' }}>20%</strong>, the risk score would improve by <strong style={{ color: 'var(--mongo)' }}>18 points</strong> (72 → 90), moving from tier <strong>B+</strong> to <strong style={{ color: 'var(--mongo)' }}>A-</strong>, qualifying for <strong>6.0% APR</strong> (saving $87/mo).
+                  If credit utilization were below <strong style={{ color: 'var(--text-primary)' }}>20%</strong>, the risk score would improve by <strong style={{ color: 'var(--mongo)' }}>18 points</strong> (72 → 90), moving from tier <strong>B+</strong> to <strong style={{ color: 'var(--mongo)' }}>A-</strong>, qualifying for <strong>4.29% APR</strong> (saving $239/mo).
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 8 }}>Powered by Atlas Vector Search — similar borrower profiling</div>
               </div>

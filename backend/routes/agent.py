@@ -11,6 +11,11 @@ from services import application_service
 from agents.graph import get_graph
 from agents.tools import log_agent_activity, update_application_status
 
+try:
+    from langgraph.errors import GraphInterrupt
+except ImportError:
+    GraphInterrupt = None
+
 router = APIRouter(tags=["agent"])
 
 
@@ -54,13 +59,13 @@ async def run_agent(app_id: str):
             }
             graph.invoke(initial_state, config={"configurable": {"thread_id": app_id}})
         except Exception as e:
-            error_msg = str(e)
-            if "interrupt" in error_msg.lower() or "GraphInterrupt" in type(e).__name__:
+            if GraphInterrupt is not None and isinstance(e, GraphInterrupt):
                 logging.getLogger(__name__).info(f"Agent pipeline paused for HITL review: {app_id}")
                 log_agent_activity(app_id, "supervisor", "hitl_waiting", "Pipeline paused — awaiting officer decision")
             else:
                 logging.getLogger(__name__).error(f"Agent pipeline failed for {app_id}: {e}")
-                update_application_status(app_id, "error", f"Pipeline failed: {error_msg[:200]}")
+                from services.application_service import update_application_status
+                update_application_status(app_id, "error", f"Pipeline failed: {str(e)[:200]}")
                 log_agent_activity(app_id, "supervisor", "pipeline_complete", f"Pipeline error: {e}")
 
     thread = threading.Thread(target=_run_graph, args=(app_id,), daemon=True)
@@ -85,7 +90,7 @@ async def stream_agent(app_id: str):
         db = _get_db()
 
         # Check application exists
-        app = db["applications"].find_one({"application_id": app_id})
+        app = await asyncio.to_thread(db["applications"].find_one, {"application_id": app_id})
         if not app:
             yield f"data: {json.dumps({'type': 'error', 'message': 'Application not found'})}\n\n"
             return

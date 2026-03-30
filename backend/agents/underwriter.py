@@ -32,6 +32,19 @@ def underwriter_node(state: LendFlowState) -> dict:
     log_agent_activity(app_id, "underwriter", "policy_match", f"Found {len(policies)} relevant policies")
 
     # Calculate GDS/TDS ratios
+    if combined_income <= 0:
+        log_agent_activity(app_id, "underwriter", "error", "Combined gross income is zero or missing — cannot calculate ratios")
+        return {
+            "gds_ratio": None,
+            "tds_ratio": None,
+            "risk_score": 100.0,
+            "risk_tier": "D",
+            "policy_citations": [],
+            "decision": "decline",
+            "decision_reasoning": "Cannot underwrite: income data is zero or missing.",
+            "messages": [{"role": "assistant", "content": "Income data missing — application cannot be underwritten."}],
+        }
+
     monthly_income = combined_income / 12
 
     # Calculate mortgage payment from loan amount and rate
@@ -56,9 +69,11 @@ def underwriter_node(state: LendFlowState) -> dict:
             if isinstance(payment, (int, float)):
                 existing_debt_payments += payment
 
-    # If no structured debt data, use a conservative estimate
     if existing_debt_payments == 0:
-        existing_debt_payments = 1826  # $482 car + $1289 condo mortgage + $55 credit card
+        log_agent_activity(
+            app_id, "underwriter", "data_gap",
+            "No structured monthly debt payments found in credit reports — treating as $0. Manual review recommended."
+        )
 
     gds = (estimated_mortgage_payment + property_tax_monthly + heating_estimate) / monthly_income
     tds = (estimated_mortgage_payment + property_tax_monthly + heating_estimate + existing_debt_payments) / monthly_income

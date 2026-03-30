@@ -112,7 +112,7 @@ export default function ApplicationForm({ onSubmit }) {
       <FormSection title="Financial Summary">
         <Field label="Existing Monthly Debt ($)" value={form.existingDebt} onChange={update('existingDebt')} />
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>EST. GDS RATIO</div>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>EST. DEBT RATIO</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800, color: 'var(--mongo)' }}>
             {((parseFloat(form.existingDebt || 0) + 4047) / ((parseFloat(form.annualIncome || 0) + 94200) / 12) * 100).toFixed(1)}%
           </div>
