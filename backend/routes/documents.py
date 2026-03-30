@@ -18,7 +18,7 @@ from db.mdb import get_db
 
 router = APIRouter(tags=["documents"])
 
-APP_ID_PATTERN = re.compile(r'^APP-[A-Z0-9]{8}$')
+APP_ID_PATTERN = re.compile(r'^APP-[A-Z0-9-]{4,20}$')
 
 def _validate_app_id(app_id: str):
     if not APP_ID_PATTERN.match(app_id):

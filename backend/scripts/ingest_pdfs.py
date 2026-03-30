@@ -162,8 +162,13 @@ def create_policies(db):
         policy["effective_date"] = now
         policy["created_at"] = now
 
-    db["underwriting_policies"].insert_many(policies)
-    print(f"  Inserted {len(policies)} underwriting policies")
+    for policy in policies:
+        db["underwriting_policies"].update_one(
+            {"policy_id": policy["policy_id"]},
+            {"$setOnInsert": policy},
+            upsert=True,
+        )
+    print(f"  Upserted {len(policies)} underwriting policies")
 
 
 def main():

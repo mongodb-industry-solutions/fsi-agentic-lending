@@ -4,9 +4,10 @@ env:
   AWS_REGION: us-east-1
   # Backend API URL for frontend to connect to backend health check - get <service-name> using kubectl get services
   BACKEND_URL: http://<demo-name>-backend-web-app:80   # or http://localhost:8000 if multicontainer pod is setup and backend is running on 8000
+  NEXT_PUBLIC_BACKEND_URL: "http://localhost:8000"
   COLLECTION_NAME: test-collection
   # CORS origins (comma-separated)
-  ORIGINS: "http://localhost:3000,http://localhost:8080"
+  ORIGINS: "http://localhost:3000,http://localhost:8080,https://<staging-ingress-hostname>"
 
 ## Single Pod Containers
 envSecrets:

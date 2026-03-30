@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["applications"])
 
-APP_ID_PATTERN = re.compile(r'^APP-[A-Z0-9]{8}$')
+APP_ID_PATTERN = re.compile(r'^APP-[A-Z0-9-]{4,20}$')
 
 
 def _validate_app_id(app_id: str):
@@ -156,7 +156,7 @@ async def get_risk_pipeline(app_id: str):
     _validate_app_id(app_id)
     from agents.tools import run_risk_aggregation
     result = await asyncio.to_thread(run_risk_aggregation, app_id)
-    if not result:
+    if not result.get("application_id"):
         raise HTTPException(status_code=404, detail="Application not found or pipeline returned no results")
 
     # Include pipeline stage descriptions for frontend display

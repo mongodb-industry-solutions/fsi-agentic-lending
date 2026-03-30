@@ -118,6 +118,7 @@ def run_risk_aggregation(application_id: str) -> dict:
             "pipeline": [
                 {"$match": {"$expr": {"$eq": ["$application_id", "$$app_id"]}}},
                 {"$match": {"doc_type": {"$in": ["employment_letter", "income_tax", "paystubs"]}}},
+                {"$project": {"_id": 0, "doc_type": 1, "status": 1}},
             ],
             "as": "income_docs",
         }},

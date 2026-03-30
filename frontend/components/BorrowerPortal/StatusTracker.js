@@ -167,6 +167,7 @@ export default function StatusTracker({ onNotification, applicationId }) {
   const [actionPaused, setActionPaused] = useState(false);
   const [actionUploading, setActionUploading] = useState(false);
   const [sseConnected, setSseConnected] = useState(false);
+  const [isDeclined, setIsDeclined] = useState(false);
   const timerRef = useRef(null);
   const stageIdxRef = useRef(0);
 
@@ -293,6 +294,9 @@ export default function StatusTracker({ onNotification, applicationId }) {
 
         if (event.type === 'status' && event.status) {
           if (process.env.NODE_ENV === 'development') console.log('[StatusTracker] Real-time status:', event.status);
+          if (event.status === 'declined') {
+            setIsDeclined(true);
+          }
           const targetIdx = STATUS_TO_STAGE[event.status];
           if (targetIdx !== undefined && targetIdx >= 0 && targetIdx > stageIdxRef.current) {
             // Clear any pending timer-based progression
@@ -320,8 +324,8 @@ export default function StatusTracker({ onNotification, applicationId }) {
   const currentStage = STAGES[activeStage];
   const isActionStage = currentStage?.type === 'action-required' && actionPaused;
 
-  const statusLabel = isComplete ? 'Complete' : isActionStage ? 'Action Needed' : 'Processing';
-  const statusColor = isComplete ? 'var(--success)' : isActionStage ? 'var(--hitl-amber)' : 'var(--mongo)';
+  const statusLabel = isDeclined ? 'Declined' : isComplete ? 'Complete' : isActionStage ? 'Action Needed' : 'Processing';
+  const statusColor = isDeclined ? 'var(--danger)' : isComplete ? 'var(--success)' : isActionStage ? 'var(--hitl-amber)' : 'var(--mongo)';
 
   const estimatedRemaining = useMemo(() => {
     if (isComplete) return null;
@@ -589,7 +593,7 @@ export default function StatusTracker({ onNotification, applicationId }) {
                       fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13,
                       color: labelColor,
                     }}>
-                      {stage.icon} {stage.label}
+                      {stage.id === 'approved' && isDeclined ? '❌ Declined' : `${stage.icon} ${stage.label}`}
                     </div>
                     {/* Badges */}
                     {isCompleted && hasInterventions && (
@@ -650,7 +654,9 @@ export default function StatusTracker({ onNotification, applicationId }) {
                 </div>
 
                 <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                  {stage.detail}
+                  {stage.id === 'approved' && isDeclined
+                    ? 'Application has been declined after officer review.'
+                    : stage.detail}
                 </div>
 
                 {/* Action-required: upload button */}

@@ -13,7 +13,7 @@ from agents.tools import log_agent_activity
 
 logger = logging.getLogger(__name__)
 
-APP_ID_PATTERN = re.compile(r'^APP-[A-Z0-9]{8}$')
+APP_ID_PATTERN = re.compile(r'^APP-[A-Z0-9-]{4,20}$')
 
 def _validate_app_id(app_id: str):
     if not APP_ID_PATTERN.match(app_id):
@@ -33,6 +33,7 @@ _running_lock = threading.Lock()
 @router.post("/agent/{app_id}/run")
 async def run_agent(app_id: str, autonomy_level: str = "bounded"):
     """Trigger agent execution for an application."""
+    _validate_app_id(app_id)
     app = application_service.get_application(app_id)
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
@@ -100,6 +101,7 @@ async def run_agent(app_id: str, autonomy_level: str = "bounded"):
 @router.get("/agent/{app_id}/stream")
 async def stream_agent(app_id: str):
     """SSE endpoint — streams agent reasoning and actions in real time."""
+    _validate_app_id(app_id)
 
     async def event_generator():
         db = _get_db()
