@@ -145,7 +145,7 @@ const STATUS_TO_STAGE = {
   submitted: 0,     // received
   processing: 1,    // docs
   underwriting: 4,  // underwriting
-  review: 5,        // decision
+  review: 6,        // officer review stage
   approved: 7,      // approved
   declined: 7,      // declined (same position, different rendering)
   active: 8,        // active

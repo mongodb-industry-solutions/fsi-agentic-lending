@@ -1500,7 +1500,7 @@ export default function LoanOfficerDashboard() {
         </div>
 
         <AgentActivityLog
-          autoPlay={isPrimaryApp && (workflowPhase === 'executing' || workflowPhase === 'observe-step')}
+          autoPlay={!liveApplications.find((a) => a.application_id === selectedApp) && isPrimaryApp && (workflowPhase === 'executing' || workflowPhase === 'observe-step')}
           onEvent={handleAgentEvent}
           applicationId={liveApplications.find((a) => a.application_id === selectedApp)?.application_id || null}
         />

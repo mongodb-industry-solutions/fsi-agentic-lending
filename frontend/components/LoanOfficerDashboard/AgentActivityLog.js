@@ -265,7 +265,7 @@ export default function AgentActivityLog({ autoPlay = true, onEvent, application
               : (event.agent || '').toLowerCase().includes('hitl') ? 'hitl'
               : 'loanapp',
             action: event.action || '',
-            op: event.detail || '',
+            op: '', // Live events don't have a separate op field
             latency: '—',
             icon: event.agent === 'underwriter' ? '📊' : event.agent === 'supervisor' ? '🧭' : '📝',
             reasoning: event.detail || '',

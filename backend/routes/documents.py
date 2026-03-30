@@ -1,20 +1,23 @@
 """Document API routes."""
 import asyncio
 import json
+import uuid
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from models.schemas import VectorSearchRequest
 from services import document_service, vector_search_service
-from services.extraction_service import extract_from_pdf
+from services.extraction_service import extract_from_pdf, EXTRACTION_PROMPTS
 from services.application_service import serialize_doc
 from db.mdb import get_db
 
 router = APIRouter(tags=["documents"])
 
 UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "docs" / "uploads"
+
+VALID_DOC_TYPES = set(EXTRACTION_PROMPTS.keys()) | {"unknown"}
 
 
 @router.get("/applications/{app_id}/documents")
@@ -39,8 +42,10 @@ PDF_DIRS = [
 
 
 def _find_pdf(filename):
+    # Sanitize to prevent path traversal
+    safe = PurePosixPath(filename).name
     for d in PDF_DIRS:
-        p = d / filename
+        p = d / safe
         if p.exists():
             return p
     return None
@@ -94,10 +99,23 @@ async def upload_document(
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
 
-    # Save file to disk
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    file_path = UPLOAD_DIR / file.filename
+    # Validate doc_type against allowlist
+    if doc_type not in VALID_DOC_TYPES:
+        doc_type = "unknown"
+
+    # Validate file type
+    if file.content_type not in ("application/pdf",):
+        raise HTTPException(status_code=400, detail="Only PDF uploads are accepted")
+
     content = await file.read()
+    if not content.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="File does not appear to be a valid PDF")
+
+    # Sanitize filename and save file to disk
+    safe_name = PurePosixPath(file.filename).name  # strips directory components
+    safe_name = f"{app_id}_{uuid.uuid4().hex[:8]}_{safe_name}"
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    file_path = UPLOAD_DIR / safe_name
     file_path.write_bytes(content)
 
     # Extract via Bedrock Claude (run in thread to not block event loop)
@@ -110,7 +128,7 @@ async def upload_document(
     doc_record = {
         "application_id": app_id,
         "doc_type": doc_type,
-        "filename": file.filename,
+        "filename": safe_name,
         "extracted_text": extraction.get("text_summary", json.dumps(extraction, indent=2)),
         "structured_data": extraction,
         "status": "parsed" if "error" not in extraction else "error",
