@@ -34,19 +34,36 @@ def hitl_gate(state: LendFlowState) -> dict:
     # Execution resumes here after officer submits decision
     if not isinstance(decision, dict):
         decision = {}
-    action = decision.get("action", "decline")
-    if action not in ("approve", "decline"):
-        action = "decline"
+    action = decision.get("action")
+    if action not in ("approve", "decline", "modify_and_continue"):
+        # Invalid action — re-interrupt
+        log_agent_activity(app_id, "hitl_gate", "invalid_action", f"Received: {action}")
+        decision = interrupt({**review_package, "error": f"Invalid action: {action}"})
+        action = decision.get("action", "decline")
+
     notes = decision.get("notes", "")
+    conditions = decision.get("conditions", [])
+    overrides = decision.get("overrides", {})
 
-    new_status = "approved" if action == "approve" else "declined"
-    log_agent_activity(app_id, "hitl_gate", "resume", f"Officer decision: {action}. Notes: {notes}")
-    update_application_status(app_id, new_status, f"Officer {action}d the application. {notes}")
-
-    return {
-        "decision": action,
+    state_updates = {
+        "decision": action if action != "modify_and_continue" else "escalate",
         "officer_notes": notes,
     }
+
+    # Apply officer overrides
+    if overrides.get("risk_tier"):
+        state_updates["risk_tier"] = overrides["risk_tier"]
+    if overrides.get("loan_amount"):
+        # Officer adjusted loan amount — force re-underwriting
+        state_updates["risk_score"] = None
+        state_updates["decision"] = None
+        state_updates["decision_reasoning"] = f"Re-underwriting: officer adjusted loan to ${overrides['loan_amount']:,.0f}"
+
+    new_status = "approved" if action == "approve" else ("processing" if action == "modify_and_continue" else "declined")
+    log_agent_activity(app_id, "hitl_gate", "resume", f"Officer decision: {action}. Notes: {notes}. Conditions: {conditions}. Overrides: {overrides}")
+    update_application_status(app_id, new_status, f"Officer {action}d the application. {notes}")
+
+    return state_updates
 
 
 def completion_node(state: LendFlowState) -> dict:
