@@ -42,14 +42,14 @@ export default function SceneNavBar({
                   display: 'flex',
                   alignItems: 'center',
                   gap: 5,
-                  padding: '6px 12px',
+                  padding: '8px 14px',
                   borderRadius: 'var(--radius-sm)',
                   border: active ? '1px solid var(--mongo)' : '1px solid transparent',
                   background: active ? 'var(--mongo-dim)' : visited ? 'var(--bg-raised)' : 'transparent',
                   color: active ? 'var(--mongo)' : visited ? 'var(--text-secondary)' : 'var(--text-dim)',
                   fontFamily: 'var(--font-display)',
                   fontWeight: active ? 700 : 500,
-                  fontSize: 11,
+                  fontSize: 12,
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                   whiteSpace: 'nowrap',
@@ -59,17 +59,12 @@ export default function SceneNavBar({
                 <span>{s.title}</span>
               </button>
               {i < SCENE_META.length - 1 && (
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: visited ? 'var(--mongo)' : 'var(--text-dim)',
-                    margin: '0 2px',
-                    opacity: visited ? 1 : 0.4,
-                    transition: 'all 0.3s',
-                  }}
-                >
-                  →
-                </span>
+                <div style={{
+                  width: 24, height: 2, borderRadius: 1,
+                  background: visited ? 'var(--mongo)' : 'var(--border-dim)',
+                  transition: 'background 0.4s ease',
+                  margin: '0 2px',
+                }} />
               )}
             </div>
           );

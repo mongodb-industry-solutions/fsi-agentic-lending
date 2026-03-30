@@ -486,7 +486,15 @@ export default function StatusTracker({ onNotification, applicationId }) {
 
       {/* Timeline */}
       <div style={{ position: 'relative', paddingLeft: spacing[5] }}>
-        <div style={{ position: 'absolute', left: 11, top: 0, bottom: 0, width: 2, background: 'var(--border-dim)' }} />
+        <div style={{ position: 'absolute', left: 11, top: 0, bottom: 0, width: 2, background: 'var(--border-dim)', borderRadius: 1 }}>
+          <div style={{
+            position: 'absolute', top: 0, left: 0, width: '100%',
+            height: `${Math.min(100, (activeStage / Math.max(STAGES.length - 1, 1)) * 100)}%`,
+            background: 'var(--mongo)',
+            borderRadius: 1,
+            transition: 'height 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+          }} />
+        </div>
 
         {STAGES.map((stage, i) => {
           const isCompleted = i < activeStage;

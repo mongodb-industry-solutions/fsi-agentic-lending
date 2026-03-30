@@ -180,9 +180,25 @@ export default function FraudGraph({ width: widthProp, height: heightProp, hopRe
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoverNode(null)}
       />
-      <div style={{ position: 'absolute', bottom: 12, left: 12, right: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--text-secondary)' }}>
-        <span style={{ color: 'var(--success)' }}>CLEAR ✓</span>
-        <span>2,847 entities scanned, 0 suspicious links</span>
+      <div style={{ position: 'absolute', bottom: 12, left: 12, right: 12, display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 11, color: 'var(--text-secondary)' }}>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '8px 16px', borderRadius: 'var(--radius-md)',
+          background: 'var(--success-dim)', border: '1px solid var(--success)',
+          boxShadow: '0 0 12px rgba(0, 104, 74, 0.15)',
+        }}>
+          <div style={{
+            width: 10, height: 10, borderRadius: '50%',
+            background: 'var(--success)', boxShadow: '0 0 6px var(--success)',
+          }} />
+          <span style={{
+            fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14,
+            color: 'var(--success)', letterSpacing: '0.05em',
+          }}>NETWORK CLEAR</span>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)',
+          }}>2,847 entities · 0 suspicious links</span>
+        </div>
       </div>
     </div>
   );
