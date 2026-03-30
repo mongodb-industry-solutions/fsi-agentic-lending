@@ -92,7 +92,7 @@ export default function BorrowerPortal() {
       </ContextualBanner>
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
       <ApplicationForm onSubmit={handleSubmit} />
-      <DocumentUpload />
+      <DocumentUpload applicationId={applicationId} />
       </div>
       <NotificationToast toasts={toasts} onDismiss={removeToast} />
     </div>

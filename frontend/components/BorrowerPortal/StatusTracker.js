@@ -140,6 +140,18 @@ const STAGES = [
   },
 ];
 
+// Maps backend status values to STAGES indices for SSE-driven progression
+const STATUS_TO_STAGE = {
+  submitted: 0,     // received
+  processing: 1,    // docs
+  underwriting: 4,  // underwriting
+  review: 5,        // decision
+  approved: 7,      // approved
+  declined: 7,      // declined (same position, different rendering)
+  active: 8,        // active
+  error: -1,        // show error
+};
+
 function formatTime(date) {
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
@@ -267,10 +279,28 @@ export default function StatusTracker({ onNotification, applicationId }) {
     const source = apiSSE(
       `/applications/${applicationId}/status`,
       (event) => {
-        if (event.type === 'status') {
+        if (event.type === 'status' && event.status) {
           console.log('[StatusTracker] Real-time status:', event.status);
-          // The existing timer-based stages still run as the primary driver.
-          // This is supplementary real-time feedback from the backend.
+          const targetIdx = STATUS_TO_STAGE[event.status];
+          if (targetIdx !== undefined && targetIdx >= 0 && targetIdx > stageIdxRef.current) {
+            // Clear any pending timer-based progression
+            if (timerRef.current) clearTimeout(timerRef.current);
+            // Advance directly to the target stage, skipping intermediate timers
+            const now = new Date();
+            const newTimestamps = [];
+            while (stageIdxRef.current < targetIdx) {
+              stageIdxRef.current++;
+              newTimestamps.push(now);
+              // Fire notification for each skipped/reached stage
+              sendNotification(STAGES[stageIdxRef.current], now);
+            }
+            setActiveStage(targetIdx);
+            setTimestamps((prev) => [...prev, ...newTimestamps]);
+            // If there are still stages ahead, resume timer-based progression
+            if (stageIdxRef.current < STAGES.length - 1) {
+              timerRef.current = setTimeout(advanceStageLoop, STAGES[stageIdxRef.current + 1].delayMs);
+            }
+          }
         }
       }
     );

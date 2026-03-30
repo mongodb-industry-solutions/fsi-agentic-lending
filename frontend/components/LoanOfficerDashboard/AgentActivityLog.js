@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { apiSSE } from '../../lib/api';
 
 const ACTIVITY_TEMPLATES = [
   {
@@ -208,7 +209,7 @@ const FILTERS = [
   { id: 'hitl', label: 'HITL' },
 ];
 
-export default function AgentActivityLog({ autoPlay = true, onEvent }) {
+export default function AgentActivityLog({ autoPlay = true, onEvent, applicationId }) {
   const [entries, setEntries] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [activeFilter, setActiveFilter] = useState('all');
@@ -239,6 +240,50 @@ export default function AgentActivityLog({ autoPlay = true, onEvent }) {
     timerRef.current = setInterval(addEntry, 1800);
     return () => clearInterval(timerRef.current);
   }, [autoPlay]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // SSE connection for live agent events when applicationId is provided
+  useEffect(() => {
+    if (!applicationId) return;
+
+    // Stop timer-based playback when we have a live application
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    counterRef.current = ACTIVITY_TEMPLATES.length; // Prevent further timer entries
+    setEntries([]); // Clear hardcoded entries for live mode
+
+    const source = apiSSE(
+      `/agent/${applicationId}/stream`,
+      (event) => {
+        if (event.type === 'agent_step') {
+          const liveEntry = {
+            id: `live-${Date.now()}-${Math.random()}`,
+            agent: event.agent || 'System',
+            category: (event.agent || '').toLowerCase().includes('underwrit') ? 'underwriting'
+              : (event.agent || '').toLowerCase().includes('supervisor') ? 'supervisor'
+              : (event.agent || '').toLowerCase().includes('hitl') ? 'hitl'
+              : 'loanapp',
+            action: event.action || '',
+            op: event.detail || '',
+            latency: '—',
+            icon: event.agent === 'underwriter' ? '📊' : event.agent === 'supervisor' ? '🧭' : '📝',
+            reasoning: event.detail || '',
+            details: null,
+            time: new Date(event.timestamp || Date.now()).toLocaleTimeString(),
+            isLive: true,
+          };
+          setEntries((prev) => [liveEntry, ...prev]);
+          if (onEvent) onEvent(liveEntry);
+        }
+        if (event.type === 'complete') {
+          console.log('[AgentActivityLog] Pipeline complete');
+        }
+      }
+    );
+
+    return () => source?.close();
+  }, [applicationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = useMemo(() => {
     let result = entries;
