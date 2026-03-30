@@ -41,8 +41,17 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, marginBottom: 4 }}>
           Application Queue
         </div>
-        <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
           {formatted.length} application{formatted.length !== 1 ? 's' : ''} · {formatted.filter((a) => a.status === 'review' || a.status === 'pending_review').length} pending review
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '2px 6px', borderRadius: 8,
+            background: 'var(--mongo-dim)', color: 'var(--mongo)',
+            fontSize: 9, fontWeight: 700, marginLeft: 6,
+          }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--mongo)', animation: 'pulse 1.5s infinite' }} />
+            Change Streams
+          </span>
         </div>
       </div>
 

@@ -292,7 +292,7 @@ export default function StatusTracker({ onNotification, applicationId }) {
         setSseConnected(true);
 
         if (event.type === 'status' && event.status) {
-          console.log('[StatusTracker] Real-time status:', event.status);
+          if (process.env.NODE_ENV === 'development') console.log('[StatusTracker] Real-time status:', event.status);
           const targetIdx = STATUS_TO_STAGE[event.status];
           if (targetIdx !== undefined && targetIdx >= 0 && targetIdx > stageIdxRef.current) {
             // Clear any pending timer-based progression
@@ -371,6 +371,11 @@ export default function StatusTracker({ onNotification, applicationId }) {
         <div style={{ padding: '6px 12px', background: 'var(--hitl-amber-dim)', borderRadius: 'var(--radius-sm)', fontSize: 10, color: 'var(--hitl-amber)', marginBottom: 8 }}>
           Connecting to backend...
         </div>
+      )}
+      {sseConnected && (
+        <span style={{ fontSize: 9, color: 'var(--mongo)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+          MongoDB Change Streams
+        </span>
       )}
       {/* Summary card */}
       <div style={{
