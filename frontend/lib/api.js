@@ -32,6 +32,24 @@ export async function apiGet(path) {
   }
 }
 
+export async function apiUpload(path, file, fields = {}) {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    Object.entries(fields).forEach(([k, v]) => formData.append(k, v));
+
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) throw new Error(`Upload error: ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn(`[LendFlow API] Upload ${path} failed:`, err.message);
+    return null;
+  }
+}
+
 export function apiSSE(path, onEvent, onError) {
   const url = `${API_BASE}${path}`;
   const source = new EventSource(url);
