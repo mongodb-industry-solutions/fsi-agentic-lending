@@ -1,12 +1,7 @@
 """MongoDB tools available to LangGraph agents."""
 import os
 from datetime import datetime, timezone
-from db.mdb import MongoDBConnector
-
-
-def _get_db():
-    connector = MongoDBConnector()
-    return connector.db
+from db.mdb import get_db as _get_db
 
 
 def get_application_documents(application_id: str) -> list[dict]:

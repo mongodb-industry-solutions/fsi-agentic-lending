@@ -41,8 +41,10 @@ class MongoDBConnector:
         result = collection.insert_many(documents)
         return result.inserted_ids
 
-    def find(self, collection_name, query={}, projection=None):
+    def find(self, collection_name, query=None, projection=None):
         """Retrieve documents from a collection."""
+        if query is None:
+            query = {}
         collection = self.get_collection(collection_name)
         return list(collection.find(query, projection))
 
@@ -69,3 +71,14 @@ class MongoDBConnector:
         collection = self.get_collection(collection_name)
         result = collection.delete_many(query)
         return result.deleted_count
+
+
+# Module-level singleton
+_instance = None
+
+def get_db():
+    """Get the singleton database instance."""
+    global _instance
+    if _instance is None:
+        _instance = MongoDBConnector()
+    return _instance.db

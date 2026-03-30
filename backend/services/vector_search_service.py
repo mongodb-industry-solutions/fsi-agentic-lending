@@ -1,11 +1,6 @@
 """Vector search service — uses Atlas autoEmbed for semantic queries."""
-from db.mdb import MongoDBConnector
+from db.mdb import get_db as _get_db
 from services.application_service import serialize_doc
-
-
-def _get_db():
-    connector = MongoDBConnector()
-    return connector.db
 
 
 def search_documents(query: str, application_id: str = None, limit: int = 5) -> list[dict]:

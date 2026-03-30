@@ -114,7 +114,7 @@ export default function ApplicationForm({ onSubmit }) {
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>EST. GDS RATIO</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800, color: 'var(--mongo)' }}>
-            {((parseFloat(form.existingDebt || 0) + 4092) / (parseFloat(form.annualIncome || 1) / 12) * 100).toFixed(1)}%
+            {((parseFloat(form.existingDebt || 0) + 4047) / ((parseFloat(form.annualIncome || 0) + 94200) / 12) * 100).toFixed(1)}%
           </div>
         </div>
       </FormSection>

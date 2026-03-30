@@ -70,14 +70,14 @@ export default function ApplicantCard({ stepIndex }) {
             Equifax
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--mongo)' }}>
-            {APPLICANT.fico}
+            {APPLICANT.equifax}
           </div>
         </div>
         <div>
           <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: 3 }}>
             GDS
           </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{APPLICANT.dti}</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{APPLICANT.gds}</div>
         </div>
       </div>
       <div style={{ marginTop: 12, fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 8 }}>

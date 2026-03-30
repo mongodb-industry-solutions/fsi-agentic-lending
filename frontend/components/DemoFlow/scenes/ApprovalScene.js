@@ -23,7 +23,7 @@ const PAYLOAD = {
   riskScore: 72,
   riskTier: 'B+',
   proposedRate: '4.89%',
-  monthlyPayment: '$4,092',
+  monthlyPayment: '$4,047',
   gds: 0.312,
   ltv: 80.0,
   triggerReason: 'Property value exceeds $500K — officer review required per policy §3.1.4',
@@ -32,17 +32,17 @@ const PAYLOAD = {
 const LOAN_TERMS = {
   type: '5yr Fixed (25yr Amortization)',
   apr: '4.89%',
-  monthlyPayment: '$4,092',
-  totalInterest: '$527,600',
-  totalCost: '$1,402,600',
+  monthlyPayment: '$4,047',
+  totalInterest: '$514,100',
+  totalCost: '$1,214,100',
   firstPayment: 'May 1, 2026',
   maturity: 'April 30, 2051',
 };
 
 const AMORTIZATION = [
-  { month: 1, payment: '$4,092.00', principal: '$1,239.50', interest: '$2,852.50', balance: '$698,760.50' },
-  { month: 2, payment: '$4,092.00', principal: '$1,244.55', interest: '$2,847.45', balance: '$697,515.95' },
-  { month: 3, payment: '$4,092.00', principal: '$1,249.62', interest: '$2,842.38', balance: '$696,266.33' },
+  { month: 1, payment: '$4,047.39', principal: '$1,194.89', interest: '$2,852.50', balance: '$698,805.11' },
+  { month: 2, payment: '$4,047.39', principal: '$1,199.76', interest: '$2,847.63', balance: '$697,605.35' },
+  { month: 3, payment: '$4,047.39', principal: '$1,204.65', interest: '$2,842.74', balance: '$696,400.70' },
 ];
 
 const DISCLOSURES = [
@@ -186,7 +186,7 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
               <div style={{ padding: 16, background: 'var(--danger-dim)', borderRadius: 'var(--radius-md)', border: '1px solid var(--danger)', marginBottom: 16 }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--danger)', marginBottom: 8 }}>Decision Summary</div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                  The loan officer has declined this application after manual review. The workflow state has been persisted to MongoDB via MongoDBSaver. An adverse action notice will be generated per ECOA/Reg B requirements.
+                  The loan officer has declined this application after manual review. The workflow state has been persisted to MongoDB via MongoDBSaver. An adverse action notice will be generated per Bank Act and FCAC requirements.
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
@@ -322,8 +322,8 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: 11 }}>
                 <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>TYPE</div><div style={{ fontWeight: 600 }}>5yr Fixed (25yr)</div></div>
                 <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>APR</div><div style={{ fontWeight: 600, color: 'var(--mongo)' }}>4.89%</div></div>
-                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>MONTHLY</div><div style={{ fontWeight: 600 }}>$4,092</div></div>
-                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>TOTAL INTEREST</div><div style={{ fontWeight: 600 }}>$527,600</div></div>
+                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>MONTHLY</div><div style={{ fontWeight: 600 }}>$4,047</div></div>
+                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>TOTAL INTEREST</div><div style={{ fontWeight: 600 }}>$514,100</div></div>
                 <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>FIRST PAYMENT</div><div style={{ fontWeight: 600 }}>May 1, 2026</div></div>
                 <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>MATURITY</div><div style={{ fontWeight: 600 }}>Apr 2051</div></div>
               </div>

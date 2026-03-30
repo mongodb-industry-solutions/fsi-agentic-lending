@@ -3,7 +3,6 @@ import os
 from agents.state import LendFlowState
 from agents.tools import log_agent_activity
 from bedrock.anthropic_chat_completions import BedrockAnthropicChatCompletions
-from agents.prompts import SUPERVISOR_PROMPT
 
 
 def supervisor_node(state: LendFlowState) -> dict:
@@ -22,7 +21,7 @@ def supervisor_node(state: LendFlowState) -> dict:
     elif state.get("decision") in ("approve", "decline"):
         next_agent = "complete"
     else:
-        next_agent = "loan_app"
+        next_agent = "complete"
 
     log_agent_activity(
         app_id, "supervisor", "route",

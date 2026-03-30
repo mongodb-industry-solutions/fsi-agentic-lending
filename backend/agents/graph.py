@@ -32,7 +32,11 @@ def hitl_gate(state: LendFlowState) -> dict:
     decision = interrupt(review_package)
 
     # Execution resumes here after officer submits decision
+    if not isinstance(decision, dict):
+        decision = {}
     action = decision.get("action", "decline")
+    if action not in ("approve", "decline"):
+        action = "decline"
     notes = decision.get("notes", "")
 
     new_status = "approved" if action == "approve" else "declined"
@@ -82,7 +86,7 @@ def build_graph(mongodb_uri: str = None, database_name: str = None):
     graph.add_edge("complete", END)
 
     # Compile with checkpointer
-    compiled = graph.compile(checkpointer=checkpointer, interrupt_before=["hitl_gate"])
+    compiled = graph.compile(checkpointer=checkpointer)
 
     return compiled
 

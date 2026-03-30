@@ -1,12 +1,9 @@
 """Document service — handles document CRUD operations."""
 from datetime import datetime, timezone
-from db.mdb import MongoDBConnector
+from bson import ObjectId
+from bson.errors import InvalidId
+from db.mdb import get_db as _get_db
 from services.application_service import serialize_doc
-
-
-def _get_db():
-    connector = MongoDBConnector()
-    return connector.db
 
 
 def list_documents(application_id: str) -> list[dict]:
@@ -18,8 +15,10 @@ def list_documents(application_id: str) -> list[dict]:
 
 def get_document(doc_id: str) -> dict | None:
     """Get a single document by ID."""
-    from bson import ObjectId
-
+    try:
+        oid = ObjectId(doc_id)
+    except (InvalidId, Exception):
+        return None
     db = _get_db()
-    doc = db["documents"].find_one({"_id": ObjectId(doc_id)})
+    doc = db["documents"].find_one({"_id": oid})
     return serialize_doc(doc)

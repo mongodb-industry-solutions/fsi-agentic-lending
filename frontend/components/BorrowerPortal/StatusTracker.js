@@ -126,7 +126,7 @@ const STAGES = [
     icon: '🎉',
     delayMs: 4000,
     agentStatus: 'Great news — your loan has been approved!',
-    whatHappened: 'Your 5yr Fixed (25yr Amort) mortgage at 4.89% APR has been formally approved with a monthly payment of $4,092. Without the AI assistant\'s interventions, your application would have scored 68 (B tier) with a higher rate of 5.24%. The AI saved you an estimated $135/mo ($40,500 over the life of the loan).',
+    whatHappened: 'Your 5yr Fixed (25yr Amort) mortgage at 4.89% APR has been formally approved with a monthly payment of $4,047. Without the AI assistant\'s interventions, your application would have scored 68 (B tier) with a higher rate of 5.24%. The AI saved you an estimated $135/mo ($40,500 over the life of the loan).',
   },
   {
     id: 'active',
@@ -136,7 +136,7 @@ const STAGES = [
     icon: '🏠',
     delayMs: 3000,
     agentStatus: 'Your loan is now active and being monitored.',
-    whatHappened: 'EFT disbursement of $700,000 has been initiated to your designated account. Mortgage servicing has begun — your first payment of $4,092 is due May 1, 2026. Our AI assistant will continue to monitor your mortgage for renewal opportunities.',
+    whatHappened: 'EFT disbursement of $700,000 has been initiated to your designated account. Mortgage servicing has begun — your first payment of $4,047 is due May 1, 2026. Our AI assistant will continue to monitor your mortgage for renewal opportunities.',
   },
 ];
 

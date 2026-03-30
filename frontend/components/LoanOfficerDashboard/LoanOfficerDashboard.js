@@ -42,7 +42,7 @@ const PAYLOAD = {
   riskScore: 72,
   riskTier: 'B+',
   proposedRate: '4.89%',
-  monthlyPayment: '$4,092',
+  monthlyPayment: '$4,047',
   dti: 0.312,
   ltv: 80.0,
   triggerReason: 'Combined GDS ratio 31.2% within tolerance but property value exceeds $500K threshold per policy §3.1.4',

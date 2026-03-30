@@ -205,7 +205,7 @@ function RiskRing({ score, maxScore = 100, tier, fico }) {
           </div>
           <div>
             <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Monthly</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700 }}>$4,092</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700 }}>$4,047</div>
           </div>
         </div>
       </div>

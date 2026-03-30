@@ -244,7 +244,7 @@ export const APPROVAL_STEPS = [
     description: 'Loan terms generated. Contract committed.',
     features: ['changeStreams'],
     canvas: { activeNodes: ['hitlGate', 'decision'], activeEdges: [['hitlGate', 'decision']], pulse: ['decision'] },
-    reasoning: { icon: '✅', agent: 'Decision Engine', text: 'APPROVED — 5yr Fixed (25yr Amort) @ 4.89% APR. Monthly payment: $4,092. Terms generated, contract committed.', timing: '1800ms' },
+    reasoning: { icon: '✅', agent: 'Decision Engine', text: 'APPROVED — 5yr Fixed (25yr Amort) @ 4.89% APR. Monthly payment: $4,047. Terms generated, contract committed.', timing: '1800ms' },
     ops: [{ verb: 'insert', collection: 'db.loanDecisions', latency: '4ms' }, { verb: 'insert', collection: 'db.loanContracts', latency: '5ms' }, { verb: 'changestream', collection: 'status → "approved"', latency: '—' }, { verb: 'insert', collection: 'db.auditTrail', latency: '3ms' }],
     memory: { type: 'checkpoint', title: 'Checkpoint #4 — Decision Logged', detail: 'cp-j0k1l2 · APPROVED · 4.89%' },
     delayMs: 1200,

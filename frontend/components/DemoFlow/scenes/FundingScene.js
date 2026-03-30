@@ -49,7 +49,7 @@ const DOC_STAGES = [
 "terms": {
   "type": "5yr Fixed (25yr Amort)",
   "apr": 4.89,
-  "monthlyPayment": 4092
+  "monthlyPayment": 4047
 },
 "disclosures": ["OSFI_B20", "FCAC", "PIPEDA"]`,
   },
@@ -235,7 +235,7 @@ export default function FundingScene({ sceneStep, currentStepData }) {
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>Funding Rails</div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {[
-                  { label: 'ACH', active: true },
+                  { label: 'EFT (Payments Canada)', active: true },
                   { label: 'Wire', active: false },
                   { label: 'Real-Time Payments (RTP)', active: false },
                 ].map((r) => (

@@ -95,7 +95,7 @@ changeStream.on("change", (event) => {
       "Columnar storage with automatic bucketing, purpose-built for payment histories and credit score trends. Combined with $setWindowFields for rolling delinquency rates.",
     code: `db.payments.insertOne({
   metadata: { loanId: "L-00001", borrowerId: "B-...", productType: "5yr_fixed" },
-  amount: 4092,
+  amount: 4047,
   principal: 1240,
   interest: 2852,
   outstandingBalance: 698760,

@@ -1,8 +1,11 @@
 """Human-in-the-Loop decision routes."""
+import logging
 from fastapi import APIRouter, HTTPException
+from langgraph.types import Command
 from models.schemas import HITLDecisionRequest
 from services import application_service
-from db.mdb import MongoDBConnector
+from db.mdb import get_db as _get_db
+from agents.graph import get_graph
 
 router = APIRouter(tags=["hitl"])
 
@@ -14,7 +17,7 @@ async def get_hitl_context(app_id: str):
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
 
-    db = MongoDBConnector().db
+    db = _get_db()
 
     # Get recent agent activity
     activity = list(
@@ -51,8 +54,15 @@ async def submit_hitl_decision(app_id: str, req: HITLDecisionRequest):
     if not success:
         raise HTTPException(status_code=404, detail="Application not found")
 
-    # TODO: Resume LangGraph from checkpoint (Phase 4 integration)
-    # graph.invoke(Command(resume={"action": req.action, "notes": req.officer_notes}),
-    #              config={"configurable": {"thread_id": app_id}})
+    # Resume LangGraph from checkpoint
+    try:
+        graph = get_graph()
+        graph.invoke(
+            Command(resume={"action": req.action, "notes": req.officer_notes}),
+            config={"configurable": {"thread_id": app_id}},
+        )
+    except Exception as e:
+        # Log but don't fail the response — status is already updated
+        logging.getLogger(__name__).warning(f"LangGraph resume failed: {e}")
 
     return {"application_id": app_id, "status": new_status, "detail": detail}

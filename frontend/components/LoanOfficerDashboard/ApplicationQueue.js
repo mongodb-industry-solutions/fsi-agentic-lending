@@ -76,7 +76,8 @@ const APPLICATIONS = [
 ];
 
 export default function ApplicationQueue({ selectedId, onSelect, liveApplications = [] }) {
-  // Merge live applications from backend with hardcoded demo data
+  // Merge live applications from backend with hardcoded demo data (deduplicated)
+  const liveIds = new Set(liveApplications.map(a => a.application_id));
   const allApplications = [
     ...liveApplications.map(app => ({
       id: app.application_id,
@@ -91,7 +92,7 @@ export default function ApplicationQueue({ selectedId, onSelect, liveApplication
       submitted: 'Live',
       isLive: true,
     })),
-    ...APPLICATIONS,
+    ...APPLICATIONS.filter(app => !liveIds.has(app.id)),
   ];
 
   return (

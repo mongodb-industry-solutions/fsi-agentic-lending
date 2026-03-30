@@ -178,7 +178,7 @@ const ACTIVITY_TEMPLATES = [
     reasoning: 'Final composite score: 72/100 (B+ tier). Score depressed from A-range primarily by 3 hard inquiries in 6 months (§4.2.1 penalty: -8pts). Without inquiry penalty, projected score would be 80 (A-). Recommended rate: 4.89% (B+ base + 12.5bps inquiry surcharge).',
     details: {
       input: '{ factors: ["gds", "ltv", "credit", "cashflow", "employment", "collateral", "comps"] }',
-      output: '{ score: 72, tier: "B+", rate: "4.89%", monthly: "$4,092" }',
+      output: '{ score: 72, tier: "B+", rate: "4.89%", monthly: "$4,047" }',
       tokens: 342,
       model: 'gpt-4o',
     },

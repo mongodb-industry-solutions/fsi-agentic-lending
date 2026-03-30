@@ -5,8 +5,8 @@ export const APPLICANT = {
   product: "5yr Fixed (25yr Amort)",
   income: "$222,700",
   employer: "TechNova Systems / Covenant Health",
-  fico: 784,
-  dti: 0.32,
+  equifax: 784,
+  gds: 0.32,
 };
 
 export const DOCUMENTS = [

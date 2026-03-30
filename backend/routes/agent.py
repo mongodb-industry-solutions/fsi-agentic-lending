@@ -1,11 +1,14 @@
 """Agent execution routes — triggers LangGraph and streams results."""
 import json
 import asyncio
+import logging
+import threading
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from db.mdb import MongoDBConnector
+from db.mdb import get_db as _get_db
 from services import application_service
+from agents.graph import get_graph
 
 router = APIRouter(tags=["agent"])
 
@@ -24,8 +27,37 @@ async def run_agent(app_id: str):
     # Update status to processing
     application_service.update_application_status(app_id, "processing", "Agent pipeline started")
 
-    # TODO: Launch LangGraph execution in background
-    # For now, return acknowledgment
+    # Launch graph execution in a background thread (sync graph, async route)
+    def _run_graph(app_id):
+        try:
+            graph = get_graph()
+            initial_state = {
+                "messages": [],
+                "application_id": app_id,
+                "current_agent": "supervisor",
+                "documents_verified": False,
+                "document_count": 0,
+                "extraction_summary": "",
+                "credit_pulled": False,
+                "primary_credit_score": None,
+                "co_applicant_credit_score": None,
+                "gds_ratio": None,
+                "tds_ratio": None,
+                "risk_score": None,
+                "risk_tier": None,
+                "policy_citations": [],
+                "decision": None,
+                "decision_reasoning": "",
+                "officer_notes": None,
+                "activity_log": [],
+            }
+            graph.invoke(initial_state, config={"configurable": {"thread_id": app_id}})
+        except Exception as e:
+            logging.getLogger(__name__).error(f"Agent pipeline failed for {app_id}: {e}")
+
+    thread = threading.Thread(target=_run_graph, args=(app_id,), daemon=True)
+    thread.start()
+
     return {
         "application_id": app_id,
         "status": "processing",
@@ -42,7 +74,7 @@ async def stream_agent(app_id: str):
     """
 
     async def event_generator():
-        db = MongoDBConnector().db
+        db = _get_db()
 
         # Check application exists
         app = db["applications"].find_one({"application_id": app_id})

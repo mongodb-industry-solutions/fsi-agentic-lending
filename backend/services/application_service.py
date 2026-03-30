@@ -2,12 +2,7 @@
 import os
 from datetime import datetime, timezone
 from bson import ObjectId
-from db.mdb import MongoDBConnector
-
-
-def _get_db():
-    connector = MongoDBConnector()
-    return connector.db
+from db.mdb import get_db as _get_db
 
 
 def serialize_doc(doc):
@@ -51,8 +46,8 @@ def create_application(data: dict) -> dict:
         borrower_names.append(data["co_applicant_name"])
 
     # Generate application ID
-    count = db["applications"].count_documents({}) + 1
-    application_id = f"APP-2026-{count:05d}"
+    oid = ObjectId()
+    application_id = f"APP-{str(oid)[-8:].upper()}"
 
     # Create application
     application = {

@@ -72,11 +72,12 @@ class BedrockAnthropicChatCompletions(BedrockClient):
             # Invoke the model with the request.
             response = self.bedrock_client.invoke_model(
                 modelId=self.model_id, body=request)
-
-        except (ClientError, Exception) as e:
-            self.log.error(
-                f"ERROR: Can't invoke '{self.model_id}'. Reason: {e}")
-            exit(1)
+        except ClientError as e:
+            self.log.error(f"Bedrock invocation failed: {e}")
+            raise RuntimeError(f"Bedrock invocation failed: {e}") from e
+        except Exception as e:
+            self.log.error(f"Bedrock invocation failed: {e}")
+            raise RuntimeError(f"Bedrock invocation failed: {e}") from e
 
         # Decode the response body.
         model_response = json.loads(response["body"].read())
@@ -109,10 +110,12 @@ class BedrockAnthropicChatCompletions(BedrockClient):
         try:
             response = self.bedrock_client.invoke_model(
                 modelId=self.model_id, body=request)
-        except (ClientError, Exception) as e:
-            self.log.error(
-                f"ERROR: Can't invoke '{self.model_id}'. Reason: {e}")
-            exit(1)
+        except ClientError as e:
+            self.log.error(f"Bedrock invocation failed: {e}")
+            raise RuntimeError(f"Bedrock invocation failed: {e}") from e
+        except Exception as e:
+            self.log.error(f"Bedrock invocation failed: {e}")
+            raise RuntimeError(f"Bedrock invocation failed: {e}") from e
 
         model_response = json.loads(response["body"].read())
         return model_response["content"][0]["text"]
@@ -141,10 +144,12 @@ class BedrockAnthropicChatCompletions(BedrockClient):
         try:
             response = self.bedrock_client.invoke_model(
                 modelId=self.model_id, body=request)
-        except (ClientError, Exception) as e:
-            self.log.error(
-                f"ERROR: Can't invoke '{self.model_id}'. Reason: {e}")
-            exit(1)
+        except ClientError as e:
+            self.log.error(f"Bedrock invocation failed: {e}")
+            raise RuntimeError(f"Bedrock invocation failed: {e}") from e
+        except Exception as e:
+            self.log.error(f"Bedrock invocation failed: {e}")
+            raise RuntimeError(f"Bedrock invocation failed: {e}") from e
 
         model_response = json.loads(response["body"].read())
         return model_response["content"][0]["text"]
