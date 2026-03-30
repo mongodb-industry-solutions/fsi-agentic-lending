@@ -46,4 +46,7 @@ class LendFlowState(TypedDict):
     stress_gds: Optional[float]
     stress_tds: Optional[float]
     stress_rate: Optional[float]
+
+    # HITL observe mode tracking
     hitl_approved_nodes: list[str]
+    _pending_node: Optional[str]

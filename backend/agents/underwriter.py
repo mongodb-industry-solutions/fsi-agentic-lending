@@ -116,6 +116,11 @@ def underwriter_node(state: LendFlowState) -> dict:
     log_agent_activity(app_id, "underwriter", "stress_test",
         f"Stress rate: {stress_rate:.2%}, Stress GDS: {stress_gds:.1%}, Stress TDS: {stress_tds:.1%}")
 
+    # Explicit stress test pass/fail
+    stress_test_passed = stress_gds <= 0.39 and stress_tds <= 0.44
+    log_agent_activity(app_id, "underwriter", "stress_test_result",
+        f"{'PASSED' if stress_test_passed else 'FAILED'}: Stress GDS {stress_gds:.1%}, Stress TDS {stress_tds:.1%}")
+
     # Use stress-test ratios for decision if they exceed limits
     effective_gds = max(gds, stress_gds)
     effective_tds = max(tds, stress_tds)
@@ -183,6 +188,23 @@ Risk Tier: {risk_tier}
 """
 
     analysis = llm.predict_with_system(analysis_input, prompt)
+
+    # Early decline if OSFI B-20 stress test failed
+    if not stress_test_passed:
+        decision = "decline"
+        decision_reasoning = f"OSFI B-20 stress test failure: Stress GDS {stress_gds:.1%} (limit 39%), Stress TDS {stress_tds:.1%} (limit 44%)"
+        log_agent_activity(app_id, "underwriter", "decision", decision_reasoning)
+        update_application_status(app_id, "declined", decision_reasoning)
+        return {
+            "gds_ratio": round(gds, 4),
+            "tds_ratio": round(tds, 4),
+            "risk_score": float(risk_score),
+            "risk_tier": risk_tier,
+            "policy_citations": [p.get("policy_id", "") for p in policies],
+            "decision": decision,
+            "decision_reasoning": decision_reasoning,
+            "messages": [{"role": "assistant", "content": analysis}],
+        }
 
     # Decision logic based on ratios and risk
     if risk_score > DECLINE_RISK_SCORE or risk_tier == "D":

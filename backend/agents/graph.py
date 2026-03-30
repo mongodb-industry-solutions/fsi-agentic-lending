@@ -68,6 +68,14 @@ def hitl_gate(state: LendFlowState) -> dict:
         "officer_notes": notes,
     }
 
+    # Record approved node to prevent re-gating in observe mode
+    pending = state.get("_pending_node")
+    if pending:
+        approved = list(state.get("hitl_approved_nodes", []))
+        approved.append(pending)
+        state_updates["hitl_approved_nodes"] = approved
+        state_updates["_pending_node"] = None
+
     if action == "modify_and_continue":
         state_updates["risk_score"] = None
 
@@ -79,6 +87,13 @@ def hitl_gate(state: LendFlowState) -> dict:
         state_updates["risk_score"] = None
         state_updates["decision"] = None
         state_updates["decision_reasoning"] = f"Re-underwriting: officer adjusted loan to ${overrides['loan_amount']:,.0f}"
+        # Persist loan_amount override to database
+        from db.mdb import get_db as _get_db
+        db = _get_db()
+        db["applications"].update_one(
+            {"application_id": app_id},
+            {"$set": {"loan_amount": overrides["loan_amount"]}}
+        )
 
     officer_id = decision.get("officer_id", "unknown")
     new_status = "approved" if action == "approve" else ("processing" if action == "modify_and_continue" else "declined")
