@@ -5,12 +5,16 @@ services:
       no_cache: true
       dockerfile: Dockerfile.backend
     image: lendflow-backend:latest
+    env_file:
+      - ./backend/.env
+    environment:
+      - ORIGINS=http://localhost:3000,http://localhost:8080
     volumes:
       - ~/.aws/credentials:/root/.aws/credentials:ro
       - ~/.aws/config:/root/.aws/config:ro
       - ~/.aws/sso/cache:/root/.aws/sso/cache:rw
     ports:
-      - "8000:8000"
+      - "8000:8080"
     restart: always
     container_name: lendflow-backend
   lendflow-frontend:
@@ -18,8 +22,14 @@ services:
       context: .
       no_cache: true
       dockerfile: Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_BACKEND_URL: http://lendflow-backend:8080
     image: lendflow-frontend:latest
+    environment:
+      - NEXT_PUBLIC_BACKEND_URL=http://lendflow-backend:8080
     ports:
-      - "3000:3000"
+      - "3000:8080"
     restart: always
     container_name: lendflow-frontend
+    depends_on:
+      - lendflow-backend

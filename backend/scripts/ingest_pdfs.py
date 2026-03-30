@@ -171,6 +171,13 @@ def main():
     db_connector = MongoDBConnector()
     db = db_connector.client[os.getenv("DATABASE_NAME", "lendflow")]
 
+    # Idempotency check
+    existing = db["applications"].count_documents({"application_id": APPLICATION_ID})
+    if existing > 0:
+        print(f"Data already ingested for {APPLICATION_ID} ({existing} docs found). Skipping.")
+        print("To re-ingest, drop the collections first.")
+        sys.exit(0)
+
     model_id = os.getenv("CHATCOMPLETIONS_MODEL_ID")
     if not model_id:
         print("ERROR: CHATCOMPLETIONS_MODEL_ID not set in .env")

@@ -56,7 +56,7 @@ export async function apiUpload(path, file, fields = {}) {
  */
 const WS_BASE = process.env.NEXT_PUBLIC_WS_BASE
   ?? (typeof window !== 'undefined'
-    ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8000/api`
+    ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/backend`
     : 'ws://localhost:8000/api');
 
 export function apiWebSocket(path, { onMessage, onError, onClose, reconnect = true, maxRetries = 5 } = {}) {

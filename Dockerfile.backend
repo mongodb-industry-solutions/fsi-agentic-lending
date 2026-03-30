@@ -1,6 +1,6 @@
 FROM python:3.13-slim
 
-WORKDIR /
+WORKDIR /app
 
 # uv installation
 RUN pip install uv
@@ -13,6 +13,9 @@ RUN uv sync --no-dev
 
 # Copy the rest of the backend code
 COPY ./backend/ .
+
+# Copy synthetic PDFs for ingestion
+COPY docs/ ./docs/
 
 # if using multi-container setup expose 8000 instead
 EXPOSE 8080

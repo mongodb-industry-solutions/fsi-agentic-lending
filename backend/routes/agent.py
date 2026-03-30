@@ -4,13 +4,12 @@ import re
 import asyncio
 import logging
 import threading
-from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from db.mdb import get_db as _get_db
 from services import application_service
 from agents.graph import get_graph
-from agents.tools import log_agent_activity, update_application_status
+from agents.tools import log_agent_activity
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +32,7 @@ _running_lock = threading.Lock()
 
 @router.post("/agent/{app_id}/run")
 async def run_agent(app_id: str, autonomy_level: str = "bounded"):
-    """Trigger agent execution for an application.
-
-    TODO: Phase 4 — wire to LangGraph graph.astream()
-    Currently returns a placeholder that logs mock activity.
-    """
+    """Trigger agent execution for an application."""
     app = application_service.get_application(app_id)
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
@@ -104,11 +99,7 @@ async def run_agent(app_id: str, autonomy_level: str = "bounded"):
 
 @router.get("/agent/{app_id}/stream")
 async def stream_agent(app_id: str):
-    """SSE endpoint — streams agent reasoning and actions in real time.
-
-    TODO: Phase 4 — wire to LangGraph graph.astream_events()
-    Currently streams from agent_activity Change Stream.
-    """
+    """SSE endpoint — streams agent reasoning and actions in real time."""
 
     async def event_generator():
         db = _get_db()

@@ -4,6 +4,8 @@ env:
   AWS_REGION: us-east-1
   # Backend API URL for frontend to connect to backend health check
   BACKEND_URL: http://<service-name>:80 # or http://localhost:8000 if multicontainer pod is setup and backend is running on 8000
+  # CORS origins (comma-separated)
+  ORIGINS: "https://<production-domain>"
 
 ## Single Pod Containers
 envSecrets:
@@ -14,6 +16,32 @@ envSecrets:
   # Bedrock Inference Profiles (see cloud-cost-tracking.md)
   CHATCOMPLETIONS_MODEL_ID: <secret-group>
   EMBEDDINGS_MODEL_ID: <secret-group>
+  # LangChain / LangSmith tracing
+  LANGCHAIN_API_KEY: <secret-group>
+
+# Resource limits
+resources:
+  limits:
+    cpu: "2"
+    memory: "4Gi"
+  requests:
+    cpu: "1"
+    memory: "2Gi"
+
+# Health probes
+livenessProbe:
+  httpGet:
+    path: /
+    port: 8080
+  initialDelaySeconds: 15
+  periodSeconds: 20
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
   
 ## should be used in case of multi-pod container i.e: both frontend and backend in one pod
 # sidecarContainers:
