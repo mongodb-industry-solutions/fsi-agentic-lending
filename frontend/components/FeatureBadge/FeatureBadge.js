@@ -4,8 +4,6 @@ import { colorMap, dimMap, borderMap } from "../../lib/data/colorMaps";
 
 export { colorMap, dimMap } from "../../lib/data/colorMaps";
 
-export { colorMap, dimMap };
-
 export default function FeatureBadge({
   icon,
   label,
