@@ -1,7 +1,8 @@
 export const APPLICANT = {
   name: "Marcus & Sofia Delgado",
   id: "APP-2026-00001",
-  loanAmount: "$875,000",
+  purchasePrice: "$875,000",
+  loanAmount: "$700,000",
   product: "5yr Fixed (25yr Amort)",
   income: "$222,700",
   employer: "TechNova Systems / Covenant Health",

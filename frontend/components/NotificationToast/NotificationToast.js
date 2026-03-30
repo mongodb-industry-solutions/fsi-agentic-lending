@@ -44,6 +44,7 @@ const TYPE_COLORS = {
 
 function Toast({ toast, onDismiss }) {
   const [exiting, setExiting] = useState(false);
+  const [paused, setPaused] = useState(false);
   const exitTimerRef = useRef(null);
 
   const dismiss = useCallback(() => {
@@ -53,12 +54,16 @@ function Toast({ toast, onDismiss }) {
   }, [toast.id, onDismiss]);
 
   useEffect(() => {
+    if (paused) return; // Don't auto-dismiss while hovered
     const autoTimer = setTimeout(dismiss, TOAST_DURATION);
+    return () => clearTimeout(autoTimer);
+  }, [dismiss, paused]);
+
+  useEffect(() => {
     return () => {
-      clearTimeout(autoTimer);
       if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
     };
-  }, [dismiss]);
+  }, []);
 
   const colors = TYPE_COLORS[toast.type] || TYPE_COLORS.info;
   const toastRole = (toast.type === 'error' || toast.type === 'warning') ? 'alert' : 'status';
@@ -67,6 +72,8 @@ function Toast({ toast, onDismiss }) {
     <div
       role={toastRole}
       tabIndex={0}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();

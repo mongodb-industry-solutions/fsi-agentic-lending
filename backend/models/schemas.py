@@ -1,6 +1,6 @@
 """Pydantic request/response models for the LendFlow API."""
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 from datetime import datetime
 
@@ -45,8 +45,7 @@ class ApplicationResponse(BaseModel):
     documents: list[dict] = []
     credit_reports: list[dict] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class HITLDecisionRequest(BaseModel):

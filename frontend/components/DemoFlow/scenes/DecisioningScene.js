@@ -32,9 +32,9 @@ const CASH_FLOW_MONTHS = [
 ];
 
 const SIMILAR_BORROWERS = [
-  { fico: 778, dti: '0.29', product: '5yr Fixed', similarity: '94.2%', status: 'Performing' },
-  { fico: 791, dti: '0.33', product: '5yr Fixed', similarity: '91.8%', status: 'Performing' },
-  { fico: 765, dti: '0.31', product: '5yr Variable', similarity: '87.4%', status: 'Performing' },
+  { fico: 778, gds: '0.29', product: '5yr Fixed', similarity: '94.2%', status: 'Performing' },
+  { fico: 791, gds: '0.33', product: '5yr Fixed', similarity: '91.8%', status: 'Performing' },
+  { fico: 765, gds: '0.31', product: '5yr Variable', similarity: '87.4%', status: 'Performing' },
 ];
 
 const COMPLIANCE = [
@@ -365,7 +365,7 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
                   <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, padding: '10px 12px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-dim)', marginBottom: 6, fontSize: 11 }}>
                     <div>
                       <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Equifax / GDS</div>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{b.fico} / {b.dti}</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{b.fico} / {b.gds}</div>
                     </div>
                     <div>
                       <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Similarity</div>

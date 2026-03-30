@@ -1,18 +1,35 @@
 "use client";
 
+import { useState, useEffect } from 'react';
+import { apiGet } from '../../lib/api';
+
 const SCREENS = [
   { id: "borrower", label: "Borrower Portal", icon: "👤" },
   { id: "officer", label: "Loan Officer", icon: "🏦" },
   { id: "demo", label: "Demo Flow", icon: "▶" },
 ];
 
-const STATUS_CHIPS = [
-  { label: "Atlas", on: true },
-  { label: "LangGraph", on: true },
-  { label: "LangSmith", on: true },
-];
-
 export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
+  const [backendHealth, setBackendHealth] = useState(null);
+
+  useEffect(() => {
+    const check = async () => {
+      const result = await apiGet('/');
+      setBackendHealth(result);
+    };
+    check();
+    const interval = setInterval(check, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const isBackendUp = backendHealth?.status === 'ok';
+  const isMongoUp = backendHealth?.mongodb === 'connected';
+
+  const statusChips = [
+    { label: "Atlas", on: isMongoUp },
+    { label: "LangGraph", on: isBackendUp },
+    { label: "LangSmith", on: isBackendUp },
+  ];
   return (
     <header
       style={{
@@ -135,7 +152,7 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
             i
           </button>
         )}
-        {STATUS_CHIPS.map((chip) => (
+        {statusChips.map((chip) => (
           <span
             key={chip.label}
             style={{

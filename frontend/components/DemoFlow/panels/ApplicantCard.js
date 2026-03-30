@@ -53,10 +53,10 @@ export default function ApplicantCard({ stepIndex }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <div>
           <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: 3 }}>
-            Loan Amount
+            Purchase Price
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--mongo)' }}>
-            {APPLICANT.loanAmount}
+            {APPLICANT.purchasePrice}
           </div>
         </div>
         <div>

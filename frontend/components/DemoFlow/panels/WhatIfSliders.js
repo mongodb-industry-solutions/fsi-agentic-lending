@@ -21,12 +21,12 @@ function tierToRate(tier) {
 }
 
 export default function WhatIfSliders() {
-  const [fico, setFico] = useState(784);
+  const [equifaxScore, setEquifaxScore] = useState(784);
   const [dti, setDti] = useState(0.312);
 
   const { score, tier, rate, decision } = useMemo(() => {
-    // Simple formula: base 50, FICO contributes ~0.05 per point above 600, DTI penalizes
-    const ficoContrib = Math.max(0, (fico - 600) / 250) * 40;
+    // Simple formula: base 50, Equifax contributes ~0.05 per point above 600, DTI penalizes
+    const ficoContrib = Math.max(0, (equifaxScore - 600) / 250) * 40;
     const dtiPenalty = Math.max(0, (dti - 0.28) / 0.22) * 25;
     const score = Math.round(50 + ficoContrib - dtiPenalty);
     const clamped = Math.max(0, Math.min(100, score));
@@ -39,7 +39,7 @@ export default function WhatIfSliders() {
       rate,
       decision: approved ? 'Approved' : 'Review Required',
     };
-  }, [fico, dti]);
+  }, [equifaxScore, dti]);
 
   return (
     <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', fontSize: 12, color: 'var(--text-secondary)' }}>
@@ -48,13 +48,13 @@ export default function WhatIfSliders() {
 
       <div style={{ marginTop: 16, marginBottom: 12, fontWeight: 600, color: 'var(--text-primary)' }}>What-if</div>
       <div style={{ marginBottom: 12 }}>
-        <label style={{ display: 'block', marginBottom: 4, fontSize: 11 }}>Equifax: {fico}</label>
+        <label style={{ display: 'block', marginBottom: 4, fontSize: 11 }}>Equifax: {equifaxScore}</label>
         <input
           type="range"
           min={600}
           max={850}
-          value={fico}
-          onChange={(e) => setFico(Number(e.target.value))}
+          value={equifaxScore}
+          onChange={(e) => setEquifaxScore(Number(e.target.value))}
           style={{ width: '100%', accentColor: 'var(--mongo)' }}
         />
       </div>

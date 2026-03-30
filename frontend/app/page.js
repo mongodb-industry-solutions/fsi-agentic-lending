@@ -8,8 +8,17 @@ import DemoFlow from "../components/DemoFlow/DemoFlow";
 import InfoWizardPanel from "../components/educational/InfoWizardPanel";
 
 export default function Home() {
-  const [activeScreen, setActiveScreen] = useState("borrower");
+  const [activeScreen, setActiveScreen] = useState(() => {
+    if (typeof window === 'undefined') return 'borrower';
+    const params = new URLSearchParams(window.location.search);
+    return params.get('screen') || 'borrower';
+  });
   const [infoWizardOpen, setInfoWizardOpen] = useState(false);
+
+  const handleScreenChange = (screen) => {
+    setActiveScreen(screen);
+    window.history.replaceState(null, '', `?screen=${screen}`);
+  };
 
   const renderScreen = () => {
     switch (activeScreen) {
@@ -26,7 +35,7 @@ export default function Home() {
 
   return (
     <>
-      <Header activeScreen={activeScreen} onScreenChange={setActiveScreen} onInfoOpen={() => setInfoWizardOpen(true)} />
+      <Header activeScreen={activeScreen} onScreenChange={handleScreenChange} onInfoOpen={() => setInfoWizardOpen(true)} />
       <main className="app-main" style={{ paddingTop: 52 }}>
         <div key={activeScreen} className="screen-content">
           {renderScreen()}

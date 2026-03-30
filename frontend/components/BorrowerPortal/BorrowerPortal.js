@@ -51,6 +51,10 @@ export default function BorrowerPortal() {
       annual_property_tax: parseFloat(formData.annualPropertyTax || 0),
     });
 
+    if (!result) {
+      addToast({ type: 'error', icon: '⚠', title: 'Submission Failed', message: 'Could not connect to backend. The demo will continue with simulated data.' });
+    }
+
     if (result?.application_id) {
       setApplicationId(result.application_id);
       await apiPost(`/agent/${result.application_id}/run`);
