@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { spacing } from '@leafygreen-ui/tokens';
 import { apiGet } from '../lib/api';
 
 export default function DocumentViewer({ docId, onClose }) {
@@ -75,7 +76,7 @@ export default function DocumentViewer({ docId, onClose }) {
           flexShrink: 0,
           background: 'var(--bg-surface)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: spacing[2] }}>
             <span style={{ fontSize: 16 }}>📄</span>
             <div>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13 }}>
@@ -117,7 +118,7 @@ export default function DocumentViewer({ docId, onClose }) {
               ].map((tab) => (
                 <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)}
                   style={{
-                    padding: '8px 16px', border: 'none', cursor: 'pointer',
+                    padding: `${spacing[2]}px ${spacing[3]}px`, border: 'none', cursor: 'pointer',
                     background: activeTab === tab.id ? 'var(--bg-base)' : 'var(--bg-surface)',
                     color: activeTab === tab.id ? 'var(--mongo)' : 'var(--text-dim)',
                     fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 600,
@@ -129,7 +130,7 @@ export default function DocumentViewer({ docId, onClose }) {
             </div>
 
             {/* Tab content */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: spacing[3] }}>
               {loading ? (
                 <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)', fontSize: 12 }}>Loading...</div>
               ) : !data ? (
@@ -162,13 +163,13 @@ function StructuredView({ data }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[2] }}>
       {Object.entries(data).filter(([k]) => k !== 'text_summary' && k !== 'raw_response' && k !== 'error').map(([key, value]) => (
         <div key={key} style={{
           padding: '8px 12px', background: 'var(--bg-surface)',
           borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-dim)',
         }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 4 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[1] }}>
             {key.replace(/_/g, ' ')}
           </div>
           {typeof value === 'object' && value !== null ? (

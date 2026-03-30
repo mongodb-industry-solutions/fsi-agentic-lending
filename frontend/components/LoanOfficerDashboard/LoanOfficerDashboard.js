@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { spacing } from '@leafygreen-ui/tokens';
 import ApplicationQueue from './ApplicationQueue';
 import AgentActivityLog from './AgentActivityLog';
 import IntentPreview from './IntentPreview';
@@ -208,7 +209,7 @@ function AutoAuditSummary({ stageTimestamps, approvalDetails, onRollback, onAcce
 
   return (
     <div style={{
-      padding: 16, background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)',
+      padding: spacing[3], background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)',
       border: '2px solid var(--success)', animation: 'slideDown 0.3s ease-out',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -268,7 +269,7 @@ function AutoAuditSummary({ stageTimestamps, approvalDetails, onRollback, onAcce
 
       {/* Cost summary */}
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14,
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: spacing[2], marginBottom: 14,
         padding: '8px 10px', background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)',
       }}>
         <div>
@@ -286,7 +287,7 @@ function AutoAuditSummary({ stageTimestamps, approvalDetails, onRollback, onAcce
       </div>
 
       {/* Actions */}
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', gap: spacing[2] }}>
         <button type="button" onClick={onAccept} style={{
           flex: 2, padding: 10, borderRadius: 'var(--radius-md)', border: 'none',
           background: 'var(--success)', color: '#fff',
@@ -498,16 +499,16 @@ function HITLReviewCard({ onApprove, onDecline, addToast }) {
 
   return (
     <div style={{
-      padding: 20,
+      padding: spacing[5],
       background: 'var(--bg-surface)',
       borderRadius: 'var(--radius-lg)',
       border: '2px solid var(--hitl-amber)',
       animation: 'slideDown 0.3s ease-out',
     }}>
       {/* Header badge */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: spacing[2], marginBottom: spacing[3] }}>
         <span style={{
-          padding: '4px 10px', borderRadius: 12,
+          padding: `${spacing[1]}px 10px`, borderRadius: 12,
           background: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)',
           fontWeight: 700, fontSize: 11,
         }}>
@@ -578,7 +579,7 @@ function HITLReviewCard({ onApprove, onDecline, addToast }) {
       </div>
 
       {/* Key metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: spacing[3], marginBottom: spacing[3] }}>
         <div>
           <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>Risk Score</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 800, color: 'var(--hitl-amber)' }}>
@@ -595,7 +596,7 @@ function HITLReviewCard({ onApprove, onDecline, addToast }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12, padding: 10, background: 'var(--bg-raised)', borderRadius: 'var(--radius-md)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: spacing[2], marginBottom: spacing[3], padding: 10, background: 'var(--bg-raised)', borderRadius: 'var(--radius-md)' }}>
         {[
           { label: 'Applicant', value: PAYLOAD.applicant },
           { label: 'Product', value: PAYLOAD.product },
@@ -768,7 +769,7 @@ function HITLReviewCard({ onApprove, onDecline, addToast }) {
       )}
 
       {/* Action buttons */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: spacing[2], flexWrap: 'wrap' }}>
         {showModify ? (
           <button type="button" onClick={handleModifySubmit} style={{
             flex: '1 1 auto', padding: 10, borderRadius: 'var(--radius-md)', border: 'none',
@@ -1059,8 +1060,8 @@ export default function LoanOfficerDashboard() {
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: 12,
-        padding: '12px 20px',
+        gap: spacing[3],
+        padding: `12px ${spacing[5]}px`,
         borderBottom: '1px solid var(--border-dim)',
         background: 'var(--bg-base)',
       }}>
@@ -1102,7 +1103,7 @@ export default function LoanOfficerDashboard() {
 
           {/* Intent Preview (pre-action) */}
           {showPreview && (
-            <div style={{ padding: 16, borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '50vh' }}>
+            <div style={{ padding: spacing[3], borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '50vh' }}>
               <IntentPreview onProceed={handleProceed} onManual={handleManual} />
             </div>
           )}
@@ -1200,14 +1201,14 @@ export default function LoanOfficerDashboard() {
 
           {/* HITL Review panel */}
           {isPrimaryApp && hitlReached && !approved && autonomyLevel !== 'auto' && (
-            <div style={{ padding: 16, borderTop: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '55vh' }}>
+            <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '55vh' }}>
               <HITLReviewCard onApprove={handleApprove} onDecline={handleDecline} addToast={addToast} />
             </div>
           )}
 
           {/* Approved card — standard (non-auto) */}
           {isPrimaryApp && approved && approvalDetails?.mode !== 'auto' && (
-            <div style={{ padding: 16, borderTop: '1px solid var(--border-dim)', background: 'var(--bg-base)', textAlign: 'center' }}>
+            <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)', background: 'var(--bg-base)', textAlign: 'center' }}>
               <div style={{ padding: 14, background: 'var(--success-dim)', borderRadius: 'var(--radius-md)', border: '1px solid var(--success)' }}>
                 <div style={{ fontSize: 24, marginBottom: 4 }}>✅</div>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16, color: 'var(--success)' }}>LOAN APPROVED</div>
@@ -1223,7 +1224,7 @@ export default function LoanOfficerDashboard() {
 
           {/* Full Auto audit summary */}
           {isPrimaryApp && approved && approvalDetails?.mode === 'auto' && (
-            <div style={{ padding: 16, borderTop: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '55vh' }}>
+            <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '55vh' }}>
               <AutoAuditSummary
                 stageTimestamps={stageTimestampsRef.current}
                 approvalDetails={approvalDetails}

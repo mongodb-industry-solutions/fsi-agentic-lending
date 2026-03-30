@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
+import Badge from '@leafygreen-ui/badge';
 import { DECISIONING_STEPS } from '../engine/demoScenes';
 import { mergeCanvasState } from '../engine/canvasUtils';
 import WorkflowCanvas from '../WorkflowCanvas';
@@ -89,9 +90,7 @@ function CashFlowCard() {
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--agent-cyan)' }}>
           Cash Flow Analysis
         </div>
-        <span style={{ fontSize: 8, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' }}>
-          Open Banking + Aggregation
-        </span>
+        <Badge variant="blue">Open Banking + Aggregation</Badge>
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 50, marginBottom: 6 }}>
         {CASH_FLOW_MONTHS.map((d, i) => {
@@ -385,7 +384,7 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
               <div style={{ marginBottom: 16, animation: 'slideDown 0.3s ease-out' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
                   Similar Borrowers
-                  <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--voyage)', padding: '2px 8px', background: 'var(--voyage-dim)', borderRadius: 4 }}>Vector Search</span>
+                  <Badge variant="blue">Vector Search</Badge>
                 </div>
                 {SIMILAR_BORROWERS.map((b, i) => (
                   <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, padding: '10px 12px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-dim)', marginBottom: 6, fontSize: 11 }}>
@@ -424,7 +423,7 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Regulatory Compliance</div>
                 {COMPLIANCE.map((c) => (
                   <div key={c.rule} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border-dim)', fontSize: 12 }}>
-                    <span style={{ color: c.met ? 'var(--success)' : 'var(--danger)', fontSize: 14 }}>{c.met ? '✓' : '✕'}</span>
+                    <Badge variant={c.met ? 'green' : 'red'}>{c.met ? 'Compliant' : 'Failed'}</Badge>
                     <span style={{ color: 'var(--text-secondary)' }}>{c.rule}</span>
                   </div>
                 ))}
