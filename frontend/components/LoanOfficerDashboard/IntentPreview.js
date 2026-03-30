@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { apiGet, apiPost } from '../../lib/api';
 
 const PLAN_STEPS = [
   {
@@ -66,8 +67,27 @@ const PLAN_STEPS = [
   },
 ];
 
-export default function IntentPreview({ onProceed, onManual }) {
+export default function IntentPreview({ applicationId, onProceed, onManual }) {
   const [editing, setEditing] = useState(false);
+  const [livePlan, setLivePlan] = useState(null);
+
+  useEffect(() => {
+    if (!applicationId) return;
+    apiGet(`/applications/${applicationId}`).then((app) => {
+      if (app) {
+        setLivePlan([
+          { label: 'Document Verification', tool: 'voyage-multimodal-3.5', est: '~480ms', status: app.status === 'submitted' ? 'pending' : 'complete' },
+          { label: 'Credit Bureau Pull', tool: 'Equifax API', est: '~120ms', status: app.credit_reports?.length > 0 ? 'complete' : 'pending' },
+          { label: 'Risk Scoring', tool: 'db.riskScores.aggregate()', est: '~18ms', status: app.status === 'underwriting' || app.status === 'review' ? 'complete' : 'pending' },
+          { label: 'Policy Compliance', tool: 'Atlas Vector Search', est: '~12ms', status: app.status === 'review' ? 'complete' : 'pending' },
+          { label: 'Decision', tool: 'LangGraph interrupt()', est: '—', status: app.status === 'approved' || app.status === 'declined' ? 'complete' : 'pending' },
+        ]);
+      }
+    });
+  }, [applicationId]);
+
+  const planSteps = livePlan || PLAN_STEPS;
+
   const [settings, setSettings] = useState(() => {
     const s = {};
     PLAN_STEPS.forEach((step) => {
@@ -78,7 +98,7 @@ export default function IntentPreview({ onProceed, onManual }) {
     return s;
   });
 
-  const enabledCount = PLAN_STEPS.filter((s) => settings[s.id].enabled).length;
+  const enabledCount = planSteps.filter((s) => settings[s.id]?.enabled).length;
 
   return (
     <div style={{
@@ -107,9 +127,9 @@ export default function IntentPreview({ onProceed, onManual }) {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-        {PLAN_STEPS.map((step, i) => {
-          const stepSettings = settings[step.id];
-          const isDisabled = editing && step.editable.skipable && !stepSettings.enabled;
+        {planSteps.map((step, i) => {
+          const stepSettings = settings[step.id] || {};
+          const isDisabled = editing && step.editable?.skipable && !stepSettings.enabled;
 
           return (
             <div key={step.id} style={{
@@ -156,12 +176,24 @@ export default function IntentPreview({ onProceed, onManual }) {
                   }}>
                     {step.tool}
                   </span>
+                  {step.status && (
+                    <span style={{
+                      fontSize: 9,
+                      fontWeight: 700,
+                      padding: '1px 5px',
+                      borderRadius: 4,
+                      background: step.status === 'complete' ? 'rgba(0,200,100,0.1)' : 'rgba(255,180,0,0.1)',
+                      color: step.status === 'complete' ? 'var(--success, #00c864)' : 'var(--hitl-amber, #ffb400)',
+                    }}>
+                      {step.status === 'complete' ? '✓ done' : '● pending'}
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
                   {step.description}
                 </div>
 
-                {editing && (
+                {editing && step.editable && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
                     {step.editable.skipable && (
                       <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-secondary)', cursor: 'pointer' }}>
@@ -234,7 +266,12 @@ export default function IntentPreview({ onProceed, onManual }) {
       </div>
 
       <div style={{ display: 'flex', gap: 10 }}>
-        <button type="button" onClick={() => onProceed(settings)} style={{
+        <button type="button" onClick={async () => {
+          if (applicationId) {
+            await apiPost(`/agent/${applicationId}/run?autonomy_level=bounded`);
+          }
+          if (onProceed) onProceed(settings);
+        }} style={{
           flex: 2,
           padding: 10,
           borderRadius: 'var(--radius-md)',

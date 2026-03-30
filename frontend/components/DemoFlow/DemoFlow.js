@@ -149,7 +149,7 @@ export default function Demo() {
                   All on one platform. All in real-time.
                 </div>
               </div>
-              <TechRecap elapsedMs={engine.elapsedMs} />
+              <TechRecap elapsedMs={engine.elapsedMs} activeFeatures={engine.activeFeatures} />
             </div>
           </div>
         ) : (
