@@ -67,7 +67,7 @@ export default function ApplicantCard({ stepIndex }) {
         </div>
         <div>
           <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: 3 }}>
-            FICO
+            Equifax
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--mongo)' }}>
             {APPLICANT.fico}
@@ -75,7 +75,7 @@ export default function ApplicantCard({ stepIndex }) {
         </div>
         <div>
           <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: 3 }}>
-            DTI
+            GDS
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{APPLICANT.dti}</div>
         </div>

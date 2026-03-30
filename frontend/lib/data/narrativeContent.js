@@ -172,7 +172,7 @@ export const architectureContent = {
     loanAppAgent: {
       name: 'Loan Application Agent',
       responsibilities:
-        'Multi-document ingestion (W-2, bank statements, pay stubs), identity verification, open banking data enrichment, and abandonment prevention.',
+        'Multi-document ingestion (CRA notices, bank statements, pay stubs), identity verification, open banking data enrichment, and abandonment prevention.',
       tools: [
         { icon: '📋', label: 'creditBureau()', colorVar: 'tool-blue' },
         { icon: '🧬', label: 'voyage-multimodal-3.5', colorVar: 'voyage' },
@@ -182,7 +182,7 @@ export const architectureContent = {
       collections: 'loanApplications, loanDocuments',
       dataSources: [
         'Borrower Profiles',
-        'W-2 / Bank Statements / Pay Stubs',
+        'CRA Notices / Bank Statements / Pay Stubs',
         'Communication Logs',
         'IDs',
       ],

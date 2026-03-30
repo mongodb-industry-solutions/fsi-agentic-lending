@@ -7,7 +7,7 @@ const STAGES = [
     id: 'received',
     label: 'Application Received',
     type: 'clean',
-    detail: 'Your application APP-2025-78342 has been received and queued for processing.',
+    detail: 'Your application APP-2026-00001 has been received and queued for processing.',
     icon: '📝',
     delayMs: 0,
     agentStatus: 'Our AI assistant is reviewing your submission...',
@@ -22,7 +22,7 @@ const STAGES = [
     delayMs: 3000,
     agentStatus: 'AI assistant detected document issues — resolving automatically...',
     agentStatusActive: 'Our AI assistant is verifying your documents...',
-    whatHappened: 'Our AI verified your W-2, bank statement, and pay stub. Two issues were detected and resolved without requiring any action from you.',
+    whatHappened: 'Our AI verified your CRA tax notices, bank statements, and pay stubs. Two issues were detected and resolved without requiring any action from you.',
     interventions: [
       {
         issue: 'Bank statement pages 2-3 had insufficient image quality — text extraction failed on first attempt.',
@@ -30,8 +30,8 @@ const STAGES = [
         icon: '📄',
       },
       {
-        issue: 'Pay stub shows "S. Chen" while credit report shows "Sarah Mei-Lin Chen" — name mismatch flagged.',
-        resolution: 'AI cross-referenced SSN and address across all documents to confirm identity match. Name variation logged as verified alias.',
+        issue: 'Pay stub shows "M. Delgado" while credit report shows "Marcus Alejandro Delgado" — name mismatch flagged.',
+        resolution: 'AI cross-referenced SIN and address across all documents to confirm identity match. Name variation logged as verified alias.',
         icon: '🔍',
       },
     ],
@@ -45,9 +45,9 @@ const STAGES = [
     delayMs: 4000,
     agentStatus: 'Waiting for you to upload an additional bank statement...',
     agentStatusActive: 'AI assistant identified a missing document requirement...',
-    whatHappened: 'Our AI detected that your bank statement covered only September–October 2024, but policy §2.3.1 requires a minimum of 3 consecutive months. After you uploaded the August 2024 statement, the AI verified it in 320ms and resumed processing.',
-    actionLabel: 'Upload August 2024 Bank Statement',
-    actionDetail: 'Policy §2.3.1 requires 3 consecutive months of bank statements. Your current upload covers September–October 2024.',
+    whatHappened: 'Our AI detected that your bank statement covered only January–February 2026, but policy §2.3.1 requires a minimum of 3 consecutive months. After you uploaded the December 2025 statement, the AI verified it in 320ms and resumed processing.',
+    actionLabel: 'Upload December 2025 Bank Statement',
+    actionDetail: 'Policy §2.3.1 requires 3 consecutive months of bank statements. Your current upload covers January–February 2026.',
   },
   {
     id: 'credit',
@@ -62,12 +62,12 @@ const STAGES = [
     interventions: [
       {
         issue: '3 hard inquiries detected within 180 days, which would trigger a -8pt score penalty under policy §4.2.1.',
-        resolution: 'AI identified that 2 of the 3 inquiries were rate-shopping for an auto loan within a 14-day window. Per CFPB §1003.4(a), these are combined into 1 inquiry — effective count reduced to 2, avoiding the penalty trigger.',
+        resolution: 'AI identified that 2 of the 3 inquiries were rate-shopping for an auto loan within a 14-day window. Per FCAC guidelines, these are combined into 1 inquiry — effective count reduced to 2, avoiding the penalty trigger.',
         icon: '🔎',
       },
       {
-        issue: 'Plaid monthly average ($8,420/mo) does not match W-2 annualized income ($8,650/mo) — $230/mo discrepancy flagged.',
-        resolution: 'AI found $2,760 in freelance 1099 deposits across the 12-month Plaid history (averaging $230/mo), fully explaining the gap. Income reconciled at $103,800/yr with $2,760 supplemental.',
+        issue: 'Plaid monthly average ($18,150/mo) does not match combined T4 annualized income ($18,558/mo) — $408/mo discrepancy flagged.',
+        resolution: 'AI found $4,900 in freelance deposits across the 12-month Plaid history (averaging $408/mo), fully explaining the gap. Combined income reconciled at $222,700/yr with $4,900 supplemental.',
         icon: '💰',
       },
     ],
@@ -81,19 +81,19 @@ const STAGES = [
     delayMs: 5000,
     agentStatus: 'AI assistant corrected a scoring error — recalculating your risk profile...',
     agentStatusActive: 'Our AI assistant is running the underwriting risk assessment...',
-    whatHappened: 'The 7-stage aggregation pipeline initially scored your application at 68 (B tier). The AI identified that your student loan payment was classified at the full $480/mo amount, but you are enrolled in an Income-Based Repayment (IBR) plan with a verified payment of $210/mo. After correction, DTI dropped from 34% to 31% and the composite score improved to 72 (B+).',
+    whatHappened: 'The 7-stage aggregation pipeline initially scored your application at 68 (B tier). The AI identified that your car loan payment was classified at the full $620/mo amount, but verified Scotiabank records show the actual payment is $482/mo. After correction, GDS dropped from 33.8% to 31.2% and the composite score improved to 72 (B+).',
     interventions: [
       {
-        issue: 'Student loan payment classified at full amount ($480/mo) instead of IBR plan payment ($210/mo), inflating DTI to 34%.',
-        resolution: 'AI verified IBR enrollment through loan servicer records. Corrected monthly payment from $480 to $210, reducing DTI from 34% to 31%. Additionally, comparable borrower analysis shows 92% successful repayment for similar profiles.',
+        issue: 'Car loan payment classified at full amount ($620/mo) instead of verified Scotiabank payment ($482/mo), inflating GDS to 33.8%.',
+        resolution: 'AI verified actual payment through Scotiabank loan records. Corrected monthly payment from $620 to $482, reducing GDS from 33.8% to 31.2%. Additionally, comparable borrower analysis shows 92% successful repayment for similar profiles.',
         icon: '🎓',
       },
     ],
     beforeAfter: {
       metrics: [
         { label: 'Risk Score', before: '68 (B)', after: '72 (B+)' },
-        { label: 'DTI Ratio', before: '34%', after: '31%' },
-        { label: 'Student Loan', before: '$480/mo', after: '$210/mo (IBR)' },
+        { label: 'GDS Ratio', before: '33.8%', after: '31.2%' },
+        { label: 'Car Loan', before: '$620/mo', after: '$482/mo (verified)' },
       ],
     },
   },
@@ -105,7 +105,7 @@ const STAGES = [
     icon: '✅',
     delayMs: 3000,
     agentStatus: 'Analysis complete — preparing your results...',
-    whatHappened: 'Underwriting completed with a risk score of 72 (B+ tier). Throughout the process, our AI assistant resolved 5 issues autonomously and flagged 1 for your action — preventing unnecessary score penalties, correcting income records, and ensuring accurate debt calculations. The proposed rate of 6.875% reflects your corrected profile.',
+    whatHappened: 'Underwriting completed with a risk score of 72 (B+ tier). Throughout the process, our AI assistant resolved 5 issues autonomously and flagged 1 for your action — preventing unnecessary score penalties, correcting income records, and ensuring accurate debt calculations. The proposed rate of 4.89% reflects your corrected profile.',
   },
   {
     id: 'review',
@@ -115,27 +115,27 @@ const STAGES = [
     icon: '👤',
     delayMs: 4000,
     agentStatus: 'A loan officer is reviewing your application...',
-    whatHappened: 'A senior loan officer reviewed the AI\'s assessment, including all 5 automated interventions. The officer verified the IBR correction, confirmed the CFPB rate-shopping consolidation, and approved the income reconciliation methodology.',
+    whatHappened: 'A senior loan officer reviewed the AI\'s assessment, including all 5 automated interventions. The officer verified the car loan correction, confirmed the FCAC rate-shopping consolidation, and approved the income reconciliation methodology.',
   },
   {
     id: 'approved',
     label: 'Approved',
     type: 'clean',
-    detail: 'Congratulations! Your loan has been approved at 6.875% APR.',
+    detail: 'Congratulations! Your mortgage has been approved at 4.89% APR.',
     icon: '🎉',
     delayMs: 4000,
     agentStatus: 'Great news — your loan has been approved!',
-    whatHappened: 'Your 30-Year Fixed loan at 6.875% APR has been formally approved with a monthly payment of $1,870. Without the AI assistant\'s interventions, your application would have scored 68 (B tier) with a higher rate of 7.25%. The AI saved you an estimated $67/mo ($24,120 over the life of the loan).',
+    whatHappened: 'Your 5yr Fixed (25yr Amort) mortgage at 4.89% APR has been formally approved with a monthly payment of $4,092. Without the AI assistant\'s interventions, your application would have scored 68 (B tier) with a higher rate of 5.24%. The AI saved you an estimated $135/mo ($40,500 over the life of the loan).',
   },
   {
     id: 'active',
     label: 'Loan Active',
     type: 'clean',
-    detail: 'Your loan is now active. $285,000 disbursed. First payment: March 1, 2025.',
+    detail: 'Your mortgage is now active. $700,000 disbursed. First payment: May 1, 2026.',
     icon: '🏠',
     delayMs: 3000,
     agentStatus: 'Your loan is now active and being monitored.',
-    whatHappened: 'ACH disbursement of $285,000 has been initiated to your designated account. Loan servicing has begun — your first payment of $1,870 is due March 1, 2025. Our AI assistant will continue to monitor your loan for refinancing opportunities.',
+    whatHappened: 'EFT disbursement of $700,000 has been initiated to your designated account. Mortgage servicing has begun — your first payment of $4,092 is due May 1, 2026. Our AI assistant will continue to monitor your mortgage for renewal opportunities.',
   },
 ];
 
@@ -160,7 +160,7 @@ export default function StatusTracker({ onNotification }) {
     if (!actionPaused) return;
     setActionUploading(true);
     sendNotification(
-      { id: 'action-uploading', label: 'Document Uploading', icon: '📤', detail: 'Uploading August 2024 bank statement...' },
+      { id: 'action-uploading', label: 'Document Uploading', icon: '📤', detail: 'Uploading December 2025 bank statement...' },
       new Date(),
       { subType: 'action-progress' }
     );
@@ -322,8 +322,8 @@ export default function StatusTracker({ onNotification }) {
         alignItems: 'center',
       }}>
         <div>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18, color: 'var(--text-primary)' }}>Sarah M. Chen</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>APP-2025-78342 · $285,000 · 30-Year Fixed</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18, color: 'var(--text-primary)' }}>Marcus & Sofia Delgado</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>APP-2026-00001 · $875,000 · 5yr Fixed (25yr Amort)</div>
         </div>
         <div style={{
           padding: '6px 14px',

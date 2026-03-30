@@ -32,15 +32,15 @@ const CASH_FLOW_MONTHS = [
 ];
 
 const SIMILAR_BORROWERS = [
-  { fico: 738, dti: '0.29', product: '30yr Fixed', similarity: '94.2%', status: 'Performing' },
-  { fico: 745, dti: '0.33', product: '30yr Fixed', similarity: '91.8%', status: 'Performing' },
-  { fico: 729, dti: '0.35', product: '15yr Fixed', similarity: '87.4%', status: 'Performing' },
+  { fico: 778, dti: '0.29', product: '5yr Fixed', similarity: '94.2%', status: 'Performing' },
+  { fico: 791, dti: '0.33', product: '5yr Fixed', similarity: '91.8%', status: 'Performing' },
+  { fico: 765, dti: '0.31', product: '5yr Variable', similarity: '87.4%', status: 'Performing' },
 ];
 
 const COMPLIANCE = [
-  { rule: 'CFPB Adverse Action Notices', met: true },
-  { rule: 'EU AI Act Art. 14 — Human Oversight', met: true },
-  { rule: 'ECOA / Regulation B — Fair Lending', met: true },
+  { rule: 'FCAC Adverse Action Notices', met: true },
+  { rule: 'OSFI B-20 — Mortgage Underwriting', met: true },
+  { rule: 'PIPEDA — Privacy Compliance', met: true },
   { rule: 'Full Audit Trail Available', met: true },
 ];
 
@@ -175,7 +175,7 @@ function AdverseActionPreview() {
             </div>
           ))}
           <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 6 }}>
-            ECOA-compliant reason codes auto-generated — addresses CFPB $89M penalty precedent
+            FCAC-compliant reason codes auto-generated — addresses Canadian fair lending requirements
           </div>
         </div>
       )}
@@ -197,15 +197,15 @@ function RiskRing({ score, maxScore = 100, tier, fico }) {
       </svg>
       <div>
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14 }}>Risk Tier {tier}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>FICO {fico} · DTI 0.31 · LTV 71.3%</div>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Equifax {fico} · GDS 31.2% · LTV 80.0%</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
           <div>
             <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Rate</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800, color: 'var(--mongo)' }}>6.875%</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800, color: 'var(--mongo)' }}>4.89%</div>
           </div>
           <div>
             <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Monthly</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700 }}>$1,870</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700 }}>$4,092</div>
           </div>
         </div>
       </div>
@@ -344,8 +344,8 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
             <div style={{ padding: 16, background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', border: '2px solid var(--mongo)', marginBottom: 16, animation: 'slideDown 0.3s ease-out' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, color: 'var(--mongo)', marginBottom: 12 }}>Risk Assessment Complete</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <RiskRing score={72} tier="B+" fico={742} />
-                <FicoRing score={742} size={80} strokeWidth={6} />
+                <RiskRing score={72} tier="B+" fico={784} />
+                <FicoRing score={784} size={80} strokeWidth={6} />
               </div>
               <div style={{ marginTop: 12 }}>
                 <ChampionChallengerCard />
@@ -364,7 +364,7 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
                 {SIMILAR_BORROWERS.map((b, i) => (
                   <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, padding: '10px 12px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-dim)', marginBottom: 6, fontSize: 11 }}>
                     <div>
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>FICO / DTI</div>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Equifax / GDS</div>
                       <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{b.fico} / {b.dti}</div>
                     </div>
                     <div>

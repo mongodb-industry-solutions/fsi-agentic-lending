@@ -11,22 +11,22 @@ import StatCard from '../../visualizations/StatCard';
 
 const DOCUMENTS = [
   {
-    type: 'W-2',
-    label: 'W-2 Wage & Tax',
+    type: 'CRA Notice',
+    label: 'CRA Notice of Assessment',
     icon: '📄',
     fields: [
-      { field: 'Document Type', value: 'W-2 Wage and Tax Statement', confidence: 99.8 },
-      { field: 'Tax Year', value: '2024', confidence: 99.9 },
-      { field: 'Employer Name', value: 'Acme Corporation', confidence: 98.4 },
-      { field: 'Employer EIN', value: '82-1234567', confidence: 99.2 },
-      { field: 'Wages, Tips, Other', value: '$142,380.00', confidence: 99.7 },
-      { field: 'Federal Tax Withheld', value: '$28,476.00', confidence: 99.5 },
-      { field: 'Social Security Wages', value: '$142,380.00', confidence: 99.3 },
-      { field: 'Medicare Wages', value: '$142,380.00', confidence: 99.1 },
-      { field: 'Employee Name', value: 'Sarah M. Chen', confidence: 99.8 },
-      { field: 'SSN (masked)', value: '***-**-4829', confidence: 99.9 },
-      { field: 'State', value: 'California', confidence: 98.7 },
-      { field: 'State Wages', value: '$142,380.00', confidence: 99.0 },
+      { field: 'Document Type', value: 'CRA Notice of Assessment', confidence: 99.8 },
+      { field: 'Tax Year', value: '2025', confidence: 99.9 },
+      { field: 'Employer Name', value: 'TechNova Systems Inc.', confidence: 98.4 },
+      { field: 'Business Number', value: '82345 6789 RT0001', confidence: 99.2 },
+      { field: 'Total Income', value: '$128,500.00', confidence: 99.7 },
+      { field: 'Federal Tax Deducted', value: '$25,700.00', confidence: 99.5 },
+      { field: 'CPP Contributions', value: '$3,754.45', confidence: 99.3 },
+      { field: 'EI Premiums', value: '$1,049.12', confidence: 99.1 },
+      { field: 'Taxpayer Name', value: 'Marcus A. Delgado', confidence: 99.8 },
+      { field: 'SIN (masked)', value: '***-***-482', confidence: 99.9 },
+      { field: 'Province', value: 'Alberta', confidence: 98.7 },
+      { field: 'Provincial Tax', value: '$12,850.00', confidence: 99.0 },
     ],
   },
   {
@@ -35,13 +35,13 @@ const DOCUMENTS = [
     icon: '🏦',
     fields: [
       { field: 'Document Type', value: 'Bank Statement', confidence: 99.4 },
-      { field: 'Institution', value: 'Chase Bank', confidence: 98.9 },
-      { field: 'Account Holder', value: 'Sarah M. Chen', confidence: 99.6 },
-      { field: 'Statement Period', value: 'Dec 2024', confidence: 99.2 },
-      { field: 'Avg Monthly Balance', value: '$34,820.00', confidence: 97.8 },
-      { field: 'Monthly Deposits', value: '$12,450.00', confidence: 98.1 },
-      { field: 'Monthly Expenses', value: '$8,920.00', confidence: 97.5 },
-      { field: 'Recurring Income', value: '$11,865.00 (bi-weekly)', confidence: 96.8 },
+      { field: 'Institution', value: 'TD Canada Trust', confidence: 98.9 },
+      { field: 'Account Holder', value: 'Marcus A. Delgado', confidence: 99.6 },
+      { field: 'Statement Period', value: 'Mar 2026', confidence: 99.2 },
+      { field: 'Avg Monthly Balance', value: '$48,230.00', confidence: 97.8 },
+      { field: 'Monthly Deposits', value: '$18,558.00', confidence: 98.1 },
+      { field: 'Monthly Expenses', value: '$12,420.00', confidence: 97.5 },
+      { field: 'Recurring Income', value: '$9,279.00 (bi-weekly)', confidence: 96.8 },
     ],
   },
   {
@@ -50,13 +50,13 @@ const DOCUMENTS = [
     icon: '💵',
     fields: [
       { field: 'Document Type', value: 'Pay Stub', confidence: 99.5 },
-      { field: 'Pay Period', value: 'Jan 1–15, 2025', confidence: 99.1 },
-      { field: 'Employer', value: 'Acme Corporation', confidence: 98.8 },
-      { field: 'Gross Pay', value: '$5,932.50', confidence: 99.3 },
-      { field: 'Net Pay', value: '$4,287.60', confidence: 99.0 },
-      { field: 'YTD Earnings', value: '$5,932.50', confidence: 98.7 },
-      { field: 'Federal Tax', value: '$1,186.50', confidence: 98.4 },
-      { field: 'State Tax', value: '$458.40', confidence: 97.9 },
+      { field: 'Pay Period', value: 'Mar 1–15, 2026', confidence: 99.1 },
+      { field: 'Employer', value: 'TechNova Systems Inc.', confidence: 98.8 },
+      { field: 'Gross Pay', value: '$5,354.17', confidence: 99.3 },
+      { field: 'Net Pay', value: '$3,892.40', confidence: 99.0 },
+      { field: 'YTD Earnings', value: '$16,062.51', confidence: 98.7 },
+      { field: 'Federal Tax', value: '$1,070.83', confidence: 98.4 },
+      { field: 'Provincial Tax', value: '$535.42', confidence: 97.9 },
     ],
   },
 ];
@@ -79,11 +79,11 @@ const OPEN_BANKING_DATA = {
 };
 
 const VALIDATIONS = [
-  { check: 'Name match: application vs W-2', pass: true, detail: 'Sarah Chen ↔ Sarah M. Chen' },
-  { check: 'Income match: stated vs documented', pass: true, detail: '$142,000 ~ $142,380 (within 1%)' },
-  { check: 'Employer verified via EIN lookup', pass: true, detail: 'EIN 82-1234567 → Acme Corporation ✓' },
-  { check: 'Income cross-ref: W-2 vs Pay Stub vs Bank', pass: true, detail: 'All 3 sources within 2% variance' },
-  { check: 'Policy RAG: DTI within limits', pass: true, detail: 'DTI 0.31 < max 0.43 per guideline' },
+  { check: 'Name match: application vs CRA', pass: true, detail: 'Marcus Delgado ↔ Marcus A. Delgado' },
+  { check: 'Income match: stated vs documented', pass: true, detail: '$128,500 ~ $128,500 (exact match)' },
+  { check: 'Employer verified via BN lookup', pass: true, detail: 'BN 82345 6789 → TechNova Systems Inc. ✓' },
+  { check: 'Income cross-ref: CRA vs Pay Stub vs Bank', pass: true, detail: 'All 3 sources within 2% variance' },
+  { check: 'Policy RAG: GDS within limits', pass: true, detail: 'GDS 0.312 < max 0.39 per guideline' },
 ];
 
 const STAT_ITEMS = [
@@ -390,11 +390,11 @@ export default function OriginationScene({ sceneStep, currentStepData }) {
               <div style={{ marginTop: 14, padding: 14, background: 'var(--mongo-dim)', borderRadius: 'var(--radius-md)', border: '1px solid var(--mongo)' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--mongo)', marginBottom: 8 }}>Profile Output — Ready for Decisioning</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 11 }}>
-                  <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>APPLICANT</div><div style={{ fontWeight: 600 }}>Sarah M. Chen</div></div>
-                  <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>INCOME</div><div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>$142,380</div></div>
-                  <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>FICO</div><div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>742</div></div>
-                  <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>DTI</div><div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>0.31</div></div>
-                  <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>DOCUMENTS</div><div style={{ fontWeight: 600 }}>3 verified (W-2, Bank, Pay Stub)</div></div>
+                  <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>APPLICANTS</div><div style={{ fontWeight: 600 }}>Marcus & Sofia Delgado</div></div>
+                  <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>COMBINED INCOME</div><div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>$222,700</div></div>
+                  <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>EQUIFAX</div><div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>784</div></div>
+                  <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>GDS</div><div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>0.312</div></div>
+                  <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>DOCUMENTS</div><div style={{ fontWeight: 600 }}>14 verified (CRA, Bank, Pay Stubs, IDs)</div></div>
                   <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>CASH FLOW</div><div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>1.47x ratio</div></div>
                   <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>OPEN BANKING</div><div style={{ fontWeight: 600 }}>Plaid verified</div></div>
                   <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>CHECKPOINT</div><div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>cp-1a2b3c</div></div>

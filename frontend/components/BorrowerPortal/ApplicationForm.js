@@ -3,24 +3,24 @@
 import { useState } from 'react';
 
 const INITIAL_DATA = {
-  firstName: 'Sarah',
-  middleInitial: 'M',
-  lastName: 'Chen',
-  email: 'sarah.chen@email.com',
-  phone: '(415) 555-0192',
-  ssn: '***-**-4829',
-  address: '742 Oak Valley Dr, San Mateo, CA 94402',
-  employer: 'Acme Corporation',
+  firstName: 'Marcus',
+  middleInitial: 'A',
+  lastName: 'Delgado',
+  email: 'marcus.delgado@email.com',
+  phone: '(587) 555-0147',
+  sin: '***-***-482',
+  address: '4821 Varsity Drive NW, Apt 305, Edmonton, AB T5K 2M4',
+  employer: 'TechNova Systems Inc.',
   jobTitle: 'Senior Software Engineer',
-  yearsEmployed: '4',
-  annualIncome: '142380',
-  loanAmount: '285000',
+  yearsEmployed: '8',
+  annualIncome: '128500',
+  loanAmount: '875000',
   loanPurpose: 'Purchase',
-  propertyType: 'Single Family',
-  productType: '30-Year Fixed',
-  downPayment: '115000',
-  existingDebt: '1200',
-  creditScore: '742',
+  propertyType: 'Detached Home',
+  productType: '5yr Fixed (25yr Amort)',
+  downPayment: '175000',
+  existingDebt: '1842',
+  creditScore: '784',
 };
 
 function FormSection({ title, children }) {
@@ -89,7 +89,7 @@ export default function ApplicationForm({ onSubmit }) {
         <Field label="Last Name" value={form.lastName} onChange={update('lastName')} />
         <Field label="Email" value={form.email} onChange={update('email')} type="email" />
         <Field label="Phone" value={form.phone} onChange={update('phone')} />
-        <Field label="SSN (masked)" value={form.ssn} onChange={update('ssn')} readOnly />
+        <Field label="SIN (masked)" value={form.sin} onChange={update('sin')} readOnly />
         <Field label="Address" value={form.address} onChange={update('address')} span2 />
       </FormSection>
 
@@ -112,9 +112,9 @@ export default function ApplicationForm({ onSubmit }) {
       <FormSection title="Financial Summary">
         <Field label="Existing Monthly Debt ($)" value={form.existingDebt} onChange={update('existingDebt')} />
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>EST. DTI RATIO</div>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>EST. GDS RATIO</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800, color: 'var(--mongo)' }}>
-            {((parseFloat(form.existingDebt || 0) + 1870) / (parseFloat(form.annualIncome || 1) / 12) * 100).toFixed(1)}%
+            {((parseFloat(form.existingDebt || 0) + 4092) / (parseFloat(form.annualIncome || 1) / 12) * 100).toFixed(1)}%
           </div>
         </div>
       </FormSection>

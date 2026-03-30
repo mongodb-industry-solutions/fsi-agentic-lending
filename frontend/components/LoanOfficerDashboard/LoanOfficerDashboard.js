@@ -34,57 +34,57 @@ const WORKFLOW_STAGES = [
 ];
 
 const PAYLOAD = {
-  applicant: 'Sarah Chen',
-  applicationId: 'APP-2025-78342',
-  loanAmount: '$285,000',
-  product: '30-Year Fixed',
+  applicant: 'Marcus & Sofia Delgado',
+  applicationId: 'APP-2026-00001',
+  loanAmount: '$875,000',
+  product: '5yr Fixed',
   riskScore: 72,
   riskTier: 'B+',
-  proposedRate: '6.875%',
-  monthlyPayment: '$1,870',
-  dti: 0.31,
-  ltv: 71.3,
-  triggerReason: '3 recent hard inquiries per policy §4.2.1',
+  proposedRate: '4.89%',
+  monthlyPayment: '$4,092',
+  dti: 0.312,
+  ltv: 80.0,
+  triggerReason: 'Combined GDS ratio 31.2% within tolerance but property value exceeds $500K threshold per policy §3.1.4',
 };
 
 const PROVENANCE_RECORDS = [
   {
-    source: 'Credit Report — Experian',
+    source: 'Credit Report — Equifax',
     finding: '3 hard inquiries within last 180 days',
     policy: '§4.2.1',
     rule: 'Applications with ≥3 hard inquiries within 180 days require mandatory officer review',
   },
   {
     source: 'Risk Score — Aggregation Pipeline',
-    finding: 'Score 72/100 (B+ tier) on loan amount $285,000',
+    finding: 'Score 72/100 (B+ tier) on loan amount $875,000',
     policy: '§3.1.4',
-    rule: 'B-tier applications exceeding $250,000 require officer sign-off',
+    rule: 'Property value exceeding $500,000 requires officer sign-off',
   },
   {
-    source: 'DTI Calculation — Cash Flow Analysis',
-    finding: 'DTI ratio at 31% with recent credit activity',
+    source: 'GDS Calculation — Cash Flow Analysis',
+    finding: 'GDS ratio at 31.2% with recent credit activity',
     policy: '§3.2.1',
-    rule: 'DTI between 28-36% combined with recent inquiry activity flagged for review',
+    rule: 'GDS between 28-36% combined with recent inquiry activity flagged for review',
   },
 ];
 
 const ADDITIONAL_CONTEXT = [
-  { label: 'Employment Verification', value: 'Confirmed 4+ years at current employer (TechCorp Inc.)', icon: '💼' },
-  { label: 'Savings Reserves', value: '8 months of payments ($14,960) in verified savings accounts', icon: '🏦' },
-  { label: 'Previous Loan History', value: '1 auto loan — paid in full, zero late payments over 48 months', icon: '📊' },
+  { label: 'Employment Verification', value: 'Marcus: 8+ years at TechNova Systems Inc. · Sofia: 9+ years at Covenant Health', icon: '💼' },
+  { label: 'Savings Reserves', value: '12 months of payments ($49,104) in verified savings + RRSP + investments', icon: '🏦' },
+  { label: 'Existing Property', value: 'Edmonton condo at 10180 104 St NW — rented at $2,200/mo, mortgage $231,450 remaining', icon: '📊' },
 ];
 
 const POLICY_BOUNDS = [
-  { rule: 'Auto-approve if score > 80 and DTI < 36%', icon: '✓' },
-  { rule: 'Escalate if loan amount > $500,000', icon: '🔒' },
+  { rule: 'Auto-approve if score > 80 and GDS < 36%', icon: '✓' },
+  { rule: 'Escalate if property value > $500,000', icon: '🔒' },
   { rule: 'Escalate on ≥3 hard inquiries in 180 days', icon: '🔒' },
-  { rule: 'Auto-decline if DTI > 50% or score < 35', icon: '✕' },
+  { rule: 'Auto-decline if GDS > 50% or score < 35', icon: '✕' },
 ];
 
 const AUDIT_STAGES = [
-  { label: 'Origination', duration: '3.8s', decisions: ['Routed to Loan Application Agent', 'Selected Experian per policy §2.1.3', 'Multimodal embed: W-2 + bank statements'] },
+  { label: 'Origination', duration: '3.8s', decisions: ['Routed to Loan Application Agent', 'Selected Equifax per policy §2.1.3', 'Multimodal embed: CRA notices + bank statements'] },
   { label: 'Decisioning', duration: '4.1s', decisions: ['7-stage aggregation pipeline: scored 72 (B+)', 'Policy RAG matched 3 rules (§4.2.1, §3.1.4, §3.2.1)', '$graphLookup fraud scan: 2,847 entities, 0 signals'] },
-  { label: 'HITL Review', duration: '1.5s', decisions: ['3 policy triggers detected — normally escalates', 'Full Auto override: auto-applied conditional approval', 'Rate set at 6.875% per B+ tier schedule'] },
+  { label: 'HITL Review', duration: '1.5s', decisions: ['3 policy triggers detected — normally escalates', 'Full Auto override: auto-applied conditional approval', 'Rate set at 4.89% per B+ tier schedule'] },
 ];
 
 // ─── Scenario data for non-primary applications ───
@@ -634,7 +634,7 @@ function PriyaProgressView() {
 // ─── Manual Review Workspace ───
 
 function ManualWorkspace({ onApprove, onDecline, addToast }) {
-  const [rate, setRate] = useState(6.875);
+  const [rate, setRate] = useState(4.89);
   const [conditions, setConditions] = useState('');
   const [decided, setDecided] = useState(null);
 
@@ -704,7 +704,7 @@ function ManualWorkspace({ onApprove, onDecline, addToast }) {
             {[
               { label: 'Amount', value: PAYLOAD.loanAmount },
               { label: 'Product', value: PAYLOAD.product },
-              { label: 'DTI', value: PAYLOAD.dti },
+              { label: 'GDS', value: PAYLOAD.dti },
               { label: 'LTV', value: `${PAYLOAD.ltv}%` },
             ].map((item) => (
               <div key={item.label}>
@@ -778,7 +778,7 @@ function HITLReviewCard({ onApprove, addToast }) {
   const [showModify, setShowModify] = useState(false);
   const [fetchingContext, setFetchingContext] = useState(false);
   const [extraContext, setExtraContext] = useState(null);
-  const [modFields, setModFields] = useState({ rate: 6.875, conditions: '', requestDocs: false });
+  const [modFields, setModFields] = useState({ rate: 4.89, conditions: '', requestDocs: false });
 
   const handleRequestContext = () => {
     setFetchingContext(true);
@@ -812,7 +812,7 @@ function HITLReviewCard({ onApprove, addToast }) {
 
   const modSummary = showModify ? (() => {
     const parts = [];
-    if (modFields.rate !== 6.875) parts.push(`Rate adjusted to ${modFields.rate.toFixed(3)}%`);
+    if (modFields.rate !== 4.89) parts.push(`Rate adjusted to ${modFields.rate.toFixed(3)}%`);
     if (modFields.conditions) parts.push(`Condition: ${modFields.conditions}`);
     if (modFields.requestDocs) parts.push('Additional docs: requested');
     return parts;
@@ -849,7 +849,7 @@ function HITLReviewCard({ onApprove, addToast }) {
         lineHeight: 1.5,
       }}>
         <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Agent attempted: </span>
-        Auto-approve 30-Year Fixed at 6.875% for Sarah Chen ($285,000). Workflow halted because 3 policy constraints were triggered during underwriting.
+        Auto-approve 5yr Fixed at 4.89% for Marcus & Sofia Delgado ($875,000). Workflow halted because 3 policy constraints were triggered during underwriting.
       </div>
 
       {/* Constraint violated */}
@@ -865,8 +865,8 @@ function HITLReviewCard({ onApprove, addToast }) {
         </div>
         <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
           <div>• <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9 }}>§4.2.1</span> — 3 hard inquiries in 180 days</div>
-          <div>• <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9 }}>§3.1.4</span> — B-tier loan exceeding $250K threshold</div>
-          <div>• <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9 }}>§3.2.1</span> — DTI at 31% with recent credit activity</div>
+          <div>• <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9 }}>§3.1.4</span> — Property value exceeding $500K threshold</div>
+          <div>• <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9 }}>§3.2.1</span> — GDS at 31.2% with recent credit activity</div>
         </div>
       </div>
 
@@ -892,7 +892,7 @@ function HITLReviewCard({ onApprove, addToast }) {
           </span>
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-primary)', fontWeight: 600 }}>
-          Approve with conditions: rate +25bps (7.125%), require 6-month reserve verification
+          Approve with conditions: rate +25bps (5.14%), require 6-month reserve verification
         </div>
         <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 3 }}>
           Strong employment history and savings offset inquiry risk. Conditions mitigate remaining exposure.
@@ -921,7 +921,7 @@ function HITLReviewCard({ onApprove, addToast }) {
         {[
           { label: 'Applicant', value: PAYLOAD.applicant },
           { label: 'Product', value: PAYLOAD.product },
-          { label: 'DTI', value: PAYLOAD.dti },
+          { label: 'GDS', value: PAYLOAD.dti },
           { label: 'LTV', value: `${PAYLOAD.ltv}%` },
         ].map((item) => (
           <div key={item.label}>
@@ -1144,7 +1144,7 @@ function HITLReviewCard({ onApprove, addToast }) {
 // ─── Main Dashboard ───
 
 export default function LoanOfficerDashboard() {
-  const [selectedApp, setSelectedApp] = useState('APP-2025-78342');
+  const [selectedApp, setSelectedApp] = useState('APP-2026-00001');
   const [autonomyLevel, setAutonomyLevel] = useState('suggest');
   const [workflowPhase, setWorkflowPhase] = useState('preview');
   const [workflowStage, setWorkflowStage] = useState(0);
@@ -1156,7 +1156,7 @@ export default function LoanOfficerDashboard() {
   const stageTimestampsRef = useRef([]);
   const { toasts, addToast, removeToast } = useToasts();
 
-  const isPrimaryApp = selectedApp === 'APP-2025-78342';
+  const isPrimaryApp = selectedApp === 'APP-2026-00001';
   const showPreview = isPrimaryApp && workflowPhase === 'preview' && (autonomyLevel === 'observe' || autonomyLevel === 'suggest');
 
   // Reactive dashboard stats
@@ -1176,7 +1176,7 @@ export default function LoanOfficerDashboard() {
     if (timerRef.current) clearTimeout(timerRef.current);
     stageTimestampsRef.current = [];
 
-    if (selectedApp !== 'APP-2025-78342') {
+    if (selectedApp !== 'APP-2026-00001') {
       setWorkflowPhase('idle');
       setWorkflowStage(0);
       setHitlReached(false);
@@ -1217,16 +1217,16 @@ export default function LoanOfficerDashboard() {
             setApprovalDetails({ mode: 'auto', rate: PAYLOAD.proposedRate });
           }, 1500);
         } else {
-          addToast({ type: 'warning', icon: '✋', title: 'HITL Review Required', message: 'Agent workflow paused. APP-2025-78342 awaiting your decision.' });
+          addToast({ type: 'warning', icon: '✋', title: 'HITL Review Required', message: 'Agent workflow paused. APP-2026-00001 awaiting your decision.' });
         }
         return;
       }
       setWorkflowStage(stage);
-      addToast({ type: 'info', icon: '⚙️', title: `Stage: ${WORKFLOW_STAGES[stage].label}`, message: `Processing ${WORKFLOW_STAGES[stage].label.toLowerCase()} for Sarah Chen.` });
+      addToast({ type: 'info', icon: '⚙️', title: `Stage: ${WORKFLOW_STAGES[stage].label}`, message: `Processing ${WORKFLOW_STAGES[stage].label.toLowerCase()} for Marcus & Sofia Delgado.` });
       timerRef.current = setTimeout(advance, 4000);
     };
 
-    addToast({ type: 'info', icon: '▶', title: 'Workflow Started', message: `Processing ${WORKFLOW_STAGES[0].label.toLowerCase()} for Sarah Chen.` });
+    addToast({ type: 'info', icon: '▶', title: 'Workflow Started', message: `Processing ${WORKFLOW_STAGES[0].label.toLowerCase()} for Marcus & Sofia Delgado.` });
     timerRef.current = setTimeout(advance, 4000);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [workflowPhase]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1247,7 +1247,7 @@ export default function LoanOfficerDashboard() {
     stageTimestampsRef.current.push(Date.now());
     if (nextStage >= WORKFLOW_STAGES.length) {
       setHitlReached(true);
-      addToast({ type: 'warning', icon: '✋', title: 'HITL Review Required', message: 'All stages complete. APP-2025-78342 awaiting your decision.' });
+      addToast({ type: 'warning', icon: '✋', title: 'HITL Review Required', message: 'All stages complete. APP-2026-00001 awaiting your decision.' });
       return;
     }
     setWorkflowStage(nextStage);

@@ -31,7 +31,7 @@ const MONTHLY_DATA = [
 ];
 
 const EVENT_TEMPLATES = [
-  { type: 'payment', icon: '💰', color: 'var(--success)', messages: ['Payment received: $1,870 on L-78342', 'Payment received: $2,450 on L-91205', 'Payment received: $1,320 on L-64817'] },
+  { type: 'payment', icon: '💰', color: 'var(--success)', messages: ['Payment received: $4,092 on L-00001', 'Payment received: $2,450 on L-91205', 'Payment received: $1,320 on L-64817'] },
   { type: 'status', icon: '🔄', color: 'var(--tool-blue)', messages: ['Status update: L-55023 → funded', 'Status update: L-82910 → underwriting', 'Status update: L-41892 → closing'] },
   { type: 'alert', icon: '⚠️', color: 'var(--hitl-amber)', messages: ['Alert: Delinquency threshold on L-33719', 'Alert: Late payment flagged on L-28104'] },
   { type: 'agent', icon: '🔄', color: 'var(--voyage)', messages: [
@@ -48,7 +48,7 @@ const INTERVENTION_STEPS = [
   { label: 'Similar Borrowers', detail: '82% resolved with modification, 12% self-cured, 6% escalated', icon: '👥', color: 'var(--agent-cyan)' },
   { label: 'Recommended Action', detail: 'Proactive restructuring offer', icon: '💡', color: 'var(--mongo)' },
   { label: 'Multi-Channel Outreach', detail: 'SMS sent, email queued, portal notification active', icon: '📱', color: 'var(--success)' },
-  { label: 'Offer Generated', detail: 'Rate reduction 6.875% → 5.5% for 6 months, payment $1,870 → $1,640', icon: '📝', color: 'var(--mongo)' },
+  { label: 'Offer Generated', detail: 'Rate reduction 4.89% → 4.29% for 6 months, payment $4,092 → $3,840', icon: '📝', color: 'var(--mongo)' },
 ];
 
 function AnimatedStat({ stat }) {
@@ -203,15 +203,15 @@ function RenewalInterventionCard({ sceneStep }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
           <div style={{ padding: '6px 8px', background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
             <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>ORIGINAL</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--text-dim)', textDecoration: 'line-through' }}>6.875%</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--text-dim)', textDecoration: 'line-through' }}>4.89%</div>
           </div>
           <div style={{ padding: '6px 8px', background: 'var(--mongo-dim)', borderRadius: 'var(--radius-sm)', textAlign: 'center', border: '1px solid var(--mongo)' }}>
             <div style={{ fontSize: 8, color: 'var(--mongo)', marginBottom: 2 }}>NEW RATE</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 800, color: 'var(--mongo)' }}>5.5%</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 800, color: 'var(--mongo)' }}>4.29%</div>
           </div>
           <div style={{ padding: '6px 8px', background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
             <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>PAYMENT</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--success)' }}>$1,640</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--success)' }}>$3,840</div>
           </div>
         </div>
       )}

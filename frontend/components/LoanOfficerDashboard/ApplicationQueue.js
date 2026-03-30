@@ -2,10 +2,10 @@
 
 const APPLICATIONS = [
   {
-    id: 'APP-2025-78342',
-    name: 'Sarah Chen',
-    amount: '$285,000',
-    product: '30yr Fixed',
+    id: 'APP-2026-00001',
+    name: 'Marcus & Sofia Delgado',
+    amount: '$875,000',
+    product: '5yr Fixed',
     status: 'pending_review',
     statusLabel: 'Pending Review',
     statusColor: 'var(--hitl-amber)',

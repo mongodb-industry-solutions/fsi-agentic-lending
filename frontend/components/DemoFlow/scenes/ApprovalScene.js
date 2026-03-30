@@ -10,46 +10,46 @@ import PipelineTimeline from '../PipelineTimeline';
 
 const CHECKPOINT_DATA = {
   checkpointId: 'cp-7g8h9i',
-  thread: 'thr-78342',
+  thread: 'thr-00001',
   step: 'hitl_gate',
-  savedAt: '2025-01-28T14:23:01.520Z',
+  savedAt: '2026-03-30T14:23:01.520Z',
 };
 
 const PAYLOAD = {
-  applicant: 'Sarah Chen',
-  applicationId: 'APP-2025-78342',
-  loanAmount: '$285,000',
-  product: '30-Year Fixed',
+  applicant: 'Marcus & Sofia Delgado',
+  applicationId: 'APP-2026-00001',
+  loanAmount: '$875,000',
+  product: '5yr Fixed (25yr Amort)',
   riskScore: 72,
   riskTier: 'B+',
-  proposedRate: '6.875%',
-  monthlyPayment: '$1,870',
-  dti: 0.31,
-  ltv: 71.3,
-  triggerReason: '3 recent hard inquiries per policy §4.2.1',
+  proposedRate: '4.89%',
+  monthlyPayment: '$4,092',
+  gds: 0.312,
+  ltv: 80.0,
+  triggerReason: 'Property value exceeds $500K — officer review required per policy §3.1.4',
 };
 
 const LOAN_TERMS = {
-  type: '30-Year Fixed Mortgage',
-  apr: '6.875%',
-  monthlyPayment: '$1,870',
-  totalInterest: '$387,200',
-  totalCost: '$672,200',
-  firstPayment: 'March 1, 2025',
-  maturity: 'February 28, 2055',
+  type: '5yr Fixed (25yr Amortization)',
+  apr: '4.89%',
+  monthlyPayment: '$4,092',
+  totalInterest: '$527,600',
+  totalCost: '$1,402,600',
+  firstPayment: 'May 1, 2026',
+  maturity: 'April 30, 2051',
 };
 
 const AMORTIZATION = [
-  { month: 1, payment: '$1,870.00', principal: '$235.94', interest: '$1,634.06', balance: '$284,764.06' },
-  { month: 2, payment: '$1,870.00', principal: '$237.30', interest: '$1,632.70', balance: '$284,526.76' },
-  { month: 3, payment: '$1,870.00', principal: '$238.66', interest: '$1,631.34', balance: '$284,288.10' },
+  { month: 1, payment: '$4,092.00', principal: '$1,239.50', interest: '$2,852.50', balance: '$698,760.50' },
+  { month: 2, payment: '$4,092.00', principal: '$1,244.55', interest: '$2,847.45', balance: '$697,515.95' },
+  { month: 3, payment: '$4,092.00', principal: '$1,249.62', interest: '$2,842.38', balance: '$696,266.33' },
 ];
 
 const DISCLOSURES = [
-  { rule: 'TILA — Truth in Lending Act', met: true },
-  { rule: 'RESPA — Real Estate Settlement Procedures', met: true },
-  { rule: 'CFPB — Consumer Financial Protection', met: true },
-  { rule: 'Fair Lending — ECOA / Reg B', met: true },
+  { rule: 'OSFI B-20 — Residential Mortgage Underwriting', met: true },
+  { rule: 'FCAC — Financial Consumer Agency of Canada', met: true },
+  { rule: 'PIPEDA — Personal Information Protection', met: true },
+  { rule: 'Bank Act — Mortgage Lending Standards', met: true },
 ];
 
 export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, onApprove, onDecline, currentStepData }) {
@@ -307,7 +307,7 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
               {[
                 { label: 'Applicant', value: PAYLOAD.applicant },
                 { label: 'Product', value: PAYLOAD.product },
-                { label: 'DTI', value: PAYLOAD.dti },
+                { label: 'GDS', value: PAYLOAD.gds },
                 { label: 'LTV', value: `${PAYLOAD.ltv}%` },
               ].map((item) => (
                 <div key={item.label}>
@@ -320,12 +320,12 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
             <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', marginBottom: 16 }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: 8 }}>Generated Loan Terms</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: 11 }}>
-                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>TYPE</div><div style={{ fontWeight: 600 }}>30yr Fixed</div></div>
-                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>APR</div><div style={{ fontWeight: 600, color: 'var(--mongo)' }}>6.875%</div></div>
-                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>MONTHLY</div><div style={{ fontWeight: 600 }}>$1,870</div></div>
-                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>TOTAL INTEREST</div><div style={{ fontWeight: 600 }}>$387,200</div></div>
-                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>FIRST PAYMENT</div><div style={{ fontWeight: 600 }}>Mar 1, 2025</div></div>
-                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>MATURITY</div><div style={{ fontWeight: 600 }}>Feb 2055</div></div>
+                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>TYPE</div><div style={{ fontWeight: 600 }}>5yr Fixed (25yr)</div></div>
+                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>APR</div><div style={{ fontWeight: 600, color: 'var(--mongo)' }}>4.89%</div></div>
+                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>MONTHLY</div><div style={{ fontWeight: 600 }}>$4,092</div></div>
+                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>TOTAL INTEREST</div><div style={{ fontWeight: 600 }}>$527,600</div></div>
+                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>FIRST PAYMENT</div><div style={{ fontWeight: 600 }}>May 1, 2026</div></div>
+                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>MATURITY</div><div style={{ fontWeight: 600 }}>Apr 2051</div></div>
               </div>
             </div>
 
