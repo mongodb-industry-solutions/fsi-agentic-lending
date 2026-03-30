@@ -69,6 +69,7 @@ async def submit_hitl_decision(app_id: str, req: HITLDecisionRequest):
                 "notes": req.officer_notes,
                 "conditions": req.conditions,
                 "overrides": req.overrides,
+                "officer_id": req.officer_id,
             }),
             {"configurable": {"thread_id": app_id}},
         )

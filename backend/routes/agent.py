@@ -4,6 +4,7 @@ import re
 import asyncio
 import logging
 import threading
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from db.mdb import get_db as _get_db
@@ -30,6 +31,37 @@ _running_apps = set()
 _running_lock = threading.Lock()
 
 
+def _make_initial_state(app_id: str, autonomy_level: str) -> dict:
+    return {
+        "messages": [],
+        "application_id": app_id,
+        "current_agent": "supervisor",
+        "autonomy_level": autonomy_level,
+        "documents_verified": False,
+        "document_count": 0,
+        "extraction_summary": "",
+        "credit_pulled": False,
+        "primary_credit_score": None,
+        "co_applicant_credit_score": None,
+        "gds_ratio": None,
+        "tds_ratio": None,
+        "risk_score": None,
+        "risk_tier": None,
+        "policy_citations": [],
+        "decision": None,
+        "decision_reasoning": "",
+        "officer_notes": None,
+        "last_error": None,
+        "retry_count": 0,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "completed_at": None,
+        "stress_gds": None,
+        "stress_tds": None,
+        "stress_rate": None,
+        "hitl_approved_nodes": [],
+    }
+
+
 @router.post("/agent/{app_id}/run")
 async def run_agent(app_id: str, autonomy_level: str = "bounded"):
     """Trigger agent execution for an application."""
@@ -51,29 +83,7 @@ async def run_agent(app_id: str, autonomy_level: str = "bounded"):
     def _run_graph(app_id, autonomy_level):
         try:
             graph = get_graph()
-            initial_state = {
-                "messages": [],
-                "application_id": app_id,
-                "current_agent": "supervisor",
-                "documents_verified": False,
-                "document_count": 0,
-                "extraction_summary": "",
-                "credit_pulled": False,
-                "primary_credit_score": None,
-                "co_applicant_credit_score": None,
-                "gds_ratio": None,
-                "tds_ratio": None,
-                "risk_score": None,
-                "risk_tier": None,
-                "policy_citations": [],
-                "decision": None,
-                "decision_reasoning": "",
-                "officer_notes": None,
-                "activity_log": [],
-                "autonomy_level": autonomy_level,
-                "last_error": None,
-                "retry_count": 0,
-            }
+            initial_state = _make_initial_state(app_id, autonomy_level)
             graph.invoke(initial_state, config={"configurable": {"thread_id": app_id}})
         except Exception as e:
             if GraphInterrupt is not None and isinstance(e, GraphInterrupt):
@@ -180,29 +190,7 @@ async def run_and_stream(app_id: str, autonomy_level: str = "bounded"):
 
     async def event_generator():
         graph = get_graph()
-        initial_state = {
-            "messages": [],
-            "application_id": app_id,
-            "current_agent": "supervisor",
-            "autonomy_level": autonomy_level,
-            "documents_verified": False,
-            "document_count": 0,
-            "extraction_summary": "",
-            "credit_pulled": False,
-            "primary_credit_score": None,
-            "co_applicant_credit_score": None,
-            "gds_ratio": None,
-            "tds_ratio": None,
-            "risk_score": None,
-            "risk_tier": None,
-            "policy_citations": [],
-            "decision": None,
-            "decision_reasoning": "",
-            "officer_notes": None,
-            "activity_log": [],
-            "last_error": None,
-            "retry_count": 0,
-        }
+        initial_state = _make_initial_state(app_id, autonomy_level)
         config = {
             "configurable": {"thread_id": app_id},
             "metadata": {"application_id": app_id},

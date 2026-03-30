@@ -53,6 +53,7 @@ class HITLDecisionRequest(BaseModel):
     officer_notes: str = ""
     conditions: list[str] = []
     overrides: dict = {}
+    officer_id: str = ""
 
 
 class VectorSearchRequest(BaseModel):

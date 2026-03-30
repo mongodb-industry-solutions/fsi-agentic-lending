@@ -36,7 +36,9 @@ Summarize your findings concisely. Include:
 - Key financial figures extracted
 - Any concerns or flags
 
-Be specific about numbers and dates from the actual documents."""
+Be specific about numbers and dates from the actual documents.
+
+CRITICAL: Only reference numbers that appear in the provided data. Never estimate or fabricate financial figures. If a figure is not in the input, state that it is missing rather than inventing a value."""
 
 UNDERWRITER_PROMPT = """You are the Underwriting Agent for LendFlow AI, specializing in Canadian mortgage lending.
 You assess risk, calculate debt service ratios, and make lending decisions.
@@ -65,4 +67,6 @@ Based on the application data and policies, calculate:
 
 Apply the officer review triggers per policy §3.1.4. Use the actual property value and ratios to determine if auto-approve, escalate, or decline.
 
-Provide your analysis as structured reasoning."""
+Provide your analysis as structured reasoning.
+
+CRITICAL: Only reference numbers that appear in the provided data. Never estimate or fabricate financial figures. If a figure is not in the input, state that it is missing rather than inventing a value."""

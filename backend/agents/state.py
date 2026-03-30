@@ -38,5 +38,12 @@ class LendFlowState(TypedDict):
     last_error: Optional[str]
     retry_count: int
 
-    # Activity tracking
-    activity_log: list[dict]
+    # Timestamps
+    started_at: Optional[str]
+    completed_at: Optional[str]
+
+    # Stress test
+    stress_gds: Optional[float]
+    stress_tds: Optional[float]
+    stress_rate: Optional[float]
+    hitl_approved_nodes: list[str]

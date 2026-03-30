@@ -121,8 +121,19 @@ def underwriter_node(state: LendFlowState) -> dict:
     effective_tds = max(tds, stress_tds)
 
     # Risk scoring — use aggregation pipeline results as base
-    primary_score = agg_result["primary_credit_score"] if agg_result.get("primary_credit_score") is not None else state.get("primary_credit_score", 0)
+    primary_score = agg_result["primary_credit_score"] if agg_result.get("primary_credit_score") is not None else state.get("primary_credit_score")
     co_score = agg_result["co_credit_score"] if agg_result.get("co_credit_score") is not None else state.get("co_applicant_credit_score", 0)
+
+    if primary_score is None:
+        log_agent_activity(app_id, "underwriter", "error", "Primary credit score unavailable — cannot underwrite")
+        update_application_status(app_id, "declined", "Declined: primary credit score unavailable")
+        return {
+            "risk_score": 100.0,
+            "risk_tier": "D",
+            "decision": "decline",
+            "decision_reasoning": "Cannot underwrite: primary credit score unavailable. Manual review required.",
+            "messages": [{"role": "assistant", "content": "Primary credit score unavailable — application declined."}],
+        }
     ltv = agg_result["ltv"] if agg_result.get("ltv") is not None else ((loan_amount / purchase_price) * 100 if purchase_price > 0 else 100)
     doc_count = agg_result["doc_count"] if agg_result.get("doc_count") is not None else 0
 
@@ -211,5 +222,8 @@ Risk Tier: {risk_tier}
         "policy_citations": [p.get("policy_id", "") for p in policies],
         "decision": decision,
         "decision_reasoning": decision_reasoning,
+        "stress_gds": round(stress_gds, 4),
+        "stress_tds": round(stress_tds, 4),
+        "stress_rate": round(stress_rate, 4),
         "messages": [{"role": "assistant", "content": analysis}],
     }

@@ -1,6 +1,7 @@
 """LangGraph workflow assembly with MongoDBSaver checkpointing."""
 import functools
 import threading
+from datetime import datetime, timezone
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.mongodb import MongoDBSaver
 from langgraph.types import interrupt, Command
@@ -79,8 +80,9 @@ def hitl_gate(state: LendFlowState) -> dict:
         state_updates["decision"] = None
         state_updates["decision_reasoning"] = f"Re-underwriting: officer adjusted loan to ${overrides['loan_amount']:,.0f}"
 
+    officer_id = decision.get("officer_id", "unknown")
     new_status = "approved" if action == "approve" else ("processing" if action == "modify_and_continue" else "declined")
-    log_agent_activity(app_id, "hitl_gate", "resume", f"Officer decision: {action}. Notes: {notes}. Conditions: {conditions}. Overrides: {overrides}")
+    log_agent_activity(app_id, "hitl_gate", "resume", f"Officer {officer_id}: {action}. {notes}")
     update_application_status(app_id, new_status, f"Officer {action}d the application. {notes}")
 
     return state_updates
@@ -93,7 +95,7 @@ def completion_node(state: LendFlowState) -> dict:
 
     log_agent_activity(app_id, "supervisor", "pipeline_complete", f"Lending pipeline complete. Final decision: {decision}")
 
-    return {"current_agent": "complete"}
+    return {"current_agent": "complete", "completed_at": datetime.now(timezone.utc).isoformat()}
 
 
 def build_graph():
