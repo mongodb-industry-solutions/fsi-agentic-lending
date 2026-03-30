@@ -668,6 +668,20 @@ export default function StatusTracker({ onNotification, applicationId }) {
                     : stage.detail}
                 </div>
 
+                {stage.id === 'approved' && (isCompleted || isActive) && !isDeclined && (
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    padding: '8px 20px', background: 'var(--success-dim)',
+                    border: '2px solid var(--success)', borderRadius: 'var(--radius-md)',
+                    animation: 'approvedStamp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, celebratePulse 1s ease-out 0.5s',
+                    fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16,
+                    color: 'var(--success)', letterSpacing: '0.02em',
+                    marginTop: 8,
+                  }}>
+                    APPROVED
+                  </div>
+                )}
+
                 {/* Action-required: upload button */}
                 {isActiveAction && (
                   <div style={{ marginTop: 10 }}>

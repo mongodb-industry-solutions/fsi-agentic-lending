@@ -65,6 +65,16 @@ function Field({ label, value, onChange, type = 'text', span2 = false, readOnly 
 
 export default function ApplicationForm({ onSubmit }) {
   const [form, setForm] = useState(INITIAL_DATA);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      await onSubmit(form);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const update = (field) => (value) => setForm((prev) => ({ ...prev, [field]: value }));
 
@@ -122,7 +132,8 @@ export default function ApplicationForm({ onSubmit }) {
 
       <button
         type="button"
-        onClick={() => onSubmit(form)}
+        onClick={handleSubmit}
+        disabled={isSubmitting}
         style={{
           width: '100%',
           padding: 14,
@@ -135,9 +146,28 @@ export default function ApplicationForm({ onSubmit }) {
           fontSize: 14,
           cursor: 'pointer',
           marginTop: 8,
+          position: 'relative',
+          opacity: isSubmitting ? 0.85 : 1,
+          pointerEvents: isSubmitting ? 'none' : 'auto',
         }}
       >
-        Submit Application
+        {isSubmitting && (
+          <span style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <span style={{
+              width: 14, height: 14,
+              border: '2px solid rgba(255,255,255,0.3)',
+              borderTopColor: '#fff',
+              borderRadius: '50%',
+              animation: 'spin 0.6s linear infinite',
+            }} />
+          </span>
+        )}
+        <span style={{ visibility: isSubmitting ? 'hidden' : 'visible' }}>
+          Submit Application
+        </span>
       </button>
     </div>
   );

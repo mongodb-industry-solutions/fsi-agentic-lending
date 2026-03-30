@@ -47,7 +47,9 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
 
   return (
     <div style={{
-      width: 280,
+      flex: '0 1 280px',
+      minWidth: 200,
+      maxWidth: 320,
       borderRight: '1px solid var(--border-dim)',
       background: 'var(--bg-base)',
       display: 'flex',

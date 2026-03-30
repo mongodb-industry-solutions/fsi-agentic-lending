@@ -320,7 +320,9 @@ export default function AgentActivityLog({ onEvent, applicationId }) {
 
   return (
     <div style={{
-      width: 360,
+      flex: '0 1 360px',
+      minWidth: 260,
+      maxWidth: 420,
       borderLeft: '1px solid var(--border-dim)',
       background: 'var(--bg-base)',
       display: 'flex',
