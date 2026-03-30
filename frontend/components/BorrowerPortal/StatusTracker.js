@@ -399,7 +399,7 @@ export default function StatusTracker({ onNotification, applicationId }) {
         <div style={{
           padding: '6px 14px',
           borderRadius: 20,
-          background: statusColor === 'var(--success)' ? 'var(--success-dim)' : statusColor === 'var(--hitl-amber)' ? 'var(--hitl-amber-dim)' : 'var(--mongo-dim)',
+          background: statusColor === 'var(--success)' ? 'var(--success-dim)' : statusColor === 'var(--danger)' ? 'var(--danger-dim)' : statusColor === 'var(--hitl-amber)' ? 'var(--hitl-amber-dim)' : 'var(--mongo-dim)',
           color: statusColor,
           fontFamily: 'var(--font-display)',
           fontWeight: 700,

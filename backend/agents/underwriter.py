@@ -75,7 +75,7 @@ def underwriter_node(state: LendFlowState) -> dict:
     )
 
     # Property costs from application data
-    annual_tax = app.get("property", {}).get("annual_tax") or None
+    annual_tax = app.get("property", {}).get("annual_tax")
     if annual_tax is None:
         log_agent_activity(app_id, "underwriter", "data_gap",
             "annual_tax missing — using $6,815 regional fallback")

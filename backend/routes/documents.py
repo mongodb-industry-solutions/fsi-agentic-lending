@@ -39,6 +39,7 @@ def _validate_doc_id(doc_id: str):
 @router.get("/applications/{app_id}/documents")
 async def list_documents(app_id: str):
     """List all documents for an application."""
+    _validate_app_id(app_id)
     return document_service.list_documents(app_id)
 
 

@@ -4,7 +4,7 @@ env:
   AWS_REGION: us-east-1
   # Backend API URL for frontend to connect to backend health check
   BACKEND_URL: http://<service-name>:80 # or http://localhost:8000 if multicontainer pod is setup and backend is running on 8000
-  NEXT_PUBLIC_BACKEND_URL: "http://localhost:8000"
+  NEXT_PUBLIC_BACKEND_URL: "http://localhost:8000"   # For multi-container pod (sidecar). For separate pods, use: https://<production-domain>
   # CORS origins (comma-separated)
   ORIGINS: "https://<production-domain>,https://<production-ingress-hostname>"
 
