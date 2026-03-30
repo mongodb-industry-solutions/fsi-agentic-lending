@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 const TOAST_DURATION = 4500;
 
@@ -44,19 +44,21 @@ const TYPE_COLORS = {
 
 function Toast({ toast, onDismiss }) {
   const [exiting, setExiting] = useState(false);
+  const exitTimerRef = useRef(null);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setExiting(true);
-      setTimeout(() => onDismiss(toast.id), 300);
-    }, TOAST_DURATION);
-    return () => clearTimeout(timer);
+  const dismiss = useCallback(() => {
+    if (exitTimerRef.current) return;
+    setExiting(true);
+    exitTimerRef.current = setTimeout(() => onDismiss(toast.id), 300);
   }, [toast.id, onDismiss]);
 
-  const dismiss = () => {
-    setExiting(true);
-    setTimeout(() => onDismiss(toast.id), 300);
-  };
+  useEffect(() => {
+    const autoTimer = setTimeout(dismiss, TOAST_DURATION);
+    return () => {
+      clearTimeout(autoTimer);
+      if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
+    };
+  }, [dismiss]);
 
   const colors = TYPE_COLORS[toast.type] || TYPE_COLORS.info;
 
