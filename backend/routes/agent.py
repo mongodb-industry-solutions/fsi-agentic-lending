@@ -172,8 +172,15 @@ async def run_and_stream(app_id: str, autonomy_level: str = "bounded"):
     Eliminates the race condition between run and stream endpoints."""
     _validate_app_id(app_id)
 
+    with _running_lock:
+        if app_id in _running_apps:
+            raise HTTPException(status_code=409, detail="Pipeline already running for this application")
+        _running_apps.add(app_id)
+
     app = application_service.get_application(app_id)
     if not app:
+        with _running_lock:
+            _running_apps.discard(app_id)
         raise HTTPException(status_code=404, detail="Application not found")
 
     application_service.update_application_status(app_id, "processing", "Agent pipeline started")
@@ -240,6 +247,9 @@ async def run_and_stream(app_id: str, autonomy_level: str = "bounded"):
         except Exception as e:
             logger.error(f"Stream error for {app_id}: {e}")
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)[:500]})}\n\n"
+        finally:
+            with _running_lock:
+                _running_apps.discard(app_id)
 
     return StreamingResponse(
         event_generator(),

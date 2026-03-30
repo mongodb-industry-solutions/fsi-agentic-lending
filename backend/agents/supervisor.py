@@ -56,7 +56,7 @@ def supervisor_node(state: LendFlowState) -> dict:
     log_agent_activity(app_id, "supervisor", "route",
         f"[{autonomy}] → {natural_next}")
 
-    return {"current_agent": natural_next}
+    return {"current_agent": natural_next, "retry_count": 0}
 
 
 def route_from_supervisor(state: LendFlowState) -> str:

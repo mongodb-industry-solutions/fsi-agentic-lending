@@ -1,24 +1,46 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiGet } from '../lib/api';
 
 export default function DocumentViewer({ docId, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('structured'); // structured | raw | text
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    dialogRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (!docId) return;
     setLoading(true);
-    apiGet(`/documents/${docId}/json`).then((result) => {
-      setData(result);
-      setLoading(false);
-    });
+    apiGet(`/documents/${docId}/json`)
+      .then((result) => setData(result))
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
   }, [docId]);
 
   useEffect(() => {
-    const handleKey = (e) => { if (e.key === 'Escape') onClose(); };
+    const handleKey = (e) => {
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key === 'Tab') {
+        const focusable = dialogRef.current?.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (!focusable?.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [onClose]);
@@ -36,7 +58,7 @@ export default function DocumentViewer({ docId, onClose }) {
       }} />
 
       {/* Viewer */}
-      <div role="dialog" aria-label="Document Viewer" aria-modal="true" style={{
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-label="Document Viewer" aria-modal="true" style={{
         position: 'fixed', top: 24, left: 24, right: 24, bottom: 24,
         zIndex: 901, background: 'var(--bg-base)',
         borderRadius: 'var(--radius-lg)',
@@ -79,6 +101,7 @@ export default function DocumentViewer({ docId, onClose }) {
             <iframe
               src={pdfUrl}
               title="PDF Viewer"
+              sandbox="allow-scripts allow-same-origin"
               style={{ flex: 1, border: 'none', width: '100%' }}
             />
           </div>

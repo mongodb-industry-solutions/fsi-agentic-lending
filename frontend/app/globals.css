@@ -191,9 +191,8 @@ body {
 }
 
 @keyframes shimmer {
-  0% { opacity: 0.6; }
-  50% { opacity: 0.3; }
-  100% { opacity: 0.6; }
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
 }
 
 /* ===================== RESPONSIVE ===================== */
