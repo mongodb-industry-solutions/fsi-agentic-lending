@@ -59,9 +59,18 @@ function Toast({ toast, onDismiss }) {
   };
 
   const colors = TYPE_COLORS[toast.type] || TYPE_COLORS.info;
+  const toastRole = (toast.type === 'error' || toast.type === 'warning') ? 'alert' : 'status';
 
   return (
     <div
+      role={toastRole}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          dismiss();
+        }
+      }}
       style={{
         padding: "10px 14px",
         background: colors.bg,
@@ -131,6 +140,8 @@ export default function NotificationToast({ toasts, onDismiss }) {
 
   return (
     <div
+      aria-live="polite"
+      role="log"
       style={{
         position: "fixed",
         bottom: 16,

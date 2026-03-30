@@ -69,15 +69,47 @@ const DOC_STAGES = [
   },
 ];
 
-function syntaxHighlight(text) {
-  return text
-    .replace(/"([^"]+)":/g, '<span style="color:var(--agent-cyan)">"$1"</span>:')
-    .replace(/: "([^"]+)"/g, ': <span style="color:var(--mongo)">"$1"</span>')
-    .replace(/: (\d+\.?\d*)/g, ': <span style="color:var(--voyage)">$1</span>')
-    .replace(/: (true|false)/g, ': <span style="color:var(--hitl-amber)">$1</span>')
-    .replace(/\["([^"]+)"(?:,\s*"([^"]+)")*(?:,\s*"([^"]+)")?\]/g, (match) => {
-      return match.replace(/"([^"]+)"/g, '<span style="color:var(--mongo)">"$1"</span>');
-    });
+function SyntaxTokens({ text }) {
+  const tokens = [];
+  let remaining = text;
+  let key = 0;
+
+  while (remaining.length > 0) {
+    // Match key + colon + space (emit key colored, colon+space plain)
+    const keyMatch = remaining.match(/^("([^"]+)")(:\s*)/);
+    if (keyMatch) {
+      tokens.push(<span key={key++} style={{ color: 'var(--agent-cyan)' }}>{keyMatch[1]}</span>);
+      tokens.push(<span key={key++}>{keyMatch[3]}</span>);
+      remaining = remaining.slice(keyMatch[0].length);
+      continue;
+    }
+    // Match string value (after key was already consumed)
+    const strMatch = remaining.match(/^"([^"]*)"/);
+    if (strMatch) {
+      tokens.push(<span key={key++} style={{ color: 'var(--mongo)' }}>{strMatch[0]}</span>);
+      remaining = remaining.slice(strMatch[0].length);
+      continue;
+    }
+    // Match number value
+    const numMatch = remaining.match(/^(\d+\.?\d*)/);
+    if (numMatch) {
+      tokens.push(<span key={key++} style={{ color: 'var(--voyage)' }}>{numMatch[1]}</span>);
+      remaining = remaining.slice(numMatch[0].length);
+      continue;
+    }
+    // Match boolean value
+    const boolMatch = remaining.match(/^(true|false)/);
+    if (boolMatch) {
+      tokens.push(<span key={key++} style={{ color: 'var(--hitl-amber)' }}>{boolMatch[1]}</span>);
+      remaining = remaining.slice(boolMatch[0].length);
+      continue;
+    }
+    // Default: consume one character
+    tokens.push(<span key={key++}>{remaining[0]}</span>);
+    remaining = remaining.slice(1);
+  }
+
+  return <>{tokens}</>;
 }
 
 function StatusBadge({ status }) {
@@ -248,8 +280,9 @@ export default function FundingScene({ sceneStep, currentStepData }) {
                   wordBreak: 'break-all',
                   opacity: i === visibleDocStages.length - 1 ? 1 : 0.7,
                 }}
-                dangerouslySetInnerHTML={{ __html: syntaxHighlight(stage.fields) }}
-              />
+              >
+                <SyntaxTokens text={stage.fields} />
+              </pre>
             </div>
           ))}
 

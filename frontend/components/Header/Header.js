@@ -88,6 +88,7 @@ export default function Header({ activeScreen, onScreenChange }) {
           <button
             key={screen.id}
             type="button"
+            aria-current={activeScreen === screen.id ? "page" : undefined}
             onClick={() => onScreenChange(screen.id)}
             style={{
               display: "flex",
