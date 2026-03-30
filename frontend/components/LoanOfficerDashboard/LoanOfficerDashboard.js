@@ -7,6 +7,7 @@ import IntentPreview from './IntentPreview';
 import AutonomyDial from './AutonomyDial';
 import WorkflowCanvas from '../DemoFlow/WorkflowCanvas';
 import NotificationToast, { useToasts } from '../NotificationToast/NotificationToast';
+import BeforeAfterStat from '../educational/BeforeAfterStat';
 
 const WORKFLOW_STAGES = [
   {
@@ -1301,6 +1302,8 @@ export default function LoanOfficerDashboard() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 52px)', background: 'var(--bg-void)' }}>
+      <BeforeAfterStat before="$8,500/loan" after="$2,100/loan" />
+
       {/* Stats bar + Autonomy Dial */}
       <div style={{
         display: 'grid',

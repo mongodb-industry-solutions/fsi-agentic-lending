@@ -6,6 +6,8 @@ import DocumentUpload from './DocumentUpload';
 import StatusTracker from './StatusTracker';
 import NotificationFeed from './NotificationFeed';
 import NotificationToast, { useToasts } from '../NotificationToast/NotificationToast';
+import BeforeAfterStat from '../educational/BeforeAfterStat';
+import ContextualBanner from '../educational/ContextualBanner';
 
 const TOAST_STAGES = new Set([
   'docs', 'action-required', 'credit', 'underwriting',
@@ -61,9 +63,14 @@ export default function BorrowerPortal() {
   }
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 52px)', background: 'var(--bg-void)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 52px)', background: 'var(--bg-void)' }}>
+      <ContextualBanner id="borrower-speed" icon="⚡">
+        Traditional lending takes <strong>45+ days</strong>. LendFlow AI processes applications in <strong>minutes</strong> using MongoDB and multi-agent AI.
+      </ContextualBanner>
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
       <ApplicationForm onSubmit={handleSubmit} />
       <DocumentUpload />
+      </div>
       <NotificationToast toasts={toasts} onDismiss={removeToast} />
     </div>
   );
