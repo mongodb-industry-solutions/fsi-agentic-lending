@@ -8,6 +8,7 @@ import AutonomyDial from './AutonomyDial';
 import WorkflowCanvas from '../DemoFlow/WorkflowCanvas';
 import NotificationToast, { useToasts } from '../NotificationToast/NotificationToast';
 import BeforeAfterStat from '../educational/BeforeAfterStat';
+import { apiPost, apiGet, apiSSE } from '../../lib/api';
 
 const WORKFLOW_STAGES = [
   {
@@ -1155,9 +1156,20 @@ export default function LoanOfficerDashboard() {
   const timerRef = useRef(null);
   const stageTimestampsRef = useRef([]);
   const { toasts, addToast, removeToast } = useToasts();
+  const [liveApplications, setLiveApplications] = useState([]);
 
   const isPrimaryApp = selectedApp === 'APP-2026-00001';
   const showPreview = isPrimaryApp && workflowPhase === 'preview' && (autonomyLevel === 'observe' || autonomyLevel === 'suggest');
+
+  // Fetch real applications from backend (supplementary to hardcoded demo data)
+  useEffect(() => {
+    apiGet('/applications').then((apps) => {
+      if (apps && apps.length > 0) {
+        console.log('[LoanOfficer] Loaded', apps.length, 'applications from backend');
+        setLiveApplications(apps);
+      }
+    });
+  }, []);
 
   // Reactive dashboard stats
   const dashboardStats = useMemo(() => {
@@ -1259,13 +1271,24 @@ export default function LoanOfficerDashboard() {
     addToast({ type: 'info', icon: '👤', title: 'Manual Mode', message: 'Agent bypassed. You are handling this application directly.' });
   }, [addToast]);
 
-  const handleApprove = useCallback((details) => {
+  const handleApprove = useCallback(async (details) => {
     setApproved(true);
     setApprovalDetails(details || { mode: 'recommended', rate: PAYLOAD.proposedRate });
     const rate = details?.rate || PAYLOAD.proposedRate;
     const suffix = details?.conditions ? ` · Conditions: ${details.conditions}` : '';
     addToast({ type: 'success', icon: '✅', title: 'Loan Approved', message: `${PAYLOAD.product} @ ${rate} for ${PAYLOAD.applicant}.${suffix}` });
-  }, [addToast]);
+
+    // Also submit to backend if we have a matching live application
+    const selectedAppData = APPLICATIONS.find((a) => a.id === selectedApp);
+    const liveApp = liveApplications.find((a) => a.application_id === selectedApp);
+    const appId = liveApp?.application_id || selectedAppData?.id;
+    if (appId) {
+      await apiPost(`/hitl/${appId}/decision`, {
+        action: 'approve',
+        officer_notes: details?.conditions || 'Approved after manual review',
+      });
+    }
+  }, [addToast, selectedApp, liveApplications]);
 
   const handleRollback = useCallback(() => {
     setApproved(false);
@@ -1324,7 +1347,7 @@ export default function LoanOfficerDashboard() {
 
       {/* Main content */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-        <ApplicationQueue selectedId={selectedApp} onSelect={setSelectedApp} />
+        <ApplicationQueue selectedId={selectedApp} onSelect={setSelectedApp} liveApplications={liveApplications} />
 
         {/* Center: Workflow Monitor */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>

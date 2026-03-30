@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { apiSSE } from '../../lib/api';
 
 const STAGES = [
   {
@@ -143,7 +144,7 @@ function formatTime(date) {
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-export default function StatusTracker({ onNotification }) {
+export default function StatusTracker({ onNotification, applicationId }) {
   const [activeStage, setActiveStage] = useState(0);
   const [timestamps, setTimestamps] = useState([]);
   const [expandedStage, setExpandedStage] = useState(null);
@@ -258,6 +259,24 @@ export default function StatusTracker({ onNotification }) {
 
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // SSE connection for real-time backend status (supplementary to timer-based stages)
+  useEffect(() => {
+    if (!applicationId) return;
+
+    const source = apiSSE(
+      `/applications/${applicationId}/status`,
+      (event) => {
+        if (event.type === 'status') {
+          console.log('[StatusTracker] Real-time status:', event.status);
+          // The existing timer-based stages still run as the primary driver.
+          // This is supplementary real-time feedback from the backend.
+        }
+      }
+    );
+
+    return () => source?.close();
+  }, [applicationId]);
 
   const isComplete = activeStage >= STAGES.length - 1;
   const currentStage = STAGES[activeStage];

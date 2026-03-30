@@ -8,6 +8,7 @@ import NotificationFeed from './NotificationFeed';
 import NotificationToast, { useToasts } from '../NotificationToast/NotificationToast';
 import BeforeAfterStat from '../educational/BeforeAfterStat';
 import ContextualBanner from '../educational/ContextualBanner';
+import { apiPost } from '../../lib/api';
 
 const TOAST_STAGES = new Set([
   'docs', 'action-required', 'credit', 'underwriting',
@@ -28,11 +29,33 @@ const STAGE_TOAST_CONFIG = {
 export default function BorrowerPortal() {
   const [phase, setPhase] = useState('apply');
   const [notifications, setNotifications] = useState([]);
+  const [applicationId, setApplicationId] = useState(null);
   const { toasts, addToast, removeToast } = useToasts();
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async (formData) => {
     setPhase('tracking');
     addToast({ type: 'info', icon: '📝', title: 'Application Submitted', message: 'Your application is now being processed by our AI assistant.' });
+
+    // Attempt to submit to real backend (falls back gracefully if unavailable)
+    const result = await apiPost('/applications', {
+      primary_name: `${formData?.firstName || 'Marcus'} ${formData?.lastName || 'Delgado'}`,
+      co_applicant_name: 'Sofia Delgado',
+      loan_amount: 700000,
+      purchase_price: 875000,
+      down_payment: 175000,
+      product: '5yr Fixed (25yr Amort)',
+      property_address: '4718 Coronation Drive SW, Calgary, AB T3E 4Y2',
+      property_type: 'Detached Home',
+      combined_income: 222700,
+      primary_income: 128500,
+      co_applicant_income: 94200,
+    });
+
+    if (result?.application_id) {
+      setApplicationId(result.application_id);
+      // Trigger agent pipeline
+      await apiPost(`/agent/${result.application_id}/run`);
+    }
   }, [addToast]);
 
   const handleNotification = useCallback((notification) => {
@@ -55,7 +78,7 @@ export default function BorrowerPortal() {
   if (phase === 'tracking') {
     return (
       <div style={{ display: 'flex', height: 'calc(100vh - 52px)', background: 'var(--bg-void)' }}>
-        <StatusTracker onNotification={handleNotification} />
+        <StatusTracker onNotification={handleNotification} applicationId={applicationId} />
         <NotificationFeed notifications={notifications} />
         <NotificationToast toasts={toasts} onDismiss={removeToast} />
       </div>

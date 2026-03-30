@@ -75,7 +75,25 @@ const APPLICATIONS = [
   },
 ];
 
-export default function ApplicationQueue({ selectedId, onSelect }) {
+export default function ApplicationQueue({ selectedId, onSelect, liveApplications = [] }) {
+  // Merge live applications from backend with hardcoded demo data
+  const allApplications = [
+    ...liveApplications.map(app => ({
+      id: app.application_id,
+      name: app.borrower_names?.join(' & ') || app.primary_name || 'Unknown',
+      amount: `$${(app.loan_amount || 0).toLocaleString()}`,
+      product: app.product || '',
+      status: app.status || 'submitted',
+      statusLabel: (app.status || 'submitted').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      statusColor: 'var(--agent-cyan)',
+      score: null,
+      tier: null,
+      submitted: 'Live',
+      isLive: true,
+    })),
+    ...APPLICATIONS,
+  ];
+
   return (
     <div style={{
       width: 280,
@@ -91,12 +109,12 @@ export default function ApplicationQueue({ selectedId, onSelect }) {
           Application Queue
         </div>
         <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-          {APPLICATIONS.length} applications · {APPLICATIONS.filter((a) => a.status === 'pending_review').length} pending review
+          {allApplications.length} applications · {allApplications.filter((a) => a.status === 'pending_review').length} pending review
         </div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        {APPLICATIONS.map((app) => {
+        {allApplications.map((app) => {
           const isSelected = app.id === selectedId;
           return (
             <button
