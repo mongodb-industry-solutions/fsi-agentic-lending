@@ -276,6 +276,7 @@ export default function InfoWizardPanel({ isOpen, onClose, activeScreen = 'demo'
           opacity: isOpen ? 1 : 0,
           pointerEvents: isOpen ? 'auto' : 'none',
           transition: 'opacity 0.3s ease',
+          animation: isOpen ? 'backdropEnter 0.2s ease-out' : 'none',
         }}
       />
 

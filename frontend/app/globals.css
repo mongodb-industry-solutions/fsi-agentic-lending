@@ -13,23 +13,23 @@
   --text-secondary: #5C6C75;/* palette.gray.dark1 */
   --text-dim: #89979B;      /* palette.gray.base */
   --mongo: #00684A;          /* palette.green.dark1 */
-  --mongo-dim: rgba(0, 104, 74, 0.06);
-  --mongo-glow: rgba(0, 104, 74, 0.18);
+  --mongo-dim: rgba(0, 104, 74, 0.10);
+  --mongo-glow: rgba(0, 104, 74, 0.22);
   --mongo-bright: #00ED64;   /* palette.green.base */
   --voyage: #6341e0;
-  --voyage-dim: rgba(99, 65, 224, 0.07);
+  --voyage-dim: rgba(99, 65, 224, 0.11);
   --voyage-glow: rgba(99, 65, 224, 0.18);
   --agent-cyan: #0891b2;
-  --agent-cyan-dim: rgba(8, 145, 178, 0.07);
+  --agent-cyan-dim: rgba(8, 145, 178, 0.12);
   --tool-blue: #2563eb;
-  --tool-blue-dim: rgba(37, 99, 235, 0.07);
+  --tool-blue-dim: rgba(37, 99, 235, 0.10);
   --hitl-amber: #d97706;
-  --hitl-amber-dim: rgba(217, 119, 6, 0.06);
+  --hitl-amber-dim: rgba(217, 119, 6, 0.10);
   --hitl-amber-glow: rgba(217, 119, 6, 0.18);
   --danger: #DB3030;         /* palette.red.base */
-  --danger-dim: rgba(219, 48, 48, 0.06);
+  --danger-dim: rgba(219, 48, 48, 0.10);
   --success: #00684A;        /* palette.green.dark1 */
-  --success-dim: rgba(0, 104, 74, 0.07);
+  --success-dim: rgba(0, 104, 74, 0.11);
   /* Override display font to prefer Euclid Circular A (MongoDB standard) */
   --font-display: 'Euclid Circular A', var(--font-display-fallback, 'Manrope'), sans-serif;
   --font-mono: 'Source Code Pro', var(--font-mono-fallback, 'JetBrains Mono'), monospace;
@@ -43,6 +43,13 @@
   --canvas-inactive-fill: #F9FBFA;   /* palette.gray.light3 */
   --canvas-text-active: #001E2B;     /* palette.gray.dark3 */
   --canvas-text-inactive: #89979B;   /* palette.gray.base */
+  --text-2xs: 10px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
   --bg-header: #023430;     /* palette.green.dark2 — dark green header */
   --bg-overlay-alpha: rgba(255, 255, 255, 0.92);
   --bg-backdrop: rgba(241, 245, 249, 0.9);
@@ -73,6 +80,59 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===================== INTERACTIVE STATES ===================== */
+button {
+  transition: background 150ms ease, border-color 150ms ease,
+              box-shadow 150ms ease, transform 100ms ease;
+}
+button:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: var(--shadow-sm);
+}
+button:active:not(:disabled) {
+  transform: scale(0.97);
+  box-shadow: none;
+}
+button:focus-visible {
+  outline: 2px solid var(--mongo);
+  outline-offset: 2px;
+}
+
+/* ===================== RANGE SLIDERS ===================== */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: var(--border-dim);
+  border-radius: 3px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--mongo);
+  border: 2px solid var(--bg-base);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: box-shadow 150ms ease, transform 100ms ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 4px var(--mongo-glow);
+  transform: scale(1.1);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--mongo);
+  border: 2px solid var(--bg-base);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
 }
 
 /* ===================== SCROLLBAR ===================== */
@@ -193,6 +253,38 @@ body {
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
+}
+
+@keyframes modalEnter {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes backdropEnter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes cardEnter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes approvedStamp {
+  0% { opacity: 0; transform: scale(1.8) rotate(-12deg); }
+  60% { opacity: 1; transform: scale(0.95) rotate(0deg); }
+  80% { transform: scale(1.02) rotate(0deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+@keyframes celebratePulse {
+  0% { box-shadow: 0 0 0 0 rgba(0, 104, 74, 0.3); }
+  50% { box-shadow: 0 0 0 20px rgba(0, 104, 74, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 104, 74, 0); }
 }
 
 /* ===================== RESPONSIVE ===================== */

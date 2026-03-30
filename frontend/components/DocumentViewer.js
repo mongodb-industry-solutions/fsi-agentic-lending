@@ -56,6 +56,7 @@ export default function DocumentViewer({ docId, onClose }) {
       <div onClick={onClose} style={{
         position: 'fixed', inset: 0, zIndex: 900,
         background: 'rgba(0,0,0,0.6)',
+        animation: 'backdropEnter 0.2s ease-out',
       }} />
 
       {/* Viewer */}
@@ -67,6 +68,7 @@ export default function DocumentViewer({ docId, onClose }) {
         boxShadow: 'var(--shadow-xl, 0 20px 25px rgba(0,0,0,0.08))',
         display: 'flex', flexDirection: 'column',
         overflow: 'hidden',
+        animation: 'modalEnter 0.25s cubic-bezier(0.32, 0.72, 0, 1) forwards',
       }}>
         {/* Header */}
         <div style={{
