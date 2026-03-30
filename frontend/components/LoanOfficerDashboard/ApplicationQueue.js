@@ -1,5 +1,23 @@
 "use client";
 
+import Badge from '@leafygreen-ui/badge';
+
+function getStatusVariant(status) {
+  const map = {
+    submitted: 'blue',
+    processing: 'blue',
+    underwriting: 'blue',
+    review: 'yellow',
+    pending_review: 'yellow',
+    approved: 'green',
+    funded: 'green',
+    active: 'green',
+    declined: 'red',
+    error: 'red',
+  };
+  return map[status] || 'lightgray';
+}
+
 const STATUS_COLORS = {
   submitted: 'var(--agent-cyan)',
   processing: 'var(--agent-cyan)',
@@ -84,16 +102,9 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
                 <span style={{ fontWeight: 600, fontSize: 12, color: isSelected ? 'var(--mongo)' : 'var(--text-primary)' }}>
                   {app.name}
                 </span>
-                <span style={{
-                  fontSize: 8,
-                  fontWeight: 700,
-                  padding: '2px 6px',
-                  borderRadius: 8,
-                  color: app.statusColor,
-                  background: `${app.statusColor}1a`,
-                }}>
+                <Badge variant={getStatusVariant(app.status)}>
                   {app.statusLabel}
-                </span>
+                </Badge>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)' }}>

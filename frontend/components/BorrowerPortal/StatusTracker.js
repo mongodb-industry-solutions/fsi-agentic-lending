@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { spacing } from '@leafygreen-ui/tokens';
 import { apiSSE } from '../../lib/api';
 
 const STAGES = [
@@ -370,9 +371,9 @@ export default function StatusTracker({ onNotification, applicationId }) {
       : 'var(--agent-cyan-dim)';
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+    <div style={{ flex: 1, overflowY: 'auto', padding: `20px ${spacing[4]}px` }}>
       {applicationId && !sseConnected && (
-        <div style={{ padding: '6px 12px', background: 'var(--hitl-amber-dim)', borderRadius: 'var(--radius-sm)', fontSize: 10, color: 'var(--hitl-amber)', marginBottom: 8 }}>
+        <div style={{ padding: '6px 12px', background: 'var(--hitl-amber-dim)', borderRadius: 'var(--radius-sm)', fontSize: 10, color: 'var(--hitl-amber)', marginBottom: spacing[2] }}>
           Connecting to backend...
         </div>
       )}
@@ -383,11 +384,11 @@ export default function StatusTracker({ onNotification, applicationId }) {
       )}
       {/* Summary card */}
       <div style={{
-        padding: 16,
+        padding: spacing[3],
         background: 'var(--bg-surface)',
         borderRadius: 'var(--radius-lg)',
         border: '1px solid var(--border-dim)',
-        marginBottom: 16,
+        marginBottom: spacing[3],
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -411,11 +412,11 @@ export default function StatusTracker({ onNotification, applicationId }) {
 
       {/* AI Assistant Status Card */}
       <div style={{
-        padding: '12px 16px',
+        padding: `12px ${spacing[3]}px`,
         background: assistantBg,
         borderRadius: 'var(--radius-md)',
         border: `1px solid ${assistantColor}`,
-        marginBottom: 16,
+        marginBottom: spacing[3],
         display: 'flex',
         alignItems: 'center',
         gap: 10,
@@ -468,7 +469,7 @@ export default function StatusTracker({ onNotification, applicationId }) {
       </div>
 
       {/* Segmented progress rail */}
-      <div style={{ display: 'flex', gap: 2, padding: '0 0 24px', flexShrink: 0 }}>
+      <div style={{ display: 'flex', gap: 2, padding: `0 0 ${spacing[4]}px`, flexShrink: 0 }}>
         {STAGES.map((stage, i) => {
           const isSegComplete = i < activeStage;
           const isSegActive = i === activeStage;
@@ -484,7 +485,7 @@ export default function StatusTracker({ onNotification, applicationId }) {
       </div>
 
       {/* Timeline */}
-      <div style={{ position: 'relative', paddingLeft: 28 }}>
+      <div style={{ position: 'relative', paddingLeft: spacing[5] }}>
         <div style={{ position: 'absolute', left: 11, top: 0, bottom: 0, width: 2, background: 'var(--border-dim)' }} />
 
         {STAGES.map((stage, i) => {
@@ -714,7 +715,7 @@ export default function StatusTracker({ onNotification, applicationId }) {
 
                     {/* Intervention sub-list */}
                     {stage.interventions && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[2] }}>
                         {stage.interventions.map((intv, idx) => (
                           <div key={idx} style={{
                             padding: '6px 8px',
@@ -762,7 +763,7 @@ export default function StatusTracker({ onNotification, applicationId }) {
                         }}>
                           Correction Summary
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[1] }}>
                           {stage.beforeAfter.metrics.map((m, idx) => (
                             <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 9 }}>
                               <span style={{ color: 'var(--text-dim)', minWidth: 70 }}>{m.label}:</span>
