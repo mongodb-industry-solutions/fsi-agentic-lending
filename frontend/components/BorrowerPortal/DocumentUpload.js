@@ -1,137 +1,167 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { apiGet } from '../../lib/api';
+import DocumentJsonViewer from '../DocumentJsonViewer';
 
-const DOCUMENTS = [
+const INITIAL_DOCUMENTS = [
   {
     id: 'gov-id',
     type: 'Government IDs',
+    docType: 'government_id',
     icon: '\u{1FA2A}',
     fileName: 'ID_MarcusDelgado_AB_DL.pdf',
     size: '1.1 MB',
     pages: 2,
     status: 'uploaded',
+    mongoId: null,
   },
   {
     id: 'employment',
     type: 'Employment Letters',
+    docType: 'employment_letter',
     icon: '\u{1F4BC}',
     fileName: 'EmploymentLetter_TechNova.pdf',
     size: '412 KB',
     pages: 1,
     status: 'uploaded',
+    mongoId: null,
   },
   {
     id: 'paystubs',
     type: 'Pay Stubs (6)',
+    docType: 'pay_stub',
     icon: '\u{1F4C4}',
     fileName: 'PayStubs_Delgado_Q4Q1.pdf',
     size: '1.8 MB',
     pages: 6,
     status: 'uploaded',
+    mongoId: null,
   },
   {
     id: 'tax',
     type: 'CRA Tax Notices',
+    docType: 'tax_notice',
     icon: '\u{1F4CB}',
     fileName: 'NOA_2025_Delgado.pdf',
     size: '624 KB',
     pages: 4,
     status: 'uploaded',
+    mongoId: null,
   },
   {
     id: 'bank',
     type: 'Bank Statements (3mo)',
+    docType: 'bank_statement',
     icon: '\u{1F3E6}',
     fileName: 'TD_Statement_Jan-Mar2026.pdf',
     size: '1.4 MB',
     pages: 8,
     status: 'uploaded',
+    mongoId: null,
   },
   {
     id: 'purchase',
     type: 'Purchase Agreement',
+    docType: 'purchase_agreement',
     icon: '\u{1F3E0}',
     fileName: 'PurchaseAgreement_4718Coronation.pdf',
     size: '2.3 MB',
     pages: 12,
     status: 'uploaded',
+    mongoId: null,
   },
   {
     id: 'investments',
     type: 'Investment Statements',
+    docType: 'investment_statement',
     icon: '\u{1F4CA}',
     fileName: 'RRSP_Investments_Delgado.pdf',
     size: '986 KB',
     pages: 3,
     status: 'uploaded',
+    mongoId: null,
   },
   {
     id: 'property',
     type: 'Existing Property Docs',
+    docType: 'property_document',
     icon: '\u{1F3E2}',
     fileName: 'Condo_10180_104St_Edmonton.pdf',
     size: '1.6 MB',
     pages: 5,
     status: 'uploaded',
+    mongoId: null,
   },
   {
     id: 'application',
     type: 'Mortgage Application',
+    docType: 'mortgage_application',
     icon: '\u{1F4DD}',
     fileName: 'MortgageApp_Delgado_APP-2026-00001.pdf',
     size: '542 KB',
     pages: 8,
     status: 'uploaded',
+    mongoId: null,
   },
   {
     id: 'utilities',
     type: 'Utility Bills',
+    docType: 'utility_bill',
     icon: '\u26A1',
     fileName: 'Utilities_Enmax_Feb2026.pdf',
     size: '218 KB',
     pages: 2,
     status: 'uploaded',
+    mongoId: null,
   },
   {
     id: 'credit',
     type: 'Credit Reports',
+    docType: 'credit_report',
     icon: '\u{1F4B3}',
     fileName: 'Equifax_Delgado_Mar2026.pdf',
     size: '1.3 MB',
     pages: 6,
     status: 'uploaded',
+    mongoId: null,
   },
   {
     id: 'carloan',
     type: 'Car Loan Statement',
+    docType: 'car_loan_statement',
     icon: '\u{1F697}',
     fileName: 'Scotiabank_AutoLoan_Delgado.pdf',
     size: '324 KB',
     pages: 2,
     status: 'uploaded',
+    mongoId: null,
   },
   {
     id: 'proptax',
     type: 'Property Tax Notice',
+    docType: 'property_tax_notice',
     icon: '\u{1F3DB}',
     fileName: 'PropertyTax_Calgary_2026.pdf',
     size: '186 KB',
     pages: 1,
     status: 'uploaded',
+    mongoId: null,
   },
   {
     id: 'inspection',
     type: 'Property Inspection',
+    docType: 'property_inspection',
     icon: '\u{1F50D}',
     fileName: 'Inspection_4718Coronation.pdf',
     size: '3.2 MB',
     pages: 14,
     status: 'uploaded',
+    mongoId: null,
   },
 ];
 
-function DocCard({ doc }) {
+function DocCard({ doc, onViewJson }) {
   return (
     <div style={{
       padding: 14,
@@ -156,7 +186,40 @@ function DocCard({ doc }) {
         {doc.icon}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)', marginBottom: 2 }}>{doc.type}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+          <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)', flex: 1, minWidth: 0 }}>{doc.type}</div>
+          {doc.mongoId && (
+            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => window.open(`/api/backend/documents/${doc.mongoId}/pdf`, '_blank')}
+                title="View PDF"
+                style={{
+                  width: 24, height: 24, borderRadius: 4,
+                  border: '1px solid var(--border-dim)', background: 'var(--bg-surface)',
+                  color: 'var(--text-dim)', fontSize: 12, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                {'\u{1F4C4}'}
+              </button>
+              <button
+                type="button"
+                onClick={() => onViewJson(doc.mongoId)}
+                title="View MongoDB JSON"
+                style={{
+                  width: 24, height: 24, borderRadius: 4,
+                  border: '1px solid var(--border-dim)', background: 'var(--bg-surface)',
+                  color: 'var(--mongo)', fontSize: 10, fontFamily: 'var(--font-mono)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700,
+                }}
+              >
+                {"{}"}
+              </button>
+            </div>
+          )}
+        </div>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {doc.fileName}
         </div>
@@ -180,7 +243,7 @@ function DocCard({ doc }) {
           fontWeight: 600,
           color: 'var(--voyage)',
         }}>
-          <span style={{ fontSize: 10 }}>🧬</span>
+          <span style={{ fontSize: 10 }}>{'\u{1F9EC}'}</span>
           Processed by voyage-multimodal-3.5
         </div>
       </div>
@@ -188,8 +251,22 @@ function DocCard({ doc }) {
   );
 }
 
-export default function DocumentUpload() {
+export default function DocumentUpload({ applicationId }) {
   const [dragOver, setDragOver] = useState(false);
+  const [documents, setDocuments] = useState(INITIAL_DOCUMENTS);
+  const [viewingJsonId, setViewingJsonId] = useState(null);
+
+  useEffect(() => {
+    if (!applicationId) return;
+    apiGet(`/applications/${applicationId}/documents`).then((docs) => {
+      if (docs) {
+        setDocuments(prev => prev.map(d => {
+          const match = docs.find(bd => bd.doc_type === d.docType);
+          return match ? { ...d, mongoId: match._id } : d;
+        }));
+      }
+    });
+  }, [applicationId]);
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', borderLeft: '1px solid var(--border-dim)' }}>
@@ -226,8 +303,8 @@ export default function DocumentUpload() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-        {DOCUMENTS.map((doc) => (
-          <DocCard key={doc.id} doc={doc} />
+        {documents.map((doc) => (
+          <DocCard key={doc.id} doc={doc} onViewJson={setViewingJsonId} />
         ))}
       </div>
 
@@ -252,6 +329,10 @@ export default function DocumentUpload() {
           ))}
         </div>
       </div>
+
+      {viewingJsonId && (
+        <DocumentJsonViewer docId={viewingJsonId} onClose={() => setViewingJsonId(null)} />
+      )}
     </div>
   );
 }
