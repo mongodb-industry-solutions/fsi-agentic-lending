@@ -1,5 +1,27 @@
 "use client";
 
+import { useState } from 'react';
+
+function CollapsibleSection({ title, defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ borderBottom: '1px solid var(--border-dim)' }}>
+      <button type="button" onClick={() => setOpen(!open)} style={{
+        width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer',
+        fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12,
+        color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em',
+      }}>
+        {title}
+        <span style={{ transform: open ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s ease', fontSize: 10, color: 'var(--text-dim)' }}>▾</span>
+      </button>
+      <div style={{ maxHeight: open ? 2000 : 0, overflow: 'hidden', transition: 'max-height 0.3s ease' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function TechRecap({ elapsedMs, activeFeatures }) {
   const featuresUsed = activeFeatures?.length || 6;
 
@@ -53,70 +75,75 @@ export default function TechRecap({ elapsedMs, activeFeatures }) {
         Demo Complete — Full Technical Summary
       </h3>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
-          gap: 12,
-          marginBottom: 20,
-        }}
-      >
-        {stats.map((s) => (
-          <div key={s.label}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>{s.label}</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700, color: s.color }}>
-              {s.value}
+      <CollapsibleSection title="Performance Stats" defaultOpen={true}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
+            gap: 12,
+            marginBottom: 20,
+          }}
+        >
+          {stats.map((s) => (
+            <div key={s.label}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>{s.label}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700, color: s.color }}>
+                {s.value}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
-        {techStack.map((t) => (
-          <div key={t.category} style={{ display: 'flex', gap: 12, fontSize: 12, lineHeight: 1.5 }}>
-            <span
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontWeight: 700,
-                color: 'var(--mongo)',
-                minWidth: 100,
-                flexShrink: 0,
-              }}
-            >
-              {t.category}
-            </span>
-            <span style={{ color: 'var(--text-secondary)' }}>{t.items}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Cross-Lifecycle Intelligence */}
-      <div style={{ padding: 16, background: 'var(--bg-base)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--mongo)', marginBottom: 16 }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, color: 'var(--mongo)', marginBottom: 10 }}>
-          Cross-Lifecycle Intelligence
+          ))}
         </div>
-        {crossLifecycle.map((cl) => (
-          <div key={cl.from + cl.to} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 11 }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--agent-cyan)', flexShrink: 0 }}>{cl.from}</span>
-            <span style={{ color: 'var(--text-dim)' }}>→</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--voyage)', flexShrink: 0 }}>{cl.to}</span>
-            <span style={{ color: 'var(--text-secondary)', flex: 1 }}>{cl.insight}</span>
-          </div>
-        ))}
-        <div style={{ fontSize: 12, color: 'var(--mongo)', fontWeight: 700, marginTop: 8 }}>
-          One platform. Full lifecycle. Continuous learning.
-        </div>
-      </div>
+      </CollapsibleSection>
 
-      {/* By the Numbers */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
-        {impactNumbers.map((n) => (
-          <div key={n.label} style={{ padding: '10px 12px', background: 'var(--mongo-dim)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 4 }}>{n.label}</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 800, color: 'var(--mongo)' }}>{n.value}</div>
+      <CollapsibleSection title="Tech Stack" defaultOpen={true}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+          {techStack.map((t) => (
+            <div key={t.category} style={{ display: 'flex', gap: 12, fontSize: 12, lineHeight: 1.5 }}>
+              <span
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontWeight: 700,
+                  color: 'var(--mongo)',
+                  minWidth: 100,
+                  flexShrink: 0,
+                }}
+              >
+                {t.category}
+              </span>
+              <span style={{ color: 'var(--text-secondary)' }}>{t.items}</span>
+            </div>
+          ))}
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection title="Cross-Lifecycle Intelligence" defaultOpen={false}>
+        {/* Cross-Lifecycle Intelligence */}
+        <div style={{ padding: 16, background: 'var(--bg-base)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--mongo)', marginBottom: 16 }}>
+          {crossLifecycle.map((cl) => (
+            <div key={cl.from + cl.to} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 11 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--agent-cyan)', flexShrink: 0 }}>{cl.from}</span>
+              <span style={{ color: 'var(--text-dim)' }}>→</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--voyage)', flexShrink: 0 }}>{cl.to}</span>
+              <span style={{ color: 'var(--text-secondary)', flex: 1 }}>{cl.insight}</span>
+            </div>
+          ))}
+          <div style={{ fontSize: 12, color: 'var(--mongo)', fontWeight: 700, marginTop: 8 }}>
+            One platform. Full lifecycle. Continuous learning.
           </div>
-        ))}
-      </div>
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection title="By the Numbers" defaultOpen={false}>
+        {/* By the Numbers */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+          {impactNumbers.map((n) => (
+            <div key={n.label} style={{ padding: '10px 12px', background: 'var(--mongo-dim)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 4 }}>{n.label}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 800, color: 'var(--mongo)' }}>{n.value}</div>
+            </div>
+          ))}
+        </div>
+      </CollapsibleSection>
 
       <p
         style={{

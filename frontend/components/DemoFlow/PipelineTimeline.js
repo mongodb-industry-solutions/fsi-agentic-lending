@@ -86,7 +86,7 @@ export default function PipelineTimeline({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <div style={{ height: 3, background: 'var(--border-dim)', borderRadius: 2, marginBottom: 6, flexShrink: 0, overflow: 'hidden' }}>
+      <div style={{ height: 6, background: 'var(--border-dim)', borderRadius: 3, marginBottom: 6, flexShrink: 0, overflow: 'hidden' }}>
         <div style={{
           height: '100%',
           width: `${steps.length > 0 ? ((stepIndex + 1) / steps.length) * 100 : 0}%`,
@@ -133,14 +133,14 @@ export default function PipelineTimeline({
                   animation: isLatest ? 'slideDown 0.25s ease-out' : undefined,
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontWeight: 700, fontSize: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontWeight: 700, fontSize: 12 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span>{e.icon}</span>
                     <span style={{ color: e.color }}>{e.agent}</span>
                   </span>
-                  <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', fontSize: 9 }}>{e.timing}</span>
+                  <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>{e.timing}</span>
                 </div>
-                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.4, fontSize: 10 }}>{e.text}</div>
+                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.4, fontSize: 12 }}>{e.text}</div>
               </div>
             );
           }
@@ -153,7 +153,7 @@ export default function PipelineTimeline({
                 onMouseEnter={() => onEntryHover && onEntryHover(e.nodeId)}
                 onMouseLeave={() => onEntryHover && onEntryHover(null)}
                 style={{
-                  display: 'flex', gap: 6, padding: '5px 10px', fontSize: 10,
+                  display: 'flex', gap: 6, padding: '5px 10px', fontSize: 12,
                   borderLeft: `3px solid ${e.color}33`,
                   borderRadius: 'var(--radius-sm)',
                   background: isHighlighted ? e.color + '0a' : 'transparent',
@@ -163,8 +163,8 @@ export default function PipelineTimeline({
               >
                 <span style={{ fontSize: 9, marginTop: 1 }}>🗄</span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, minWidth: 60, color: 'var(--mongo)' }}>{e.verb}</span>
-                <span style={{ flex: 1, color: 'var(--text-secondary)' }}>{e.collection}</span>
-                <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', fontSize: 9 }}>{e.latency}</span>
+                <span style={{ flex: 1, color: 'var(--text-secondary)', fontSize: 11 }}>{e.collection}</span>
+                <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>{e.latency}</span>
               </div>
             );
           }
@@ -177,7 +177,7 @@ export default function PipelineTimeline({
                 onMouseEnter={() => onEntryHover && onEntryHover(e.nodeId)}
                 onMouseLeave={() => onEntryHover && onEntryHover(null)}
                 style={{
-                  display: 'flex', gap: 8, padding: '6px 10px', fontSize: 10,
+                  display: 'flex', gap: 8, padding: '6px 10px', fontSize: 12,
                   borderLeft: `3px solid ${e.color}`,
                   borderRadius: 'var(--radius-sm)',
                   background: isHighlighted ? e.color + '14' : e.color + '08',
@@ -187,8 +187,8 @@ export default function PipelineTimeline({
               >
                 <span style={{ fontSize: 11 }}>{e.memType === 'checkpoint' ? '💾' : '🧠'}</span>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 10, color: e.color }}>{e.title}</div>
-                  <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>{e.detail}</div>
+                  <div style={{ fontWeight: 600, fontSize: 12, color: e.color }}>{e.title}</div>
+                  <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>{e.detail}</div>
                 </div>
               </div>
             );
