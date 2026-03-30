@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { SCENE_META, SCENE_STEPS, CAPABILITY_IDS } from '../data/demoScenes';
+import { SCENE_META, SCENE_STEPS } from '../data/demoScenes';
 
 const DELAY_BASE_MS = 800;
 const SPEED_MULT = { 0.25: 4, 0.5: 2, 1: 1, 2: 0.5 };

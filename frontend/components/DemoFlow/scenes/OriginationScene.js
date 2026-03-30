@@ -257,14 +257,17 @@ export default function OriginationScene({ sceneStep, currentStepData }) {
   const handleNodeHover = useCallback((nodeId) => setHoveredNode(nodeId), []);
   const handleTimelineHover = useCallback((nodeId) => setTimelineHighlight(nodeId), []);
 
+  const hasExtraction = sceneStep >= 3;
+
   useEffect(() => {
-    if (sceneStep >= 3 && activeDocIdx === 0) {
+    if (!hasExtraction) return;
+    if (activeDocIdx === 0) {
       const t1 = setTimeout(() => setActiveDocIdx(1), 600);
       const t2 = setTimeout(() => setActiveDocIdx(2), 1200);
       const t3 = setTimeout(() => setActiveDocIdx(0), 1800);
       return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
     }
-  }, [sceneStep >= 3]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hasExtraction]);
 
   const activeDoc = DOCUMENTS[activeDocIdx];
   const visibleFieldCount = useProgressiveReveal(activeDoc.fields.length, showExtraction, 120);

@@ -96,6 +96,7 @@ export default function SceneNavBar({
               key={s}
               type="button"
               onClick={() => setSpeed(s)}
+              aria-label={`Set speed to ${s}x`}
               style={{
                 padding: '3px 8px',
                 borderRadius: 'var(--radius-sm)',
@@ -115,6 +116,7 @@ export default function SceneNavBar({
         <button
           type="button"
           onClick={isPlaying ? onPause : onPlay}
+          aria-label={isPlaying ? 'Pause demo' : 'Play demo'}
           style={{
             padding: '6px 14px',
             borderRadius: 'var(--radius-sm)',
@@ -133,6 +135,7 @@ export default function SceneNavBar({
         <button
           type="button"
           onClick={onStep}
+          aria-label="Step forward"
           style={{
             padding: '6px 14px',
             borderRadius: 'var(--radius-sm)',
@@ -151,6 +154,7 @@ export default function SceneNavBar({
         <button
           type="button"
           onClick={onReset}
+          aria-label="Reset demo"
           style={{
             padding: '6px 10px',
             borderRadius: 'var(--radius-sm)',
