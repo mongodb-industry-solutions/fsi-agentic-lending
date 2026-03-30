@@ -44,6 +44,9 @@ const AMORTIZATION = [
   { month: 1, payment: '$4,047.39', principal: '$1,194.89', interest: '$2,852.50', balance: '$698,805.11' },
   { month: 2, payment: '$4,047.39', principal: '$1,199.76', interest: '$2,847.63', balance: '$697,605.35' },
   { month: 3, payment: '$4,047.39', principal: '$1,204.65', interest: '$2,842.74', balance: '$696,400.70' },
+  { month: 6, payment: '$4,047.39', principal: '$1,219.42', interest: '$2,827.97', balance: '$692,784.08' },
+  { month: 12, payment: '$4,047.39', principal: '$1,249.39', interest: '$2,798.00', balance: '$685,341.22' },
+  { month: 24, payment: '$4,047.39', principal: '$1,312.26', interest: '$2,735.13', balance: '$669,470.48' },
 ];
 
 const DISCLOSURES = [
@@ -128,6 +131,14 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
                     <span>{row.balance}</span>
                   </div>
                 ))}
+                <button type="button" style={{
+                  width: '100%', padding: '6px 0', fontSize: 10,
+                  color: 'var(--mongo)', fontWeight: 600, fontFamily: 'var(--font-mono)',
+                  background: 'none', border: 'none', borderTop: '1px solid var(--border-dim)',
+                  cursor: 'pointer',
+                }}>
+                  View full 300-month schedule →
+                </button>
               </div>
 
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: 10 }}>Regulatory Disclosures</div>

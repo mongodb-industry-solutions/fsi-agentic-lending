@@ -360,8 +360,12 @@ export default function DocumentUpload({ applicationId }) {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-        {documents.map((doc) => (
-          <DocCard key={doc.id} doc={doc} onViewDoc={setViewingDocId} />
+        {documents.map((doc, index) => (
+          <div key={doc.id} style={{
+            animation: `cardEnter 0.3s cubic-bezier(0.4, 0, 0.2, 1) ${index * 0.06}s both`,
+          }}>
+            <DocCard doc={doc} onViewDoc={setViewingDocId} />
+          </div>
         ))}
       </div>
 

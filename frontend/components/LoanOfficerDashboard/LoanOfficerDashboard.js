@@ -1075,7 +1075,7 @@ export default function LoanOfficerDashboard() {
       </div>
 
       {/* Main content */}
-      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div className="officer-layout" style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <ApplicationQueue selectedId={selectedApp} onSelect={setSelectedApp} applications={liveApplications} />
 
         {/* Center: Workflow Monitor */}
