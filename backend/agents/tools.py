@@ -1,4 +1,5 @@
 """MongoDB tools available to LangGraph agents."""
+import logging
 import os
 import time as _time
 from datetime import datetime, timezone
@@ -22,11 +23,19 @@ def get_credit_reports(application_id: str) -> list[dict]:
     if not app:
         return []
 
+    borrower_ids = app.get("borrower_ids", [])
     reports = list(db["credit_reports"].find(
-        {"borrower_id": {"$in": app.get("borrower_ids", [])}},
-        {"_id": 0, "borrower_name": 1, "score": 1, "accounts": 1, "total_outstanding": 1, "payment_history": 1, "inquiries": 1, "derogatory_items": 1}
+        {"borrower_id": {"$in": borrower_ids}},
+        {"_id": 0, "borrower_name": 1, "score": 1, "accounts": 1, "total_outstanding": 1, "payment_history": 1, "inquiries": 1, "derogatory_items": 1, "borrower_id": 1}
     ))
-    return reports
+
+    # Sort to match borrower_ids order (primary first, co-applicant second)
+    sorted_reports = []
+    for bid in borrower_ids:
+        match = next((r for r in reports if r.get("borrower_id") == bid), None)
+        if match:
+            sorted_reports.append(match)
+    return sorted_reports
 
 
 def get_application_summary(application_id: str) -> dict:
@@ -70,11 +79,13 @@ def search_policies(query: str, limit: int = 5) -> list[dict]:
         results = list(db["underwriting_policies"].aggregate(pipeline))
         return results
     except Exception as e:
-        # Fallback if vector search index not ready
-        import logging
-        logging.getLogger(__name__).warning(f"Vector search failed, falling back to scan: {e}")
-        results = list(db["underwriting_policies"].find({}, {"_id": 0, "policy_id": 1, "title": 1, "content": 1}).limit(limit))
-        return results
+        logging.getLogger(__name__).error(f"Vector search failed: {e}")
+        return [{
+            "policy_id": "SEARCH_UNAVAILABLE",
+            "title": "Policy Search Unavailable",
+            "content": f"Atlas Vector Search failed: {str(e)[:200]}. Manual policy review required.",
+            "score": 0,
+        }]
 
 
 def log_agent_activity(application_id: str, agent: str, action: str, detail: str, checkpoint_id: str = None):
@@ -382,7 +393,7 @@ def get_recent_events(limit: int = 20) -> list:
         status = p.get("status", "on_time")
         events.append({
             "type": "payment",
-            "message": f"Payment ${p.get('amount', 0):,.2f} received for {p.get('loan_id', '?')} — {'on time' if status == 'on_time' else f'{p.get(\"days_late\", 0)} days late'}",
+            "message": f"Payment ${p.get('amount', 0):,.2f} received for {p.get('loan_id', '?')} — {'on time' if status == 'on_time' else str(p.get('days_late', 0)) + ' days late'}",
             "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
             "icon": "💰" if status == "on_time" else "⚠",
             "color": "var(--success)" if status == "on_time" else "var(--danger)",

@@ -38,5 +38,9 @@ class LendFlowState(TypedDict):
     last_error: Optional[str]
     retry_count: int
 
+    # HITL observe mode tracking
+    hitl_approved_nodes: list[str]
+    _pending_node: Optional[str]
+
     # Activity tracking
     activity_log: list[dict]

@@ -38,10 +38,11 @@ def supervisor_node(state: LendFlowState) -> dict:
     # Apply autonomy gates
     if autonomy == "observe":
         # Every transition requires officer approval
-        if natural_next not in ("hitl_gate", "complete"):
+        approved_nodes = state.get("hitl_approved_nodes", [])
+        if natural_next not in ("hitl_gate", "complete") and natural_next not in approved_nodes:
             log_agent_activity(app_id, "supervisor", "autonomy_gate",
                 f"Observe mode: pausing before {natural_next} for officer review")
-            natural_next = "hitl_gate"
+            return {"current_agent": "hitl_gate", "retry_count": 0, "_pending_node": natural_next}
     elif autonomy == "suggest":
         # Pause before final decision only
         if natural_next == "complete" and state.get("decision") not in ("error", "decline"):
