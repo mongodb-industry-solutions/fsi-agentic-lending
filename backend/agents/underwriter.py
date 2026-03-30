@@ -5,6 +5,7 @@ from agents.state import LendFlowState
 from agents.tools import (
     get_application_summary,
     get_credit_reports,
+    run_risk_aggregation,
     search_policies,
     log_agent_activity,
     update_application_status,
@@ -24,12 +25,15 @@ def underwriter_node(state: LendFlowState) -> dict:
 
     log_agent_activity(app_id, "underwriter", "start", "Beginning risk assessment")
 
+    # Run 7-stage MongoDB aggregation pipeline
+    agg_result = run_risk_aggregation(app_id)
+
     # Get application data
     app = get_application_summary(app_id)
     income = app.get("income_summary", {})
     combined_income = income.get("combined_gross", 0)
-    loan_amount = app.get("loan_amount", 0)
-    purchase_price = app.get("purchase_price", 0)
+    loan_amount = agg_result.get("loan_amount") or app.get("loan_amount", 0)
+    purchase_price = agg_result.get("purchase_price") or app.get("purchase_price", 0)
 
     # Search for relevant policies via Vector Search
     log_agent_activity(app_id, "underwriter", "policy_search", "Searching underwriting policies via Atlas Vector Search")
@@ -116,24 +120,24 @@ def underwriter_node(state: LendFlowState) -> dict:
     effective_gds = max(gds, stress_gds)
     effective_tds = max(tds, stress_tds)
 
-    # Risk scoring
-    primary_score = state.get("primary_credit_score", 0)
-    co_score = state.get("co_applicant_credit_score", 0)
-    ltv = (loan_amount / purchase_price) * 100 if purchase_price > 0 else 100
+    # Risk scoring — use aggregation pipeline results as base
+    primary_score = agg_result.get("primary_credit_score") or state.get("primary_credit_score", 0)
+    co_score = agg_result.get("co_credit_score") or state.get("co_applicant_credit_score", 0)
+    ltv = agg_result.get("ltv") or ((loan_amount / purchase_price) * 100 if purchase_price > 0 else 100)
+    monthly_income_agg = agg_result.get("monthly_income", monthly_income)
+    doc_count = agg_result.get("doc_count", 0)
 
     log_agent_activity(app_id, "underwriter", "ltv_calc", f"LTV: {ltv:.1f}% ({loan_amount:,.0f} / {purchase_price:,.0f})")
+    log_agent_activity(app_id, "underwriter", "agg_data",
+        f"Aggregation: primary_score={primary_score}, co_score={co_score}, doc_count={doc_count}, pipeline_ms={agg_result.get('pipeline_elapsed_ms', 'N/A')}")
 
-    # Simple risk score (0-100, lower is better risk)
-    risk_score = 100
-    if primary_score >= 750: risk_score -= 25
-    elif primary_score >= 700: risk_score -= 15
-    elif primary_score >= 680: risk_score -= 5
-    if co_score >= 750: risk_score -= 10
-    if effective_gds <= 0.32: risk_score -= 15
-    elif effective_gds <= 0.39: risk_score -= 5
-    if effective_tds <= 0.40: risk_score -= 10
-    if ltv <= 80: risk_score -= 15
-    risk_score = max(0, min(100, risk_score))
+    # Base risk score from aggregation pipeline (credit + LTV factors)
+    base_risk = agg_result.get("risk_score", 100)
+    # Adjust for GDS/TDS (calculated in Python with property tax + heating + debt)
+    if effective_gds <= 0.32: base_risk -= 15
+    elif effective_gds <= 0.39: base_risk -= 5
+    if effective_tds <= 0.40: base_risk -= 10
+    risk_score = max(0, min(100, base_risk))
 
     # Risk tier
     if risk_score <= 30: risk_tier = "A"

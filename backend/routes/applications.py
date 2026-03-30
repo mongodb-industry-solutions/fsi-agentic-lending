@@ -150,6 +150,28 @@ async def stream_status(app_id: str):
     )
 
 
+@router.get("/applications/{app_id}/risk-pipeline")
+async def get_risk_pipeline(app_id: str):
+    """Return the 7-stage aggregation pipeline stages and results."""
+    _validate_app_id(app_id)
+    from agents.tools import run_risk_aggregation
+    result = await asyncio.to_thread(run_risk_aggregation, app_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Application not found or pipeline returned no results")
+
+    # Include pipeline stage descriptions for frontend display
+    result["pipeline_description"] = [
+        {"stage": 1, "operator": "$match", "description": "Filter by application ID"},
+        {"stage": 2, "operator": "$lookup", "description": "Join credit reports from credit_reports collection"},
+        {"stage": 3, "operator": "$lookup", "description": "Join income verification documents"},
+        {"stage": 4, "operator": "$addFields", "description": "Calculate monthly income, LTV, credit scores"},
+        {"stage": 5, "operator": "$addFields", "description": "Score risk factors (credit + LTV points)"},
+        {"stage": 6, "operator": "$addFields", "description": "Compute final risk score (0-100)"},
+        {"stage": 7, "operator": "$project", "description": "Shape clean output for underwriting"},
+    ]
+    return result
+
+
 @router.websocket("/applications/ws")
 async def applications_ws(websocket: WebSocket):
     """WebSocket — real-time application queue via MongoDB Change Stream.
