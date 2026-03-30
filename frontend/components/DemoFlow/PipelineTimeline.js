@@ -86,6 +86,15 @@ export default function PipelineTimeline({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div style={{ height: 3, background: 'var(--border-dim)', borderRadius: 2, marginBottom: 6, flexShrink: 0, overflow: 'hidden' }}>
+        <div style={{
+          height: '100%',
+          width: `${steps.length > 0 ? ((stepIndex + 1) / steps.length) * 100 : 0}%`,
+          background: 'var(--mongo)',
+          borderRadius: 2,
+          transition: 'width 0.6s ease-out',
+        }} />
+      </div>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '8px 0 6px', borderBottom: '1px solid var(--border-dim)', marginBottom: 6, flexShrink: 0,

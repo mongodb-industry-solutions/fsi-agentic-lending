@@ -12,7 +12,7 @@ const STATUS_CHIPS = [
   { label: "LangSmith", on: true },
 ];
 
-export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
+export default function Header({ activeScreen, onScreenChange, onInfoOpen, theme, onThemeToggle }) {
   return (
     <header
       style={{
@@ -119,25 +119,31 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
       </nav>
 
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        {onThemeToggle && (
+          <button
+            type="button"
+            onClick={onThemeToggle}
+            style={{
+              width: 28, height: 28, borderRadius: '50%',
+              border: '1px solid var(--border-dim)', background: 'var(--bg-surface)',
+              color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          >
+            {theme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19'}
+          </button>
+        )}
         {onInfoOpen && (
           <button
             type="button"
             onClick={onInfoOpen}
             style={{
-              width: 28,
-              height: 28,
-              borderRadius: '50%',
-              border: '1px solid var(--border-dim)',
-              background: 'var(--bg-surface)',
-              color: 'var(--text-dim)',
-              fontFamily: 'var(--font-display)',
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s',
+              width: 28, height: 28, borderRadius: '50%',
+              border: '1px solid var(--border-dim)', background: 'var(--bg-surface)',
+              color: 'var(--text-dim)', fontFamily: 'var(--font-display)',
+              fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
             aria-label="Open technology reference panel"
           >

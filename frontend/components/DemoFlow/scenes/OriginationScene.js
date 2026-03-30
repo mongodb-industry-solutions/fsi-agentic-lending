@@ -7,6 +7,7 @@ import AnnotationOverlay from '../AnnotationOverlay';
 import ApplicantCard from '../panels/ApplicantCard';
 import DataSourceStrip from '../DataSourceStrip';
 import PipelineTimeline from '../PipelineTimeline';
+import StatCard from '../../visualizations/StatCard';
 
 const DOCUMENTS = [
   {
@@ -313,6 +314,12 @@ export default function OriginationScene({ sceneStep, currentStepData }) {
             totalSteps={ORIGINATION_STEPS.length}
           />
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
+              <StatCard label="Documents" value={sceneStep >= 2 ? 4 : sceneStep >= 0 ? 2 : 0} color="var(--agent-cyan)" />
+              <StatCard label="Fields Extracted" value={sceneStep >= 3 ? 47 : sceneStep >= 1 ? 12 : 0} color="var(--mongo)" />
+              <StatCard label="Validations" value={sceneStep >= 4 ? 23 : sceneStep >= 2 ? 8 : 0} color="var(--success)" />
+              <StatCard label="Processing" value={sceneStep >= 0 ? 'Live' : '—'} color="var(--tool-blue)" animate={false} />
+            </div>
             <ApplicantCard stepIndex={sceneStep} />
 
             {showExtraction && (
