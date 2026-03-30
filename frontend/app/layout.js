@@ -26,7 +26,7 @@ const jetbrainsMono = JetBrains_Mono({
 const sourceCodePro = Source_Code_Pro({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
-  variable: '--font-source-code',
+  variable: '--font-mono',
   display: 'swap',
 });
 

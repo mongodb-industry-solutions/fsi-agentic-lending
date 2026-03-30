@@ -47,7 +47,8 @@ async def get_hitl_context(app_id: str):
 @router.post("/hitl/{app_id}/decision")
 async def submit_hitl_decision(app_id: str, req: HITLDecisionRequest):
     """Submit officer decision (approve/decline). Resumes LangGraph from checkpoint."""
-    new_status = "approved" if req.action == "approve" else "declined"
+    status_map = {"approve": "approved", "decline": "declined", "modify_and_continue": "processing"}
+    new_status = status_map.get(req.action, "processing")
     detail = f"Officer decision: {req.action}"
     if req.officer_notes:
         detail += f" — {req.officer_notes}"

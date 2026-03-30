@@ -245,8 +245,12 @@ async def run_and_stream(app_id: str, autonomy_level: str = "bounded"):
             yield f"data: {json.dumps({'type': 'complete', 'application_id': app_id})}\n\n"
 
         except Exception as e:
-            logger.error(f"Stream error for {app_id}: {e}")
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)[:500]})}\n\n"
+            # GraphInterrupt means HITL gate paused the pipeline
+            if GraphInterrupt is not None and isinstance(e, GraphInterrupt):
+                yield f"data: {json.dumps({'type': 'hitl_waiting', 'application_id': app_id})}\n\n"
+            else:
+                logger.error(f"Stream error for {app_id}: {e}")
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e)[:500]})}\n\n"
         finally:
             with _running_lock:
                 _running_apps.discard(app_id)
