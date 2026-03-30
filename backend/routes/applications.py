@@ -44,6 +44,25 @@ async def portfolio_stats():
     return result
 
 
+@router.get("/portfolio/ews")
+async def portfolio_ews(loan_id: str = None):
+    """Early Warning System signals from payment time-series analysis."""
+    from agents.tools import get_ews_signals
+    if not loan_id:
+        return []
+    result = await asyncio.to_thread(get_ews_signals, loan_id)
+    return result
+
+
+@router.get("/portfolio/events")
+async def portfolio_events(limit: int = 20):
+    """Recent loan events (payments, agent actions)."""
+    from agents.tools import get_recent_events
+    limit = min(max(limit, 1), 100)
+    result = await asyncio.to_thread(get_recent_events, limit)
+    return result
+
+
 @router.get("/portfolio/payments")
 async def portfolio_payments(loan_id: str = None):
     from agents.tools import get_payment_trends

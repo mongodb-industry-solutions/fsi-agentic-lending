@@ -114,17 +114,23 @@ function StatusDot({ status }) {
   );
 }
 
-function EWSPanel({ highlightAlert }) {
+function EWSPanel({ highlightAlert, signals }) {
+  const data = signals || EWS_SIGNALS;
   return (
     <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', animation: 'slideDown 0.3s ease-out' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12 }}>Early Warning System</div>
-        <span style={{ fontSize: 8, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' }}>
-          Time Series + $setWindowFields + Change Streams
-        </span>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <span style={{ fontSize: 8, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'var(--voyage-dim)', color: 'var(--voyage)' }}>
+            Time Series &middot; $setWindowFields
+          </span>
+          <span style={{ fontSize: 8, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' }}>
+            Change Streams
+          </span>
+        </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-        {EWS_SIGNALS.map((s) => {
+        {data.map((s) => {
           const isHighlighted = highlightAlert && (s.status === 'red' || s.status === 'amber');
           return (
             <div key={s.signal} style={{
@@ -242,11 +248,25 @@ function CrossLifecycleFeedback() {
   );
 }
 
-function LiveEventFeed({ sceneStep }) {
+function LiveEventFeed({ sceneStep, backendEvents }) {
   const [events, setEvents] = useState([]);
   const counterRef = useRef(0);
 
   useEffect(() => {
+    // If we have backend events, use them as initial seed
+    if (backendEvents && backendEvents.length > 0) {
+      const seeded = backendEvents.map((e, i) => ({
+        id: `be-${i}`,
+        type: e.type || 'payment',
+        icon: e.icon || '💰',
+        color: e.color || 'var(--text-secondary)',
+        text: e.message || '',
+        time: e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : '',
+      }));
+      setEvents(seeded.slice(0, 20));
+      return;
+    }
+
     const addEvent = () => {
       const templates = sceneStep >= 2
         ? EVENT_TEMPLATES
@@ -259,7 +279,7 @@ function LiveEventFeed({ sceneStep }) {
     addEvent(); addEvent(); addEvent();
     const interval = setInterval(addEvent, 1800);
     return () => clearInterval(interval);
-  }, [sceneStep]);
+  }, [sceneStep, backendEvents]);
 
   return (
     <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)' }}>
@@ -296,6 +316,8 @@ export default function ManagementScene({ sceneStep, currentStepData }) {
 
   const [liveStats, setLiveStats] = useState(null);
   const [liveMonthly, setLiveMonthly] = useState(null);
+  const [ewsSignals, setEwsSignals] = useState(EWS_SIGNALS);
+  const [liveEvents, setLiveEvents] = useState(null);
 
   useEffect(() => {
     if (sceneStep < 0) return;
@@ -325,6 +347,26 @@ export default function ManagementScene({ sceneStep, currentStepData }) {
         }
       } catch {
         // Keep fallback data on error
+      }
+
+      // Fetch EWS signals
+      try {
+        const ewsRes = await apiGet('/api/backend/portfolio/ews?loan_id=L-00001');
+        if (!cancelled && ewsRes && Array.isArray(ewsRes) && ewsRes.length > 0) {
+          setEwsSignals(ewsRes);
+        }
+      } catch {
+        // Keep fallback EWS data
+      }
+
+      // Fetch recent events
+      try {
+        const eventsRes = await apiGet('/api/backend/portfolio/events?limit=20');
+        if (!cancelled && eventsRes && Array.isArray(eventsRes) && eventsRes.length > 0) {
+          setLiveEvents(eventsRes);
+        }
+      } catch {
+        // Keep fallback events
       }
     }
 
@@ -378,11 +420,11 @@ export default function ManagementScene({ sceneStep, currentStepData }) {
               ).map((s) => <AnimatedStat key={s.label} stat={s} />)}
             </div>
 
-            {showEWS && <EWSPanel highlightAlert={showAlertHighlight} />}
+            {showEWS && <EWSPanel highlightAlert={showAlertHighlight} signals={ewsSignals} />}
             {showPSI && <PSIHealthIndicator />}
 
             <BarChart data={liveMonthly || DEFAULT_MONTHLY_DATA} label="Monthly Payment Volume ($M)" badge="Time Series &middot; $setWindowFields" />
-            <LiveEventFeed sceneStep={sceneStep} />
+            <LiveEventFeed sceneStep={sceneStep} backendEvents={liveEvents} />
 
             {showRenewalAgent && <RenewalInterventionCard sceneStep={sceneStep} />}
             {showCrossLifecycle && <CrossLifecycleFeedback />}
