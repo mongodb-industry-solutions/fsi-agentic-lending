@@ -44,17 +44,17 @@ async def get_hitl_context(app_id: str):
 @router.post("/hitl/{app_id}/decision")
 async def submit_hitl_decision(app_id: str, req: HITLDecisionRequest):
     """Submit officer decision (approve/decline). Resumes LangGraph from checkpoint."""
-    # Update application status
     new_status = "approved" if req.action == "approve" else "declined"
     detail = f"Officer decision: {req.action}"
     if req.officer_notes:
         detail += f" — {req.officer_notes}"
 
-    success = application_service.update_application_status(app_id, new_status, detail)
-    if not success:
+    # Verify application exists before proceeding
+    app = application_service.get_application(app_id)
+    if not app:
         raise HTTPException(status_code=404, detail="Application not found")
 
-    # Resume LangGraph from checkpoint
+    # Resume LangGraph from checkpoint first
     try:
         graph = get_graph()
         graph.invoke(
@@ -62,7 +62,9 @@ async def submit_hitl_decision(app_id: str, req: HITLDecisionRequest):
             config={"configurable": {"thread_id": app_id}},
         )
     except Exception as e:
-        # Log but don't fail the response — status is already updated
         logging.getLogger(__name__).warning(f"LangGraph resume failed: {e}")
+
+    # Then update status (graph's hitl_gate already updates status, but this is a safety net)
+    application_service.update_application_status(app_id, new_status, detail)
 
     return {"application_id": app_id, "status": new_status, "detail": detail}

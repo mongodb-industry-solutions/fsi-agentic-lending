@@ -1,10 +1,10 @@
 """LangGraph workflow assembly with MongoDBSaver checkpointing."""
-import os
+import threading
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.mongodb import MongoDBSaver
 from langgraph.types import interrupt, Command
-from pymongo import MongoClient
 
+from db.mdb import get_db
 from agents.state import LendFlowState
 from agents.supervisor import supervisor_node, route_from_supervisor
 from agents.loan_app_agent import loan_app_node
@@ -59,12 +59,11 @@ def completion_node(state: LendFlowState) -> dict:
     return {"current_agent": "complete"}
 
 
-def build_graph(mongodb_uri: str = None, database_name: str = None):
+def build_graph():
     """Build and compile the LendFlow agent graph with MongoDBSaver."""
-    uri = mongodb_uri or os.getenv("MONGODB_URI")
-    db_name = database_name or os.getenv("DATABASE_NAME", "lendflow")
-
-    client = MongoClient(uri)
+    db = get_db()
+    client = db.client  # Reuse the singleton's MongoClient
+    db_name = db.name
     checkpointer = MongoDBSaver(client, db_name=db_name)
 
     # Build the state graph
@@ -93,10 +92,13 @@ def build_graph(mongodb_uri: str = None, database_name: str = None):
 
 # Singleton graph instance
 _graph = None
+_graph_lock = threading.Lock()
 
 def get_graph():
-    """Get or create the singleton graph instance."""
+    """Get or create the singleton graph instance (thread-safe)."""
     global _graph
     if _graph is None:
-        _graph = build_graph()
+        with _graph_lock:
+            if _graph is None:
+                _graph = build_graph()
     return _graph

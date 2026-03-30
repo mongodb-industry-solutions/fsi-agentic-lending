@@ -70,6 +70,8 @@ def search_policies(query: str, limit: int = 5) -> list[dict]:
         return results
     except Exception as e:
         # Fallback if vector search index not ready
+        import logging
+        logging.getLogger(__name__).warning(f"Vector search failed, falling back to scan: {e}")
         results = list(db["underwriting_policies"].find({}, {"_id": 0, "policy_id": 1, "title": 1, "content": 1}).limit(limit))
         return results
 

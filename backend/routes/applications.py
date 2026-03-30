@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from models.schemas import ApplicationCreateRequest
 from services import application_service
-from db.mdb import MongoDBConnector
+from db.mdb import get_db
 
 router = APIRouter(tags=["applications"])
 
@@ -37,15 +37,16 @@ async def stream_activity(app_id: str):
     """SSE endpoint — streams agent activity via MongoDB Change Stream."""
 
     async def event_generator():
-        db = MongoDBConnector().db
-        # Watch agent_activity collection for this application
+        db = get_db()
+        yield f"data: {json.dumps({'type': 'connected', 'application_id': app_id})}\n\n"
+
         pipeline = [{"$match": {"fullDocument.application_id": app_id}}]
+        stream = db["agent_activity"].watch(pipeline, full_document="updateLookup")
 
         try:
-            with db["agent_activity"].watch(pipeline, full_document="updateLookup") as stream:
-                yield f"data: {json.dumps({'type': 'connected', 'application_id': app_id})}\n\n"
-
-                for change in stream:
+            while True:
+                change = await asyncio.to_thread(stream.try_next)
+                if change:
                     doc = change.get("fullDocument", {})
                     event = {
                         "type": "activity",
@@ -57,8 +58,14 @@ async def stream_activity(app_id: str):
                         else str(doc.get("timestamp", "")),
                     }
                     yield f"data: {json.dumps(event)}\n\n"
+                else:
+                    await asyncio.sleep(0.5)
+        except asyncio.CancelledError:
+            pass
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        finally:
+            stream.close()
 
     return StreamingResponse(
         event_generator(),
@@ -76,7 +83,15 @@ async def stream_status(app_id: str):
     """SSE endpoint — streams application status changes via Change Stream."""
 
     async def event_generator():
-        db = MongoDBConnector().db
+        db = get_db()
+
+        # Send current status first
+        app = await asyncio.to_thread(
+            db["applications"].find_one, {"application_id": app_id}
+        )
+        if app:
+            yield f"data: {json.dumps({'type': 'status', 'status': app.get('status', 'unknown')})}\n\n"
+
         pipeline = [
             {
                 "$match": {
@@ -85,15 +100,12 @@ async def stream_status(app_id: str):
                 }
             }
         ]
+        stream = db["applications"].watch(pipeline, full_document="updateLookup")
 
         try:
-            # Send current status first
-            app = db["applications"].find_one({"application_id": app_id})
-            if app:
-                yield f"data: {json.dumps({'type': 'status', 'status': app.get('status', 'unknown')})}\n\n"
-
-            with db["applications"].watch(pipeline, full_document="updateLookup") as stream:
-                for change in stream:
+            while True:
+                change = await asyncio.to_thread(stream.try_next)
+                if change:
                     doc = change.get("fullDocument", {})
                     event = {
                         "type": "status",
@@ -103,8 +115,14 @@ async def stream_status(app_id: str):
                         else "",
                     }
                     yield f"data: {json.dumps(event)}\n\n"
+                else:
+                    await asyncio.sleep(0.5)
+        except asyncio.CancelledError:
+            pass
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        finally:
+            stream.close()
 
     return StreamingResponse(
         event_generator(),

@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from db.mdb import get_db as _get_db
 from services import application_service
 from agents.graph import get_graph
+from agents.tools import log_agent_activity, update_application_status
 
 router = APIRouter(tags=["agent"])
 
@@ -53,7 +54,14 @@ async def run_agent(app_id: str):
             }
             graph.invoke(initial_state, config={"configurable": {"thread_id": app_id}})
         except Exception as e:
-            logging.getLogger(__name__).error(f"Agent pipeline failed for {app_id}: {e}")
+            error_msg = str(e)
+            if "interrupt" in error_msg.lower() or "GraphInterrupt" in type(e).__name__:
+                logging.getLogger(__name__).info(f"Agent pipeline paused for HITL review: {app_id}")
+                log_agent_activity(app_id, "supervisor", "hitl_waiting", "Pipeline paused — awaiting officer decision")
+            else:
+                logging.getLogger(__name__).error(f"Agent pipeline failed for {app_id}: {e}")
+                update_application_status(app_id, "error", f"Pipeline failed: {error_msg[:200]}")
+                log_agent_activity(app_id, "supervisor", "pipeline_complete", f"Pipeline error: {e}")
 
     thread = threading.Thread(target=_run_graph, args=(app_id,), daemon=True)
     thread.start()
@@ -86,9 +94,12 @@ async def stream_agent(app_id: str):
 
         # Stream from agent_activity Change Stream
         pipeline = [{"$match": {"fullDocument.application_id": app_id}}]
+        stream = db["agent_activity"].watch(pipeline, full_document="updateLookup")
+
         try:
-            with db["agent_activity"].watch(pipeline, full_document="updateLookup") as stream:
-                for change in stream:
+            while True:
+                change = await asyncio.to_thread(stream.try_next)
+                if change:
                     doc = change.get("fullDocument", {})
                     event = {
                         "type": "agent_step",
@@ -106,8 +117,14 @@ async def stream_agent(app_id: str):
                     if doc.get("action") == "pipeline_complete":
                         yield f"data: {json.dumps({'type': 'complete', 'application_id': app_id})}\n\n"
                         break
+                else:
+                    await asyncio.sleep(0.5)
+        except asyncio.CancelledError:
+            pass
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        finally:
+            stream.close()
 
     return StreamingResponse(
         event_generator(),

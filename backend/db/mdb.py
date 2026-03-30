@@ -1,4 +1,5 @@
 import os
+import threading
 from pymongo import MongoClient
 from dotenv import load_dotenv
 
@@ -75,10 +76,13 @@ class MongoDBConnector:
 
 # Module-level singleton
 _instance = None
+_lock = threading.Lock()
 
 def get_db():
-    """Get the singleton database instance."""
+    """Get the singleton database instance (thread-safe)."""
     global _instance
     if _instance is None:
-        _instance = MongoDBConnector()
+        with _lock:
+            if _instance is None:
+                _instance = MongoDBConnector()
     return _instance.db

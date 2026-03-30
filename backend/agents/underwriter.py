@@ -2,6 +2,7 @@
 from agents.state import LendFlowState
 from agents.tools import (
     get_application_summary,
+    get_credit_reports,
     search_policies,
     log_agent_activity,
     update_application_status,
@@ -31,17 +32,36 @@ def underwriter_node(state: LendFlowState) -> dict:
     log_agent_activity(app_id, "underwriter", "policy_match", f"Found {len(policies)} relevant policies")
 
     # Calculate GDS/TDS ratios
-    # Estimated monthly costs
     monthly_income = combined_income / 12
-    estimated_mortgage_payment = 4092  # Pre-calculated for $700K at 4.89%
-    property_tax_monthly = 568  # $6,815/yr
-    heating_estimate = 250  # Standard estimate
-    car_loan = 482
-    condo_mortgage = 1289  # Existing property
-    credit_card_min = 55  # ~3% of $1,842
+
+    # Calculate mortgage payment from loan amount and rate
+    annual_rate = 0.0489  # Current rate for 5yr Fixed
+    monthly_rate = annual_rate / 12
+    n_payments = 25 * 12  # 25yr amortization
+    estimated_mortgage_payment = round(
+        (loan_amount * monthly_rate * (1 + monthly_rate)**n_payments)
+        / ((1 + monthly_rate)**n_payments - 1)
+    )
+
+    # Property costs from application data
+    property_tax_monthly = round(app.get("property", {}).get("annual_tax", 6815) / 12)
+    heating_estimate = 250  # Standard heating estimate for Calgary
+
+    # Existing debts from credit reports (fetch structured data)
+    credit_reports = get_credit_reports(app_id)
+    existing_debt_payments = 0
+    for report in credit_reports:
+        for account in report.get("accounts", []):
+            payment = account.get("monthly_payment", 0)
+            if isinstance(payment, (int, float)):
+                existing_debt_payments += payment
+
+    # If no structured debt data, use a conservative estimate
+    if existing_debt_payments == 0:
+        existing_debt_payments = 1826  # $482 car + $1289 condo mortgage + $55 credit card
 
     gds = (estimated_mortgage_payment + property_tax_monthly + heating_estimate) / monthly_income
-    tds = (estimated_mortgage_payment + property_tax_monthly + heating_estimate + car_loan + condo_mortgage + credit_card_min) / monthly_income
+    tds = (estimated_mortgage_payment + property_tax_monthly + heating_estimate + existing_debt_payments) / monthly_income
 
     log_agent_activity(app_id, "underwriter", "ratio_calc", f"GDS: {gds:.1%}, TDS: {tds:.1%}")
 
@@ -96,12 +116,35 @@ Risk Tier: {risk_tier}
 
     analysis = llm.predict_with_system(analysis_input, prompt)
 
-    # Decision: always escalate for $875K property (per policy §3.1.4)
-    decision = "escalate"
-    decision_reasoning = f"Property value ${purchase_price:,.0f} exceeds $500K threshold — officer review required per policy §3.1.4. GDS {gds:.1%}, TDS {tds:.1%}, Risk Score {risk_score}/100 ({risk_tier})."
+    # Decision logic based on ratios and risk
+    if risk_score > 80 or risk_tier == "D":
+        decision = "decline"
+        decision_reasoning = f"Risk score {risk_score}/100 ({risk_tier}) exceeds acceptable threshold."
+    elif purchase_price > 500000 or gds > 0.36 or tds > 0.41 or risk_tier in ("B", "C"):
+        decision = "escalate"
+        decision_reasoning = "Officer review required: "
+        reasons = []
+        if purchase_price > 500000:
+            reasons.append(f"property value ${purchase_price:,.0f} exceeds $500K threshold (policy \u00a73.1.4)")
+        if gds > 0.36:
+            reasons.append(f"GDS {gds:.1%} approaching 39% limit")
+        if tds > 0.41:
+            reasons.append(f"TDS {tds:.1%} approaching 44% limit")
+        if risk_tier in ("B", "C"):
+            reasons.append(f"risk tier {risk_tier} requires review")
+        decision_reasoning += "; ".join(reasons) + "."
+    else:
+        decision = "approve"
+        decision_reasoning = f"Auto-approved: GDS {gds:.1%}, TDS {tds:.1%}, Risk {risk_score}/100 ({risk_tier})."
 
     log_agent_activity(app_id, "underwriter", "decision", decision_reasoning)
-    update_application_status(app_id, "review", "Escalated to officer review — property exceeds $500K threshold")
+
+    if decision == "escalate":
+        update_application_status(app_id, "review", f"Escalated to officer review — {decision_reasoning}")
+    elif decision == "decline":
+        update_application_status(app_id, "declined", decision_reasoning)
+    else:
+        update_application_status(app_id, "approved", decision_reasoning)
 
     return {
         "gds_ratio": round(gds, 4),

@@ -63,6 +63,6 @@ Based on the application data and policies, calculate:
 5. Risk tier (A/B+/B/C/D)
 6. Decision: "approve" (auto-approve), "escalate" (needs officer review), or "decline"
 
-For this application with property value $875,000, always escalate to officer review per policy §3.1.4.
+Apply the officer review triggers per policy §3.1.4. Use the actual property value and ratios to determine if auto-approve, escalate, or decline.
 
 Provide your analysis as structured reasoning."""
