@@ -143,6 +143,29 @@ class BedrockAnthropicChatCompletions(BedrockClient):
         model_response = json.loads(response["body"].read())
         return model_response["content"][0]["text"]
 
+    @traceable(name="bedrock_converse_with_tools")
+    def converse_with_tools(self, messages, system_prompt, tools, max_retries=3):
+        """Bedrock Converse API with tool definitions for structured output."""
+        for attempt in range(max_retries):
+            try:
+                response = self.bedrock_client.converse(
+                    modelId=self.model_id,
+                    system=[{"text": system_prompt}],
+                    messages=messages,
+                    toolConfig={"tools": tools},
+                    inferenceConfig={"maxTokens": self.max_tokens, "temperature": self.temperature},
+                )
+                return response
+            except ClientError as e:
+                error_code = e.response.get('Error', {}).get('Code', '')
+                if error_code in ('ThrottlingException', 'ServiceUnavailableException', 'ModelTimeoutException') and attempt < max_retries - 1:
+                    wait = 2 ** attempt
+                    self.log.warning(f"Bedrock converse throttled, retrying in {wait}s (attempt {attempt + 1})")
+                    time.sleep(wait)
+                    continue
+                raise RuntimeError(f"Bedrock converse failed after {attempt + 1} attempts: {e}") from e
+        raise RuntimeError("Bedrock converse failed after retries")
+
     @traceable(name="bedrock_predict_messages")
     def predict_messages(self, messages: list, system_prompt: str = None) -> str:
         """Generate response from a full message history.

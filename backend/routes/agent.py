@@ -124,6 +124,8 @@ async def stream_agent(app_id: str):
 
         yield f"data: {json.dumps({'type': 'connected', 'application_id': app_id})}\n\n"
 
+        heartbeat_counter = 0
+
         # Stream from agent_activity Change Stream
         pipeline = [{"$match": {"fullDocument.application_id": app_id}}]
         stream = db["agent_activity"].watch(pipeline, full_document="updateLookup")
@@ -151,6 +153,9 @@ async def stream_agent(app_id: str):
                         break
                 else:
                     await asyncio.sleep(0.5)
+                    heartbeat_counter += 1
+                    if heartbeat_counter % 30 == 0:  # Every 15 seconds (30 * 0.5s)
+                        yield ": heartbeat\n\n"
         except asyncio.CancelledError:
             pass
         except Exception as e:
@@ -217,11 +222,6 @@ async def run_and_stream(app_id: str, autonomy_level: str = "bounded"):
                         if isinstance(v, (str, int, float, bool, list)) or v is None:
                             safe_output[k] = v
                     yield f"data: {json.dumps({'type': 'node_complete', 'agent': name, 'output': safe_output})}\n\n"
-
-                    # Check for HITL interrupt
-                    if name == "hitl_gate" and output and output.get("decision") is None:
-                        yield f"data: {json.dumps({'type': 'hitl_waiting', 'application_id': app_id})}\n\n"
-                        break  # Stream ends; client reconnects after officer decision
 
             yield f"data: {json.dumps({'type': 'complete', 'application_id': app_id})}\n\n"
 

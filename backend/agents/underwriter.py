@@ -11,7 +11,23 @@ from agents.tools import (
     update_application_status,
 )
 from agents.prompts import UNDERWRITER_PROMPT
+from agents.tool_schemas import UNDERWRITING_ANALYSIS_TOOL
 from bedrock.anthropic_chat_completions import BedrockAnthropicChatCompletions
+
+try:
+    from langsmith import traceable
+except ImportError:
+    def traceable(**kwargs):
+        def decorator(fn): return fn
+        return decorator
+
+_llm = None
+
+def _get_llm():
+    global _llm
+    if _llm is None:
+        _llm = BedrockAnthropicChatCompletions()
+    return _llm
 
 DECLINE_RISK_SCORE = int(os.getenv("DECLINE_RISK_SCORE", "80"))
 ESCALATE_PURCHASE_PRICE = int(os.getenv("ESCALATE_PURCHASE_PRICE", "500000"))
@@ -19,6 +35,7 @@ ESCALATE_GDS = float(os.getenv("ESCALATE_GDS", "0.36"))
 ESCALATE_TDS = float(os.getenv("ESCALATE_TDS", "0.41"))
 
 
+@traceable(name="underwriter_node")
 def underwriter_node(state: LendFlowState) -> dict:
     """Assess risk and make underwriting decision."""
     app_id = state["application_id"]
@@ -165,7 +182,7 @@ def underwriter_node(state: LendFlowState) -> dict:
     log_agent_activity(app_id, "underwriter", "risk_score", f"Score: {risk_score}/100, Tier: {risk_tier}")
 
     # Use LLM for detailed analysis
-    llm = BedrockAnthropicChatCompletions()
+    llm = _get_llm()
     prompt = UNDERWRITER_PROMPT.format(
         application_id=app_id,
         primary_credit_score=primary_score,
@@ -187,7 +204,34 @@ Risk Score: {risk_score}/100
 Risk Tier: {risk_tier}
 """
 
-    analysis = llm.predict_with_system(analysis_input, prompt)
+    try:
+        response = llm.converse_with_tools(
+            messages=[{"role": "user", "content": [{"text": analysis_input}]}],
+            system_prompt=prompt,
+            tools=[UNDERWRITING_ANALYSIS_TOOL],
+        )
+
+        # Parse tool_use response
+        content = response.get("output", {}).get("message", {}).get("content", [])
+        tool_use = next((block for block in content if "toolUse" in block), None)
+
+        if tool_use:
+            structured_analysis = tool_use["toolUse"]["input"]
+            analysis = structured_analysis.get("narrative_summary", "")
+            log_agent_activity(app_id, "underwriter", "structured_analysis",
+                f"Confidence: {structured_analysis.get('confidence', 'N/A')}, "
+                f"Risk factors: {len(structured_analysis.get('risk_factors', []))}, "
+                f"Mitigating: {len(structured_analysis.get('mitigating_factors', []))}")
+        else:
+            # Fallback: extract text response
+            text_block = next((block for block in content if "text" in block), None)
+            analysis = text_block.get("text", "") if text_block else ""
+            structured_analysis = None
+
+    except RuntimeError as e:
+        log_agent_activity(app_id, "underwriter", "llm_error", str(e)[:500])
+        analysis = f"LLM analysis unavailable: {str(e)[:200]}"
+        structured_analysis = None
 
     # Early decline if OSFI B-20 stress test failed
     if not stress_test_passed:
@@ -203,6 +247,7 @@ Risk Tier: {risk_tier}
             "policy_citations": [p.get("policy_id", "") for p in policies],
             "decision": decision,
             "decision_reasoning": decision_reasoning,
+            "structured_analysis": structured_analysis,
             "messages": [{"role": "assistant", "content": analysis}],
         }
 
@@ -247,5 +292,6 @@ Risk Tier: {risk_tier}
         "stress_gds": round(stress_gds, 4),
         "stress_tds": round(stress_tds, 4),
         "stress_rate": round(stress_rate, 4),
+        "structured_analysis": structured_analysis,
         "messages": [{"role": "assistant", "content": analysis}],
     }

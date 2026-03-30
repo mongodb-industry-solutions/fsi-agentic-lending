@@ -10,7 +10,23 @@ from agents.tools import (
 from agents.prompts import LOAN_APP_AGENT_PROMPT
 from bedrock.anthropic_chat_completions import BedrockAnthropicChatCompletions
 
+try:
+    from langsmith import traceable
+except ImportError:
+    def traceable(**kwargs):
+        def decorator(fn): return fn
+        return decorator
 
+_llm = None
+
+def _get_llm():
+    global _llm
+    if _llm is None:
+        _llm = BedrockAnthropicChatCompletions()
+    return _llm
+
+
+@traceable(name="loan_app_node")
 def loan_app_node(state: LendFlowState) -> dict:
     """Process loan application documents and verify borrower information."""
     app_id = state["application_id"]
@@ -39,7 +55,7 @@ def loan_app_node(state: LendFlowState) -> dict:
     app_summary = get_application_summary(app_id)
 
     # Use Bedrock to analyze documents
-    llm = BedrockAnthropicChatCompletions()
+    llm = _get_llm()
 
     doc_summary_text = "\n".join([
         f"- {d['doc_type']}: {d.get('extracted_text', 'No text')[:200]}..."
@@ -52,8 +68,9 @@ def loan_app_node(state: LendFlowState) -> dict:
         credit_pulled=credit_pulled,
     )
 
+    credit_repr = str(credit_reports)[:2000]
     analysis = llm.predict_with_system(
-        f"Application summary: {app_summary}\n\nDocuments:\n{doc_summary_text}\n\nCredit reports: {credit_reports}",
+        f"Application summary: {app_summary}\n\nDocuments:\n{doc_summary_text}\n\nCredit reports: {credit_repr}",
         prompt,
     )
 
