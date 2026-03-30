@@ -10,10 +10,10 @@ export const CAPABILITIES = [
     description:
       "Store loan applications, extracted document fields, embeddings, and validation results in a single flexible document. No rigid table schemas, no JOIN sprawl, no ETL. Schema flexibility for evolving data sources.",
     code: `db.loanApplications.insertOne({
-  _id: "APP-2025-78342",
-  borrower: { name: "Sarah Chen", income: 142000 },
+  _id: "APP-2026-00001",
+  borrower: { name: "Marcus Delgado", income: 222700 },
   documents: [
-    { type: "W-2", status: "verified", embeddingId: "emb_..." }
+    { type: "CRA_NOA", status: "verified", embeddingId: "emb_..." }
   ],
   riskScore: 72,
   status: "underwriting"
@@ -94,11 +94,11 @@ changeStream.on("change", (event) => {
     description:
       "Columnar storage with automatic bucketing, purpose-built for payment histories and credit score trends. Combined with $setWindowFields for rolling delinquency rates.",
     code: `db.payments.insertOne({
-  metadata: { loanId: "L-78342", borrowerId: "B-...", productType: "30yr" },
-  amount: 1870,
-  principal: 1200,
-  interest: 670,
-  outstandingBalance: 282000,
+  metadata: { loanId: "L-00001", borrowerId: "B-...", productType: "5yr_fixed" },
+  amount: 4092,
+  principal: 1240,
+  interest: 2852,
+  outstandingBalance: 698760,
   daysLate: 0,
   timestamp: new Date()
 })`,

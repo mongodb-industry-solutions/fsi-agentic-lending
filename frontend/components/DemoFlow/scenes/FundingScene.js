@@ -11,59 +11,59 @@ import PipelineTimeline from '../PipelineTimeline';
 const TIMELINE_EVENTS = [
   { icon: '📡', label: 'Change Stream fires', detail: 'watch() detects status → "approved"', status: 'active', feature: 'Change Streams' },
   { icon: '⚡', label: 'Funding workflow initiated', detail: 'Event-driven automation starts', status: 'active', feature: 'Change Streams' },
-  { icon: '💰', label: 'Ledger entry created', detail: '$285,000 disbursed to borrower', status: 'funded', feature: 'Document Model' },
+  { icon: '💰', label: 'Ledger entry created', detail: '$700,000 disbursed to borrower', status: 'funded', feature: 'Document Model' },
   { icon: '✅', label: 'Loan activated', detail: 'Live financial object in MongoDB', status: 'active', feature: 'Document Model' },
 ];
 
 const ACCOUNTING = [
-  { entry: 'Loan Disbursement', debit: '$285,000.00', credit: '—', balance: '$285,000.00', type: 'debit' },
-  { entry: 'Escrow Reserve', debit: '$4,275.00', credit: '—', balance: '$289,275.00', type: 'debit' },
-  { entry: 'Origination Fee', debit: '—', credit: '$2,850.00', balance: '$286,425.00', type: 'credit' },
+  { entry: 'Loan Disbursement', debit: '$700,000.00', credit: '—', balance: '$700,000.00', type: 'debit' },
+  { entry: 'Escrow Reserve', debit: '$10,500.00', credit: '—', balance: '$710,500.00', type: 'debit' },
+  { entry: 'Origination Fee', debit: '—', credit: '$7,000.00', balance: '$703,500.00', type: 'credit' },
 ];
 
 const DOC_STAGES = [
   {
     label: 'Origination',
     color: 'var(--agent-cyan)',
-    fields: `"applicationId": "APP-2025-78342",
+    fields: `"applicationId": "APP-2026-00001",
 "applicant": {
-  "name": "Sarah M. Chen",
-  "income": 142380.00,
-  "fico": 742
+  "name": "Marcus & Sofia Delgado",
+  "combinedIncome": 222700.00,
+  "equifax": 784
 },
-"documents": [{ "type": "W-2", "verified": true }]`,
+"documents": [{ "type": "CRA_NOA", "verified": true }]`,
   },
   {
     label: 'Decisioning',
     color: 'var(--tool-blue)',
     fields: `"riskScore": 72,
 "riskTier": "B+",
-"rate": 6.875,
+"rate": 4.89,
 "fraudScan": "CLEAR",
-"policyMatch": "30yr_fixed_standard"`,
+"policyMatch": "5yr_fixed_standard"`,
   },
   {
     label: 'Approval',
     color: 'var(--hitl-amber)',
     fields: `"decision": "APPROVED",
 "terms": {
-  "type": "30-Year Fixed",
-  "apr": 6.875,
-  "monthlyPayment": 1870
+  "type": "5yr Fixed (25yr Amort)",
+  "apr": 4.89,
+  "monthlyPayment": 4092
 },
-"disclosures": ["TILA", "RESPA", "CFPB"]`,
+"disclosures": ["OSFI_B20", "FCAC", "PIPEDA"]`,
   },
   {
     label: 'Funding',
     color: 'var(--mongo)',
     fields: `"disbursement": {
-  "amount": 285000.00,
-  "date": "2025-01-28",
-  "method": "ACH"
+  "amount": 700000.00,
+  "date": "2026-03-30",
+  "method": "EFT"
 },
 "balance": {
-  "outstanding": 285000.00,
-  "escrow": 4275.00
+  "outstanding": 700000.00,
+  "escrow": 10500.00
 },
 "status": "active"`,
   },

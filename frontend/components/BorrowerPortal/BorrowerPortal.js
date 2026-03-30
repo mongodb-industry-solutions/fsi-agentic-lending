@@ -21,8 +21,8 @@ const STAGE_TOAST_CONFIG = {
   'credit': { type: 'info', icon: '📋', title: 'Credit Discrepancies Found', message: 'AI is investigating 2 discrepancies in your credit and income records.' },
   'underwriting': { type: 'info', icon: '📊', title: 'Score Correction Applied', message: 'AI corrected a misclassified debt payment. Your score improved from 68 to 72.' },
   'decision': { type: 'success', icon: '✅', title: 'Decision Ready', message: 'Underwriting complete with 5 AI interventions. Moving to officer review.' },
-  'approved': { type: 'success', icon: '🎉', title: 'Loan Approved', message: 'Congratulations! Your loan has been approved at 6.875% APR.' },
-  'active': { type: 'success', icon: '🏠', title: 'Loan Active', message: 'Your loan is now active. First payment due March 1, 2025.' },
+  'approved': { type: 'success', icon: '🎉', title: 'Mortgage Approved', message: 'Congratulations! Your mortgage has been approved at 4.89% APR.' },
+  'active': { type: 'success', icon: '🏠', title: 'Mortgage Active', message: 'Your mortgage is now active. First payment due May 1, 2026.' },
 };
 
 export default function BorrowerPortal() {

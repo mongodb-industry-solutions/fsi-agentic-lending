@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Interactive sliders: FICO (600-850), DTI (0.20-0.50).
+ * Interactive sliders: Equifax (600-850), GDS (0.20-0.50).
  * Risk score, tier, rate and decision update locally to show what Aggregation + Vector Search enable.
  */
 import { useState, useMemo } from 'react';
@@ -16,13 +16,13 @@ function scoreToTier(score) {
 }
 
 function tierToRate(tier) {
-  const rates = { A: 5.75, 'A-': 6.0, B: 6.875, 'B+': 6.875, 'C+': 7.5, C: 8.25 };
-  return rates[tier] ?? 6.875;
+  const rates = { A: 3.99, 'A-': 4.29, B: 4.89, 'B+': 4.89, 'C+': 5.49, C: 6.29 };
+  return rates[tier] ?? 4.89;
 }
 
 export default function WhatIfSliders() {
-  const [fico, setFico] = useState(742);
-  const [dti, setDti] = useState(0.31);
+  const [fico, setFico] = useState(784);
+  const [dti, setDti] = useState(0.312);
 
   const { score, tier, rate, decision } = useMemo(() => {
     // Simple formula: base 50, FICO contributes ~0.05 per point above 600, DTI penalizes
@@ -44,11 +44,11 @@ export default function WhatIfSliders() {
   return (
     <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', fontSize: 12, color: 'var(--text-secondary)' }}>
       <div style={{ fontWeight: 700, marginBottom: 10 }}>Decision factors</div>
-      <div style={{ marginBottom: 8 }}>Income Stability +42 · Credit History +35 · DTI +28 · Payment Regularity +22 · Credit Utilization −12 · Hard Inquiries −8 · Cash Reserves +15</div>
+      <div style={{ marginBottom: 8 }}>Income Stability +42 · Credit History +35 · GDS +28 · Payment Regularity +22 · Credit Utilization −12 · Hard Inquiries −8 · Cash Reserves +15</div>
 
       <div style={{ marginTop: 16, marginBottom: 12, fontWeight: 600, color: 'var(--text-primary)' }}>What-if</div>
       <div style={{ marginBottom: 12 }}>
-        <label style={{ display: 'block', marginBottom: 4, fontSize: 11 }}>FICO: {fico}</label>
+        <label style={{ display: 'block', marginBottom: 4, fontSize: 11 }}>Equifax: {fico}</label>
         <input
           type="range"
           min={600}
@@ -59,7 +59,7 @@ export default function WhatIfSliders() {
         />
       </div>
       <div style={{ marginBottom: 12 }}>
-        <label style={{ display: 'block', marginBottom: 4, fontSize: 11 }}>DTI: {(dti * 100).toFixed(0)}%</label>
+        <label style={{ display: 'block', marginBottom: 4, fontSize: 11 }}>GDS: {(dti * 100).toFixed(0)}%</label>
         <input
           type="range"
           min={20}
