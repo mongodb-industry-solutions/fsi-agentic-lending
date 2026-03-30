@@ -10,8 +10,6 @@ import InfoWizardPanel from "../components/educational/InfoWizardPanel";
 export default function Home() {
   const [activeScreen, setActiveScreen] = useState("borrower");
   const [infoWizardOpen, setInfoWizardOpen] = useState(false);
-  const [infoScrollTo, setInfoScrollTo] = useState(null);
-
   const [theme, setTheme] = useState(() => {
     if (typeof document === 'undefined') return 'light';
     return document.documentElement.getAttribute('data-theme') || 'light';
@@ -49,9 +47,8 @@ export default function Home() {
       </main>
       <InfoWizardPanel
         isOpen={infoWizardOpen}
-        onClose={() => { setInfoWizardOpen(false); setInfoScrollTo(null); }}
+        onClose={() => setInfoWizardOpen(false)}
         activeScreen={activeScreen}
-        scrollToSection={infoScrollTo}
       />
     </>
   );

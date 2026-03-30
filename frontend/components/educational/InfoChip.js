@@ -2,23 +2,16 @@
 
 import { useState } from 'react';
 import { CAPABILITIES } from '../../lib/data/capabilities';
-
-const colorMap = {
-  mongo: { accent: 'var(--mongo)', dim: 'var(--mongo-dim)' },
-  voyage: { accent: 'var(--voyage)', dim: 'var(--voyage-dim)' },
-  'agent-cyan': { accent: 'var(--agent-cyan)', dim: 'var(--agent-cyan-dim)' },
-  'tool-blue': { accent: 'var(--tool-blue)', dim: 'var(--tool-blue-dim)' },
-  'hitl-amber': { accent: 'var(--hitl-amber)', dim: 'var(--hitl-amber-dim)' },
-  danger: { accent: 'var(--danger)', dim: 'var(--danger-dim)' },
-  success: { accent: 'var(--success)', dim: 'var(--success-dim)' },
-};
+import { colorMap as rawColorMap, dimMap as rawDimMap } from '../../lib/data/colorMaps';
 
 export default function InfoChip({ capabilityId, children, label }) {
   const [expanded, setExpanded] = useState(false);
   const cap = CAPABILITIES.find((c) => c.id === capabilityId);
   if (!cap) return null;
 
-  const colors = colorMap[cap.colorVar] || colorMap.mongo;
+  const accent = rawColorMap[cap.colorVar] || rawColorMap.mongo;
+  const dim = rawDimMap[cap.colorVar] || rawDimMap.mongo;
+  const colors = { accent, dim };
   const displayLabel = label || cap.label;
   const content = children || cap.oneLiner;
   const contentId = `infochip-${capabilityId}`;

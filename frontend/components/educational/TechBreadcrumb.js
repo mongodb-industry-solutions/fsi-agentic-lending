@@ -1,26 +1,7 @@
 "use client";
 
 import { CAPABILITIES } from '../../lib/data/capabilities';
-
-const colorMap = {
-  mongo: 'var(--mongo)',
-  voyage: 'var(--voyage)',
-  'agent-cyan': 'var(--agent-cyan)',
-  'tool-blue': 'var(--tool-blue)',
-  'hitl-amber': 'var(--hitl-amber)',
-  danger: 'var(--danger)',
-  success: 'var(--success)',
-};
-
-const dimMap = {
-  mongo: 'var(--mongo-dim)',
-  voyage: 'var(--voyage-dim)',
-  'agent-cyan': 'var(--agent-cyan-dim)',
-  'tool-blue': 'var(--tool-blue-dim)',
-  'hitl-amber': 'var(--hitl-amber-dim)',
-  danger: 'var(--danger-dim)',
-  success: 'var(--success-dim)',
-};
+import { colorMap, dimMap } from '../../lib/data/colorMaps';
 
 export default function TechBreadcrumb({ activatedCapabilities = [] }) {
   const activeSet = new Set(activatedCapabilities);

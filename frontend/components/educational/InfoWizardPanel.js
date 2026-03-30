@@ -6,26 +6,7 @@ import { architectureContent } from '../../lib/data/narrativeContent';
 import InsightCard from '../insights/InsightCard';
 import CodeSnippet from '../CodeSnippet/CodeSnippet';
 import { useEducationalContext } from './useEducationalContext';
-
-const colorMap = {
-  mongo: 'var(--mongo)',
-  voyage: 'var(--voyage)',
-  'agent-cyan': 'var(--agent-cyan)',
-  'tool-blue': 'var(--tool-blue)',
-  'hitl-amber': 'var(--hitl-amber)',
-  danger: 'var(--danger)',
-  success: 'var(--success)',
-};
-
-const dimMap = {
-  mongo: 'var(--mongo-dim)',
-  voyage: 'var(--voyage-dim)',
-  'agent-cyan': 'var(--agent-cyan-dim)',
-  'tool-blue': 'var(--tool-blue-dim)',
-  'hitl-amber': 'var(--hitl-amber-dim)',
-  danger: 'var(--danger-dim)',
-  success: 'var(--success-dim)',
-};
+import { colorMap, dimMap } from '../../lib/data/colorMaps';
 
 const screenTitles = {
   borrower: 'Borrower Portal — Technology Reference',
@@ -244,6 +225,30 @@ export default function InfoWizardPanel({ isOpen, onClose, activeScreen = 'demo'
       return () => document.removeEventListener('keydown', handleKeyDown);
     }
   }, [isOpen, handleKeyDown]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    const trap = (e) => {
+      if (e.key !== 'Tab') return;
+      const focusable = panel.querySelectorAll(
+        'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    panel.addEventListener('keydown', trap);
+    return () => panel.removeEventListener('keydown', trap);
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen && scrollToSection && panelRef.current) {

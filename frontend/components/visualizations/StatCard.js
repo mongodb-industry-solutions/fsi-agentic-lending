@@ -13,8 +13,7 @@ export default function StatCard({ label, value, suffix = '', color = 'var(--mon
       background: 'var(--bg-surface)',
       borderRadius: 'var(--radius-md)',
       border: '1px solid var(--border-dim)',
-      borderLeftWidth: 3,
-      borderLeftColor: color,
+      borderLeft: `3px solid ${color}`,
     }}>
       <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
         {label}
