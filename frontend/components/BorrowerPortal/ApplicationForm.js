@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from 'react';
+import { spacing } from '@leafygreen-ui/tokens';
+import TextInput from '@leafygreen-ui/text-input';
 
 const INITIAL_DATA = {
   firstName: 'Marcus',
@@ -29,15 +31,15 @@ const INITIAL_DATA = {
 
 function FormSection({ title, children }) {
   return (
-    <div style={{ marginBottom: 20 }}>
+    <div style={{ marginBottom: spacing[5] }}>
       <div style={{
         fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13,
-        color: 'var(--text-primary)', marginBottom: 10, paddingBottom: 6,
+        color: 'var(--text-primary)', marginBottom: spacing[3], paddingBottom: spacing[2],
         borderBottom: '1px solid var(--border-dim)',
       }}>
         {title}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing[3] }}>
         {children}
       </div>
     </div>
@@ -48,27 +50,14 @@ function Field({ label, value, onChange, type = 'text', span2 = false, readOnly 
   const fieldId = `field-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-$/, '')}`;
   return (
     <div style={{ gridColumn: span2 ? 'span 2' : undefined }}>
-      <label htmlFor={fieldId} style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block', marginBottom: 3 }}>
-        {label}
-      </label>
-      <input
+      <TextInput
         id={fieldId}
-        type={type}
+        label={label}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        readOnly={readOnly}
-        style={{
-          width: '100%',
-          padding: '8px 10px',
-          borderRadius: 'var(--radius-sm)',
-          border: '1px solid var(--border-dim)',
-          background: readOnly ? 'var(--bg-raised)' : 'var(--bg-surface)',
-          color: 'var(--text-primary)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 12,
-          outline: 'none',
-          boxSizing: 'border-box',
-        }}
+        disabled={readOnly}
+        type={type}
+        sizeVariant="small"
       />
     </div>
   );
@@ -80,13 +69,14 @@ export default function ApplicationForm({ onSubmit }) {
   const update = (field) => (value) => setForm((prev) => ({ ...prev, [field]: value }));
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+    <div style={{ flex: 1, overflowY: 'auto', padding: `${spacing[5]}px ${spacing[6]}px` }}>
       <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 20, marginBottom: 4, color: 'var(--text-primary)' }}>
         Loan Application
       </div>
       <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 20 }}>
         Complete your application below. All fields are pre-verified.
       </div>
+
 
       <FormSection title="Personal Information">
         <Field label="First Name" value={form.firstName} onChange={update('firstName')} />

@@ -117,7 +117,7 @@ def get_application(application_id: str) -> dict | None:
     return app
 
 
-def list_applications() -> list[dict]:
+def list_applications(skip: int = 0, limit: int = 50) -> list[dict]:
     """List all applications (summary view)."""
     db = _get_db()
     apps = db["applications"].find(
@@ -130,7 +130,7 @@ def list_applications() -> list[dict]:
             "status": 1,
             "created_at": 1,
         },
-    ).sort("created_at", -1)
+    ).sort("created_at", -1).skip(skip).limit(limit)
     result = [serialize_doc(a) for a in apps]
     logger.info(f"Listed {len(result)} applications")
     return result

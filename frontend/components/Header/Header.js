@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { spacing } from '@leafygreen-ui/tokens';
 import { apiGet } from '../../lib/api';
 
 const SCREENS = [
@@ -39,7 +40,7 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
         right: 0,
         zIndex: 200,
         height: 52,
-        padding: "0 24px",
+        padding: `0 ${spacing[6]}px`,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -49,7 +50,7 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
         boxShadow: "var(--shadow-sm)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: spacing[3] }}>
         <div
           style={{
             width: 30,
@@ -97,7 +98,7 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 6,
+          gap: spacing[2],
           position: "absolute",
           left: "50%",
           transform: "translateX(-50%)",
@@ -137,7 +138,7 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
         ))}
       </nav>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: spacing[4] }}>
         {onInfoOpen && (
           <button
             type="button"

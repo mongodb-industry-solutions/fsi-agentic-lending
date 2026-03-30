@@ -6,6 +6,7 @@ import BorrowerPortal from "../components/BorrowerPortal/BorrowerPortal";
 import LoanOfficerDashboard from "../components/LoanOfficerDashboard/LoanOfficerDashboard";
 import DemoFlow from "../components/DemoFlow/DemoFlow";
 import InfoWizardPanel from "../components/educational/InfoWizardPanel";
+import ErrorBoundary from '../components/ErrorBoundary';
 
 export default function Home() {
   const [activeScreen, setActiveScreen] = useState(() => {
@@ -23,13 +24,13 @@ export default function Home() {
   const renderScreen = () => {
     switch (activeScreen) {
       case "borrower":
-        return <BorrowerPortal />;
+        return <ErrorBoundary><BorrowerPortal /></ErrorBoundary>;
       case "officer":
-        return <LoanOfficerDashboard />;
+        return <ErrorBoundary><LoanOfficerDashboard /></ErrorBoundary>;
       case "demo":
-        return <DemoFlow />;
+        return <ErrorBoundary><DemoFlow /></ErrorBoundary>;
       default:
-        return <BorrowerPortal />;
+        return <ErrorBoundary><BorrowerPortal /></ErrorBoundary>;
     }
   };
 
