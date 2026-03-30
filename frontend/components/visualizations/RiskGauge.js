@@ -35,7 +35,7 @@ export default function RiskGauge({ score = 72, size = 140, strokeWidth = 12 }) 
           {score}
         </div>
         <div style={{
-          fontSize: 10, fontWeight: 700, color: 'var(--bg-base)',
+          fontSize: 10, fontWeight: 700, color: score <= 40 ? '#FFFFFF' : '#001E2B',
           background: color, padding: '2px 8px', borderRadius: 4, marginTop: 2,
         }}>
           {tier}

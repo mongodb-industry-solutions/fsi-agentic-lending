@@ -1,4 +1,5 @@
 """LangGraph workflow assembly with MongoDBSaver checkpointing."""
+import functools
 import threading
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.mongodb import MongoDBSaver
@@ -14,6 +15,7 @@ from agents.tools import log_agent_activity, update_application_status
 
 def safe_node(node_fn):
     """Catches errors and writes to state instead of crashing the graph."""
+    @functools.wraps(node_fn)
     def wrapper(state: LendFlowState) -> dict:
         try:
             return node_fn(state)
@@ -61,9 +63,12 @@ def hitl_gate(state: LendFlowState) -> dict:
     overrides = decision.get("overrides", {})
 
     state_updates = {
-        "decision": action if action != "modify_and_continue" else "escalate",
+        "decision": action if action != "modify_and_continue" else None,  # Clear to force re-underwriting
         "officer_notes": notes,
     }
+
+    if action == "modify_and_continue":
+        state_updates["risk_score"] = None
 
     # Apply officer overrides
     if overrides.get("risk_tier"):
