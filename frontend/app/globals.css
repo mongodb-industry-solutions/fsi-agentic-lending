@@ -43,6 +43,7 @@
   --canvas-inactive-fill: #F9FBFA;   /* palette.gray.light3 */
   --canvas-text-active: #001E2B;     /* palette.gray.dark3 */
   --canvas-text-inactive: #89979B;   /* palette.gray.base */
+  /* Type scale — available for gradual migration from hardcoded px */
   --text-2xs: 10px;
   --text-xs: 12px;
   --text-sm: 13px;
@@ -87,11 +88,11 @@ button {
   transition: background 150ms ease, border-color 150ms ease,
               box-shadow 150ms ease, transform 100ms ease;
 }
-button:hover:not(:disabled) {
+button:not([data-leafygreen-ui]):hover:not(:disabled) {
   filter: brightness(1.08);
   box-shadow: var(--shadow-sm);
 }
-button:active:not(:disabled) {
+button:not([data-leafygreen-ui]):active:not(:disabled) {
   transform: scale(0.97);
   box-shadow: none;
 }
@@ -328,12 +329,13 @@ input[type="range"]::-moz-range-thumb {
   .officer-layout {
     flex-direction: column !important;
   }
-  .officer-layout > * {
+  .officer-layout > *:first-child,
+  .officer-layout > *:last-child {
     width: 100% !important;
     max-width: none !important;
     min-width: 0 !important;
-    flex: 1 1 auto !important;
-    max-height: 400px;
+    flex: 0 0 auto !important;
+    max-height: 300px;
     overflow-y: auto;
   }
 }
