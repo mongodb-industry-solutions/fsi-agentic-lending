@@ -98,7 +98,7 @@ export default function IntentPreview({ applicationId, onProceed, onManual }) {
     return s;
   });
 
-  const enabledCount = planSteps.filter((s) => settings[s.id]?.enabled).length;
+  const enabledCount = PLAN_STEPS.filter((s) => settings[s.id]?.enabled !== false).length;
 
   return (
     <div style={{

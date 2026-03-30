@@ -1,7 +1,7 @@
 "use client";
 
 export default function TechRecap({ elapsedMs, activeFeatures }) {
-  const featuresUsed = activeFeatures?.length ?? 6;
+  const featuresUsed = activeFeatures?.length || 6;
 
   const stats = [
     { label: 'Total Time', value: `${(elapsedMs / 1000).toFixed(2)}s`, color: 'var(--mongo)' },

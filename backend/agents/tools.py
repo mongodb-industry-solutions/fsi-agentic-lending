@@ -304,7 +304,10 @@ def get_ews_signals(loan_id: str) -> list:
         avg = sum(amounts) / len(amounts)
         variance = sum((a - avg) ** 2 for a in amounts) / len(amounts)
         stddev = variance ** 0.5
-        stability = "green" if stddev < avg * 0.05 else "amber" if stddev < avg * 0.15 else "red"
+        if avg > 0:
+            stability = "green" if stddev < avg * 0.05 else "amber" if stddev < avg * 0.15 else "red"
+        else:
+            stability = "green"
     else:
         stability = "green"
         stddev = 0
