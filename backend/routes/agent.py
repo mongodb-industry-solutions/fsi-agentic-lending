@@ -18,9 +18,12 @@ except ImportError:
 
 router = APIRouter(tags=["agent"])
 
+_running_apps = set()
+_running_lock = threading.Lock()
+
 
 @router.post("/agent/{app_id}/run")
-async def run_agent(app_id: str):
+async def run_agent(app_id: str, autonomy_level: str = "bounded"):
     """Trigger agent execution for an application.
 
     TODO: Phase 4 — wire to LangGraph graph.astream()
@@ -30,11 +33,17 @@ async def run_agent(app_id: str):
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
 
+    # Concurrency deduplication
+    with _running_lock:
+        if app_id in _running_apps:
+            return {"status": "already_running", "application_id": app_id}
+        _running_apps.add(app_id)
+
     # Update status to processing
     application_service.update_application_status(app_id, "processing", "Agent pipeline started")
 
     # Launch graph execution in a background thread (sync graph, async route)
-    def _run_graph(app_id):
+    def _run_graph(app_id, autonomy_level):
         try:
             graph = get_graph()
             initial_state = {
@@ -56,6 +65,9 @@ async def run_agent(app_id: str):
                 "decision_reasoning": "",
                 "officer_notes": None,
                 "activity_log": [],
+                "autonomy_level": autonomy_level,
+                "last_error": None,
+                "retry_count": 0,
             }
             graph.invoke(initial_state, config={"configurable": {"thread_id": app_id}})
         except Exception as e:
@@ -67,8 +79,11 @@ async def run_agent(app_id: str):
                 from services.application_service import update_application_status
                 update_application_status(app_id, "error", f"Pipeline failed: {str(e)[:200]}")
                 log_agent_activity(app_id, "supervisor", "pipeline_complete", f"Pipeline error: {e}")
+        finally:
+            with _running_lock:
+                _running_apps.discard(app_id)
 
-    thread = threading.Thread(target=_run_graph, args=(app_id,), daemon=True)
+    thread = threading.Thread(target=_run_graph, args=(app_id, autonomy_level), daemon=True)
     thread.start()
 
     return {

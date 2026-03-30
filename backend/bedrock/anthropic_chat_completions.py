@@ -1,4 +1,5 @@
 import json
+import time
 
 from bedrock.client import BedrockClient
 from botocore.exceptions import ClientError
@@ -68,16 +69,22 @@ class BedrockAnthropicChatCompletions(BedrockClient):
         # Convert the native request to JSON.
         request = json.dumps(native_request)
 
-        try:
-            # Invoke the model with the request.
-            response = self.bedrock_client.invoke_model(
-                modelId=self.model_id, body=request)
-        except ClientError as e:
-            self.log.error(f"Bedrock invocation failed: {e}")
-            raise RuntimeError(f"Bedrock invocation failed: {e}") from e
-        except Exception as e:
-            self.log.error(f"Bedrock invocation failed: {e}")
-            raise RuntimeError(f"Bedrock invocation failed: {e}") from e
+        for attempt in range(3):
+            try:
+                # Invoke the model with the request.
+                response = self.bedrock_client.invoke_model(
+                    modelId=self.model_id, body=request)
+                break
+            except ClientError as e:
+                error_code = e.response.get('Error', {}).get('Code', '')
+                if error_code in ('ThrottlingException', 'ServiceUnavailableException', 'ModelTimeoutException') and attempt < 2:
+                    wait = 2 ** attempt
+                    self.log.warning(f"Bedrock throttled/timeout, retrying in {wait}s (attempt {attempt + 1})")
+                    time.sleep(wait)
+                    continue
+                raise RuntimeError(f"Bedrock failed after {attempt + 1} attempts: {e}") from e
+            except Exception as e:
+                raise RuntimeError(f"Bedrock failed: {e}") from e
 
         # Decode the response body.
         model_response = json.loads(response["body"].read())
@@ -107,15 +114,21 @@ class BedrockAnthropicChatCompletions(BedrockClient):
 
         request = json.dumps(native_request)
 
-        try:
-            response = self.bedrock_client.invoke_model(
-                modelId=self.model_id, body=request)
-        except ClientError as e:
-            self.log.error(f"Bedrock invocation failed: {e}")
-            raise RuntimeError(f"Bedrock invocation failed: {e}") from e
-        except Exception as e:
-            self.log.error(f"Bedrock invocation failed: {e}")
-            raise RuntimeError(f"Bedrock invocation failed: {e}") from e
+        for attempt in range(3):
+            try:
+                response = self.bedrock_client.invoke_model(
+                    modelId=self.model_id, body=request)
+                break
+            except ClientError as e:
+                error_code = e.response.get('Error', {}).get('Code', '')
+                if error_code in ('ThrottlingException', 'ServiceUnavailableException', 'ModelTimeoutException') and attempt < 2:
+                    wait = 2 ** attempt
+                    self.log.warning(f"Bedrock throttled/timeout, retrying in {wait}s (attempt {attempt + 1})")
+                    time.sleep(wait)
+                    continue
+                raise RuntimeError(f"Bedrock failed after {attempt + 1} attempts: {e}") from e
+            except Exception as e:
+                raise RuntimeError(f"Bedrock failed: {e}") from e
 
         model_response = json.loads(response["body"].read())
         return model_response["content"][0]["text"]
@@ -141,15 +154,21 @@ class BedrockAnthropicChatCompletions(BedrockClient):
 
         request = json.dumps(native_request)
 
-        try:
-            response = self.bedrock_client.invoke_model(
-                modelId=self.model_id, body=request)
-        except ClientError as e:
-            self.log.error(f"Bedrock invocation failed: {e}")
-            raise RuntimeError(f"Bedrock invocation failed: {e}") from e
-        except Exception as e:
-            self.log.error(f"Bedrock invocation failed: {e}")
-            raise RuntimeError(f"Bedrock invocation failed: {e}") from e
+        for attempt in range(3):
+            try:
+                response = self.bedrock_client.invoke_model(
+                    modelId=self.model_id, body=request)
+                break
+            except ClientError as e:
+                error_code = e.response.get('Error', {}).get('Code', '')
+                if error_code in ('ThrottlingException', 'ServiceUnavailableException', 'ModelTimeoutException') and attempt < 2:
+                    wait = 2 ** attempt
+                    self.log.warning(f"Bedrock throttled/timeout, retrying in {wait}s (attempt {attempt + 1})")
+                    time.sleep(wait)
+                    continue
+                raise RuntimeError(f"Bedrock failed after {attempt + 1} attempts: {e}") from e
+            except Exception as e:
+                raise RuntimeError(f"Bedrock failed: {e}") from e
 
         model_response = json.loads(response["body"].read())
         return model_response["content"][0]["text"]

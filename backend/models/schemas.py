@@ -59,6 +59,10 @@ class VectorSearchRequest(BaseModel):
     limit: int = Field(default=5, ge=1, le=100)
 
 
+class AgentRunRequest(BaseModel):
+    autonomy_level: str = Field(default="bounded", pattern="^(observe|suggest|bounded|auto)$")
+
+
 class AgentActivityEvent(BaseModel):
     application_id: str
     agent: str

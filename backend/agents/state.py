@@ -33,5 +33,10 @@ class LendFlowState(TypedDict):
     # HITL
     officer_notes: Optional[str]
 
+    # Autonomy
+    autonomy_level: str  # "observe" | "suggest" | "bounded" | "auto"
+    last_error: Optional[str]
+    retry_count: int
+
     # Activity tracking
     activity_log: list[dict]

@@ -918,6 +918,8 @@ export default function LoanOfficerDashboard() {
 
     if (autonomyLevel === 'bounded' || autonomyLevel === 'auto') {
       setWorkflowPhase('executing');
+      // Trigger backend agent with autonomy level for live applications
+      apiPost(`/agent/${selectedApp}/run?autonomy_level=${autonomyLevel}`);
     } else {
       setWorkflowPhase('preview');
     }
@@ -957,6 +959,8 @@ export default function LoanOfficerDashboard() {
 
   const handleProceed = useCallback((settings) => {
     setPlanSettings(settings || null);
+    // Trigger backend agent with autonomy level
+    apiPost(`/agent/${selectedApp}/run?autonomy_level=${autonomyLevel}`);
     if (autonomyLevel === 'observe') {
       setWorkflowPhase('observe-step');
       stageTimestampsRef.current = [Date.now()];
@@ -964,7 +968,7 @@ export default function LoanOfficerDashboard() {
     } else {
       setWorkflowPhase('executing');
     }
-  }, [autonomyLevel, addToast]);
+  }, [autonomyLevel, addToast, selectedApp]);
 
   const handleObserveAdvance = useCallback(() => {
     const nextStage = workflowStage + 1;

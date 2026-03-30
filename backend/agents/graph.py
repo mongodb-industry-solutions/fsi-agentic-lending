@@ -12,6 +12,21 @@ from agents.underwriter import underwriter_node
 from agents.tools import log_agent_activity, update_application_status
 
 
+def safe_node(node_fn):
+    """Catches errors and writes to state instead of crashing the graph."""
+    def wrapper(state: LendFlowState) -> dict:
+        try:
+            return node_fn(state)
+        except Exception as e:
+            app_id = state.get("application_id", "unknown")
+            log_agent_activity(app_id, node_fn.__name__, "error", str(e)[:500])
+            return {
+                "last_error": str(e)[:500],
+                "messages": [{"role": "assistant", "content": f"Error in {node_fn.__name__}: {str(e)[:200]}"}],
+            }
+    return wrapper
+
+
 def hitl_gate(state: LendFlowState) -> dict:
     """HITL gate — pauses execution for officer review via LangGraph interrupt()."""
     app_id = state["application_id"]
@@ -71,8 +86,8 @@ def build_graph():
 
     # Add nodes
     graph.add_node("supervisor", supervisor_node)
-    graph.add_node("loan_app", loan_app_node)
-    graph.add_node("underwriter", underwriter_node)
+    graph.add_node("loan_app", safe_node(loan_app_node))
+    graph.add_node("underwriter", safe_node(underwriter_node))
     graph.add_node("hitl_gate", hitl_gate)
     graph.add_node("complete", completion_node)
 

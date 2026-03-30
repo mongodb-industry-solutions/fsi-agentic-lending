@@ -57,7 +57,7 @@ export default function BorrowerPortal() {
 
     if (result?.application_id) {
       setApplicationId(result.application_id);
-      await apiPost(`/agent/${result.application_id}/run`);
+      await apiPost(`/agent/${result.application_id}/run?autonomy_level=bounded`);
     }
   }, [addToast]);
 
