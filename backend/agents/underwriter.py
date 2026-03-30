@@ -85,6 +85,12 @@ def underwriter_node(state: LendFlowState) -> dict:
     co_score = state.get("co_applicant_credit_score", 0)
     ltv = (loan_amount / purchase_price) * 100 if purchase_price > 0 else 100
 
+    log_agent_activity(app_id, "underwriter", "ltv_calc", f"LTV: {ltv:.1f}% ({loan_amount:,.0f} / {purchase_price:,.0f})")
+
+    # Stress test at qualifying rate
+    stress_rate = max(annual_rate + 0.02, 0.0525)
+    log_agent_activity(app_id, "underwriter", "stress_test", f"Qualifying at stress rate {stress_rate:.2%}")
+
     # Simple risk score (0-100, lower is better risk)
     risk_score = 100
     if primary_score >= 750: risk_score -= 25

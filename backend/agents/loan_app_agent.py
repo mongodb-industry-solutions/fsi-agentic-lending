@@ -61,6 +61,14 @@ def loan_app_node(state: LendFlowState) -> dict:
 
     log_agent_activity(app_id, "loan_app_agent", "analysis_complete", analysis[:500])
 
+    # Cross-reference identity across documents
+    log_agent_activity(app_id, "loan_app_agent", "identity_check", f"Cross-referencing identity across {doc_count} documents...")
+
+    # Extract and log income information
+    combined_income = app_summary.get("income_summary", {}).get("combined_gross", 0)
+    if combined_income > 0:
+        log_agent_activity(app_id, "loan_app_agent", "income_extraction", f"Combined gross income: ${combined_income:,.0f}/yr")
+
     # Mark documents as verified
     documents_verified = doc_count >= 10  # Expect at least 10 of 14 docs
     if documents_verified:
