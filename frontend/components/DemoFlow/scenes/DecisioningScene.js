@@ -9,6 +9,8 @@ import WhatIfSliders from '../panels/WhatIfSliders';
 import FraudGraph from '../panels/FraudGraph';
 import DataSourceStrip from '../DataSourceStrip';
 import PipelineTimeline from '../PipelineTimeline';
+import StatCard from '../../visualizations/StatCard';
+import FicoRing from '../../visualizations/FicoRing';
 
 const FACTORS = [
   { label: 'Income Stability', points: 42, color: 'var(--mongo)' },
@@ -264,6 +266,12 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
             totalSteps={DECISIONING_STEPS.length}
           />
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
+              <StatCard label="Risk Score" value={sceneStep >= 1 ? 72 : 0} suffix="/100" color="var(--hitl-amber)" />
+              <StatCard label="Risk Tier" value={sceneStep >= 2 ? 'B+' : '—'} color="var(--tool-blue)" animate={false} />
+              <StatCard label="Fraud Scan" value={sceneStep >= 4 ? 'CLEAR' : 'Pending'} color={sceneStep >= 4 ? 'var(--success)' : 'var(--text-dim)'} animate={false} />
+              <StatCard label="Factors" value={sceneStep >= 1 ? 7 : 0} color="var(--agent-cyan)" />
+            </div>
             {sceneStep < 0 && (
               <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>
                 Awaiting underwriting agent...
@@ -335,7 +343,10 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
           {showFinalScore && (
             <div style={{ padding: 16, background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', border: '2px solid var(--mongo)', marginBottom: 16, animation: 'slideDown 0.3s ease-out' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, color: 'var(--mongo)', marginBottom: 12 }}>Risk Assessment Complete</div>
-              <RiskRing score={72} tier="B+" fico={742} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <RiskRing score={72} tier="B+" fico={742} />
+                <FicoRing score={742} size={80} strokeWidth={6} />
+              </div>
               <div style={{ marginTop: 12 }}>
                 <ChampionChallengerCard />
                 <AdverseActionPreview />

@@ -47,6 +47,58 @@
   --bg-backdrop: rgba(241, 245, 249, 0.9);
 }
 
+/* ===================== DARK THEME ===================== */
+[data-theme="dark"] {
+  --bg-void: #0a0e17;
+  --bg-base: #0f1420;
+  --bg-surface: #141a2a;
+  --bg-raised: #1e2740;
+  --bg-overlay: #2a3654;
+  --border-dim: #1e2a42;
+  --border-base: #2a3654;
+  --border-bright: #3a4a6a;
+  --text-primary: #e8ecf4;
+  --text-secondary: #8b95a8;
+  --text-dim: #5a6478;
+  --mongo: #00ED64;
+  --mongo-dim: rgba(0, 237, 100, 0.08);
+  --mongo-glow: rgba(0, 237, 100, 0.22);
+  --mongo-bright: #3bff8a;
+  --voyage: #a78bfa;
+  --voyage-dim: rgba(167, 139, 250, 0.08);
+  --voyage-glow: rgba(167, 139, 250, 0.18);
+  --agent-cyan: #22d3ee;
+  --agent-cyan-dim: rgba(34, 211, 238, 0.08);
+  --tool-blue: #60a5fa;
+  --tool-blue-dim: rgba(96, 165, 250, 0.08);
+  --hitl-amber: #fbbf24;
+  --hitl-amber-dim: rgba(251, 191, 36, 0.08);
+  --hitl-amber-glow: rgba(251, 191, 36, 0.18);
+  --danger: #ef4444;
+  --danger-dim: rgba(239, 68, 68, 0.08);
+  --success: #10b981;
+  --success-dim: rgba(16, 185, 129, 0.08);
+  --langsmith: #94a3b8;
+  --canvas-grid: #141a2a;
+  --canvas-inactive-stroke: #2a3654;
+  --canvas-inactive-fill: #0f1420;
+  --canvas-text-active: #e8ecf4;
+  --canvas-text-inactive: #5a6478;
+  --bg-header: rgba(15, 20, 32, 0.92);
+  --bg-overlay-alpha: rgba(15, 20, 32, 0.92);
+  --bg-backdrop: rgba(10, 14, 23, 0.9);
+  /* font/radius tokens unchanged — inherited from :root */
+  scrollbar-color: #2a3654 #0f1420;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #2a3654;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: #0f1420;
+}
+
 /* ===================== BASE RESETS ===================== */
 *,
 *::before,
