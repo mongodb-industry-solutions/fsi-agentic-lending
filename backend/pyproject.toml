@@ -13,6 +13,7 @@ dependencies = [
     "botocore>=1.35.70",
     "voyageai>=0.3.2",
     "langgraph>=0.4",
+    "langgraph-checkpoint-mongodb>=0.2",
     "langchain-mongodb>=0.5",
     "langchain-aws>=0.3",
     "langsmith>=0.3",
