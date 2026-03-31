@@ -30,7 +30,7 @@ const INITIAL_DOCUMENTS = [
   {
     id: 'paystubs',
     type: 'Pay Stubs (6)',
-    docType: 'pay_stub',
+    docType: 'paystubs',
     icon: '\u{1F4C4}',
     fileName: 'PayStubs_Delgado_Q4Q1.pdf',
     size: '1.8 MB',
@@ -41,7 +41,7 @@ const INITIAL_DOCUMENTS = [
   {
     id: 'tax',
     type: 'CRA Tax Notices',
-    docType: 'tax_notice',
+    docType: 'income_tax',
     icon: '\u{1F4CB}',
     fileName: 'NOA_2025_Delgado.pdf',
     size: '624 KB',
@@ -52,7 +52,7 @@ const INITIAL_DOCUMENTS = [
   {
     id: 'bank',
     type: 'Bank Statements (3mo)',
-    docType: 'bank_statement',
+    docType: 'bank_statements',
     icon: '\u{1F3E6}',
     fileName: 'TD_Statement_Jan-Mar2026.pdf',
     size: '1.4 MB',
@@ -74,7 +74,7 @@ const INITIAL_DOCUMENTS = [
   {
     id: 'investments',
     type: 'Investment Statements',
-    docType: 'investment_statement',
+    docType: 'investment_statements',
     icon: '\u{1F4CA}',
     fileName: 'RRSP_Investments_Delgado.pdf',
     size: '986 KB',
@@ -85,7 +85,7 @@ const INITIAL_DOCUMENTS = [
   {
     id: 'property',
     type: 'Existing Property Docs',
-    docType: 'property_document',
+    docType: 'other_property_docs',
     icon: '\u{1F3E2}',
     fileName: 'Condo_10180_104St_Edmonton.pdf',
     size: '1.6 MB',
@@ -107,7 +107,7 @@ const INITIAL_DOCUMENTS = [
   {
     id: 'utilities',
     type: 'Utility Bills',
-    docType: 'utility_bill',
+    docType: 'utility_bills',
     icon: '\u26A1',
     fileName: 'Utilities_Enmax_Feb2026.pdf',
     size: '218 KB',
@@ -140,7 +140,7 @@ const INITIAL_DOCUMENTS = [
   {
     id: 'proptax',
     type: 'Property Tax Notice',
-    docType: 'property_tax_notice',
+    docType: 'property_tax',
     icon: '\u{1F3DB}',
     fileName: 'PropertyTax_Calgary_2026.pdf',
     size: '186 KB',
@@ -267,9 +267,10 @@ export default function DocumentUpload({ applicationId }) {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    if (!applicationId) return;
-    apiGet(`/applications/${applicationId}/documents`).then((docs) => {
-      if (docs) {
+    // Try the provided applicationId, or fall back to the demo app
+    const appId = applicationId || 'APP-2026-00001';
+    apiGet(`/applications/${appId}/documents`).then((docs) => {
+      if (docs && Array.isArray(docs) && docs.length > 0) {
         setDocuments(prev => prev.map(d => {
           const match = docs.find(bd => bd.doc_type === d.docType);
           return match ? { ...d, mongoId: match._id } : d;
