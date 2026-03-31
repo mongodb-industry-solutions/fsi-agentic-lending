@@ -201,6 +201,16 @@ input[type="range"]::-moz-range-thumb {
   }
 }
 
+@keyframes statusPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
 @keyframes sceneTitleEnter {
   0% {
     opacity: 0;
@@ -338,6 +348,12 @@ input[type="range"]::-moz-range-thumb {
     max-height: 300px;
     overflow-y: auto;
   }
+}
+
+/* ===================== TYPING INDICATOR ===================== */
+@keyframes typingDot {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
 }
 
 /* ===================== REDUCED MOTION ===================== */

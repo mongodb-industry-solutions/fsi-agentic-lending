@@ -10,7 +10,7 @@ const STAGES = [
     label: 'Application Received',
     type: 'clean',
     detail: 'Your application APP-2026-00001 has been received and queued for processing.',
-    icon: '📝',
+    icon: '1',
     delayMs: 0,
     agentStatus: 'Our AI assistant is reviewing your submission...',
     whatHappened: 'Your application was received and queued for processing. All required fields validated — personal information, employment details, and loan parameters confirmed complete.',
@@ -20,7 +20,7 @@ const STAGES = [
     label: 'Document Verification',
     type: 'intervention',
     detail: 'AI detected 2 issues during document analysis and resolved both automatically.',
-    icon: '🧬',
+    icon: '2',
     delayMs: 3000,
     agentStatus: 'AI assistant detected document issues — resolving automatically...',
     agentStatusActive: 'Our AI assistant is verifying your documents...',
@@ -29,12 +29,12 @@ const STAGES = [
       {
         issue: 'Bank statement pages 2-3 had insufficient image quality — text extraction failed on first attempt.',
         resolution: 'AI auto-enhanced the images using voyage-multimodal-3.5 and re-processed successfully on retry. All 247 transactions extracted.',
-        icon: '📄',
+        icon: null,
       },
       {
         issue: 'Pay stub shows "M. Delgado" while credit report shows "Marcus Alejandro Delgado" — name mismatch flagged.',
         resolution: 'AI cross-referenced SIN and address across all documents to confirm identity match. Name variation logged as verified alias.',
-        icon: '🔍',
+        icon: null,
       },
     ],
   },
@@ -43,7 +43,7 @@ const STAGES = [
     label: 'Additional Document Needed',
     type: 'action-required',
     detail: 'Your bank statement covers only 2 months. Our policy requires a minimum of 3 months. Please upload an additional statement.',
-    icon: '⚠',
+    icon: '3',
     delayMs: 4000,
     agentStatus: 'Waiting for you to upload an additional bank statement...',
     agentStatusActive: 'AI assistant identified a missing document requirement...',
@@ -56,7 +56,7 @@ const STAGES = [
     label: 'Credit & Income Analysis',
     type: 'intervention',
     detail: 'AI investigated 2 discrepancies in your credit and income records and resolved both.',
-    icon: '📋',
+    icon: '4',
     delayMs: 5000,
     agentStatus: 'AI assistant found discrepancies in your records — investigating...',
     agentStatusActive: 'Our AI assistant is analyzing your credit and income data...',
@@ -65,12 +65,12 @@ const STAGES = [
       {
         issue: '3 hard inquiries detected within 180 days, which would trigger a -8pt score penalty under policy §4.2.1.',
         resolution: 'AI identified that 2 of the 3 inquiries were rate-shopping for an auto loan within a 14-day window. Per FCAC guidelines, these are combined into 1 inquiry — effective count reduced to 2, avoiding the penalty trigger.',
-        icon: '🔎',
+        icon: null,
       },
       {
         issue: 'Plaid monthly average ($18,150/mo) does not match combined T4 annualized income ($18,558/mo) — $408/mo discrepancy flagged.',
         resolution: 'AI found $4,900 in freelance deposits across the 12-month Plaid history (averaging $408/mo), fully explaining the gap. Combined income reconciled at $222,700/yr with $4,900 supplemental.',
-        icon: '💰',
+        icon: null,
       },
     ],
   },
@@ -79,7 +79,7 @@ const STAGES = [
     label: 'Underwriting Risk Assessment',
     type: 'intervention',
     detail: 'Initial score: 68 (B). AI corrected a misclassified debt payment and improved the score to 72 (B+).',
-    icon: '📊',
+    icon: '5',
     delayMs: 5000,
     agentStatus: 'AI assistant corrected a scoring error — recalculating your risk profile...',
     agentStatusActive: 'Our AI assistant is running the underwriting risk assessment...',
@@ -88,7 +88,7 @@ const STAGES = [
       {
         issue: 'Car loan payment classified at full amount ($620/mo) instead of verified Scotiabank payment ($482/mo), inflating GDS to 33.8%.',
         resolution: 'AI verified actual payment through Scotiabank loan records. Corrected monthly payment from $620 to $482, reducing GDS from 33.8% to 31.2%. Additionally, comparable borrower analysis shows 92% successful repayment for similar profiles.',
-        icon: '🎓',
+        icon: null,
       },
     ],
     beforeAfter: {
@@ -104,7 +104,7 @@ const STAGES = [
     label: 'Decision Ready',
     type: 'clean',
     detail: 'Underwriting complete. Risk score: 72 (B+). 5 issues resolved by AI across the process.',
-    icon: '✅',
+    icon: '6',
     delayMs: 3000,
     agentStatus: 'Analysis complete — preparing your results...',
     whatHappened: 'Underwriting completed with a risk score of 72 (B+ tier). Throughout the process, our AI assistant resolved 5 issues autonomously and flagged 1 for your action — preventing unnecessary score penalties, correcting income records, and ensuring accurate debt calculations. The proposed rate of 4.89% reflects your corrected profile.',
@@ -114,7 +114,7 @@ const STAGES = [
     label: 'Officer Review',
     type: 'clean',
     detail: 'A loan officer is reviewing your application and the AI assistant\'s intervention history.',
-    icon: '👤',
+    icon: '7',
     delayMs: 4000,
     agentStatus: 'A loan officer is reviewing your application...',
     whatHappened: 'A senior loan officer reviewed the AI\'s assessment, including all 5 automated interventions. The officer verified the car loan correction, confirmed the FCAC rate-shopping consolidation, and approved the income reconciliation methodology.',
@@ -124,7 +124,7 @@ const STAGES = [
     label: 'Approved',
     type: 'clean',
     detail: 'Congratulations! Your mortgage has been approved at 4.89% APR.',
-    icon: '🎉',
+    icon: '8',
     delayMs: 4000,
     agentStatus: 'Great news — your loan has been approved!',
     whatHappened: 'Your 5yr Fixed (25yr Amort) mortgage at 4.89% APR has been formally approved with a monthly payment of $4,047. Without the AI assistant\'s interventions, your application would have scored 68 (B tier) with a higher rate of 5.24%. The AI saved you an estimated $135/mo ($40,500 over the life of the loan).',
@@ -134,7 +134,7 @@ const STAGES = [
     label: 'Loan Active',
     type: 'clean',
     detail: 'Your mortgage is now active. $700,000 disbursed. First payment: May 1, 2026.',
-    icon: '🏠',
+    icon: '9',
     delayMs: 3000,
     agentStatus: 'Your loan is now active and being monitored.',
     whatHappened: 'EFT disbursement of $700,000 has been initiated to your designated account. Mortgage servicing has begun — your first payment of $4,047 is due May 1, 2026. Our AI assistant will continue to monitor your mortgage for renewal opportunities.',
@@ -192,13 +192,13 @@ export default function StatusTracker({ onNotification, applicationId }) {
       stage.interventions.forEach((intv, idx) => {
         setTimeout(() => {
           sendNotification(
-            { id: `${stage.id}-issue-${idx}`, label: `Issue Detected`, icon: '⚠', detail: intv.issue },
+            { id: `${stage.id}-issue-${idx}`, label: `Issue Detected`, icon: null, detail: intv.issue },
             new Date(),
             { subType: 'intervention-issue', parentStage: stage.id }
           );
           setTimeout(() => {
             sendNotification(
-              { id: `${stage.id}-fix-${idx}`, label: `Resolved by AI`, icon: '🔧', detail: intv.resolution },
+              { id: `${stage.id}-fix-${idx}`, label: `Resolved by AI`, icon: null, detail: intv.resolution },
               new Date(),
               { subType: 'intervention-resolved', parentStage: stage.id }
             );
@@ -222,7 +222,7 @@ export default function StatusTracker({ onNotification, applicationId }) {
     if (!actionPaused) return;
     setActionUploading(true);
     sendNotification(
-      { id: 'action-uploading', label: 'Document Uploading', icon: '📤', detail: 'Uploading December 2025 bank statement...' },
+      { id: 'action-uploading', label: 'Document Uploading', icon: null, detail: 'Uploading December 2025 bank statement...' },
       new Date(),
       { subType: 'action-progress' }
     );
@@ -230,7 +230,7 @@ export default function StatusTracker({ onNotification, applicationId }) {
       setActionUploading(false);
       setActionPaused(false);
       sendNotification(
-        { id: 'action-complete', label: 'Document Received', icon: '✅', detail: 'Additional bank statement verified. Processing resumed.' },
+        { id: 'action-complete', label: 'Document Received', icon: null, detail: 'Additional bank statement verified. Processing resumed.' },
         new Date(),
         { subType: 'action-resolved' }
       );
@@ -247,13 +247,13 @@ export default function StatusTracker({ onNotification, applicationId }) {
           nextStage.interventions.forEach((intv, idx) => {
             setTimeout(() => {
               sendNotification(
-                { id: `${nextStage.id}-issue-${idx}`, label: `Issue Detected`, icon: '⚠', detail: intv.issue },
+                { id: `${nextStage.id}-issue-${idx}`, label: `Issue Detected`, icon: null, detail: intv.issue },
                 new Date(),
                 { subType: 'intervention-issue', parentStage: nextStage.id }
               );
               setTimeout(() => {
                 sendNotification(
-                  { id: `${nextStage.id}-fix-${idx}`, label: `Resolved by AI`, icon: '🔧', detail: intv.resolution },
+                  { id: `${nextStage.id}-fix-${idx}`, label: `Resolved by AI`, icon: null, detail: intv.resolution },
                   new Date(),
                   { subType: 'intervention-resolved', parentStage: nextStage.id }
                 );
@@ -603,7 +603,7 @@ export default function StatusTracker({ onNotification, applicationId }) {
                       fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13,
                       color: labelColor,
                     }}>
-                      {stage.id === 'approved' && isDeclined ? '❌ Declined' : `${stage.icon} ${stage.label}`}
+                      {stage.id === 'approved' && isDeclined ? 'Declined' : stage.label}
                     </div>
                     {/* Badges */}
                     {isCompleted && hasInterventions && (
@@ -749,7 +749,7 @@ export default function StatusTracker({ onNotification, applicationId }) {
                             border: '1px solid var(--border-dim)',
                           }}>
                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 4 }}>
-                              <span style={{ fontSize: 10, flexShrink: 0 }}>{intv.icon}</span>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--hitl-amber)', flexShrink: 0, marginTop: 3 }} />
                               <div>
                                 <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--hitl-amber)', marginBottom: 2 }}>
                                   Issue Detected
@@ -760,7 +760,7 @@ export default function StatusTracker({ onNotification, applicationId }) {
                               </div>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                              <span style={{ fontSize: 10, flexShrink: 0 }}>🔧</span>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--success)', flexShrink: 0, marginTop: 3 }} />
                               <div>
                                 <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--success)', marginBottom: 2 }}>
                                   Resolved by AI

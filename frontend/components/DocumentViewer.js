@@ -1,18 +1,16 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import { apiGet } from '../lib/api';
 
 export default function DocumentViewer({ docId, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('structured'); // structured | raw | text
+  const [mongoExpanded, setMongoExpanded] = useState(false);
   const dialogRef = useRef(null);
 
-  useEffect(() => {
-    dialogRef.current?.focus();
-  }, []);
+  useEffect(() => { dialogRef.current?.focus(); }, []);
 
   useEffect(() => {
     if (!docId) return;
@@ -33,13 +31,8 @@ export default function DocumentViewer({ docId, onClose }) {
         if (!focusable?.length) return;
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
       }
     };
     document.addEventListener('keydown', handleKey);
@@ -53,103 +46,325 @@ export default function DocumentViewer({ docId, onClose }) {
   return (
     <>
       {/* Backdrop */}
-      <div onClick={onClose} style={{
-        position: 'fixed', inset: 0, zIndex: 900,
-        background: 'rgba(0,0,0,0.6)',
-        animation: 'backdropEnter 0.2s ease-out',
-      }} />
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 900,
+          background: 'rgba(0,0,0,0.5)',
+          animation: 'backdropEnter 0.2s ease-out',
+        }}
+      />
 
-      {/* Viewer */}
-      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-label="Document Viewer" aria-modal="true" style={{
-        position: 'fixed', top: 24, left: 24, right: 24, bottom: 24,
-        zIndex: 901, background: 'var(--bg-base)',
-        borderRadius: 'var(--radius-lg)',
-        border: '1px solid var(--border-base)',
-        boxShadow: 'var(--shadow-xl, 0 20px 25px rgba(0,0,0,0.08))',
-        display: 'flex', flexDirection: 'column',
-        overflow: 'hidden',
-        animation: 'modalEnter 0.25s cubic-bezier(0.32, 0.72, 0, 1) forwards',
-      }}>
+      {/* Modal */}
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-label="Document Viewer"
+        aria-modal="true"
+        style={{
+          position: 'fixed',
+          top: '3vh', left: '3vw', right: '3vw', bottom: '3vh',
+          zIndex: 901,
+          background: 'var(--bg-base)',
+          borderRadius: 8,
+          border: '1px solid var(--border-base)',
+          boxShadow: 'var(--shadow-xl)',
+          display: 'flex', flexDirection: 'column',
+          overflow: 'hidden',
+          animation: 'modalEnter 0.22s cubic-bezier(0.33, 1, 0.68, 1) forwards',
+        }}
+      >
         {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '10px 16px',
+          padding: `${spacing[2]}px ${spacing[3]}px`,
           borderBottom: '1px solid var(--border-dim)',
-          flexShrink: 0,
           background: 'var(--bg-surface)',
+          flexShrink: 0,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: spacing[2] }}>
-            <span style={{ fontSize: 16 }}>📄</span>
             <div>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13 }}>
+              <div style={{
+                fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14,
+                color: 'var(--text-primary)',
+              }}>
                 {data?.doc_type?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Document'}
               </div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-                {data?.filename || ''}
+              <div style={{
+                fontFamily: 'var(--font-mono)', fontSize: 10,
+                color: 'var(--text-dim)',
+              }}>
+                {data?.filename || 'Loading...'}
               </div>
             </div>
           </div>
-          <button type="button" onClick={onClose}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 18, padding: 4 }}
-            aria-label="Close">×</button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close document viewer"
+            style={{
+              width: 28, height: 28, borderRadius: 6,
+              border: '1px solid var(--border-dim)',
+              background: 'var(--bg-base)',
+              color: 'var(--text-dim)', fontSize: 14,
+              cursor: 'pointer', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              transition: 'background 150ms ease, color 150ms ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--bg-raised)';
+              e.currentTarget.style.color = 'var(--text-primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--bg-base)';
+              e.currentTarget.style.color = 'var(--text-dim)';
+            }}
+          >
+            ×
+          </button>
         </div>
 
-        {/* Split pane */}
+        {/* Split Pane */}
         <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-          {/* Left: PDF */}
-          <div style={{ flex: 1, borderRight: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '6px 12px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-dim)', fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-              Original Document
+
+          {/* Left: Original PDF */}
+          <div style={{
+            flex: 1, display: 'flex', flexDirection: 'column',
+            borderRight: '1px solid var(--border-dim)',
+            background: 'var(--bg-surface)',
+          }}>
+            <div style={{
+              padding: `${spacing[1]}px ${spacing[3]}px`,
+              borderBottom: '1px solid var(--border-dim)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <span style={{
+                fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
+                color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em',
+              }}>
+                Original Document
+              </span>
+              <a
+                href={pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  fontSize: 10, color: 'var(--mongo)', fontWeight: 600,
+                  textDecoration: 'none', fontFamily: 'var(--font-display)',
+                }}
+              >
+                Open in new tab ↗
+              </a>
             </div>
-            <iframe
-              src={pdfUrl}
-              title="PDF Viewer"
-              sandbox="allow-scripts allow-same-origin"
-              style={{ flex: 1, border: 'none', width: '100%' }}
-            />
+            <object
+              data={pdfUrl}
+              type="application/pdf"
+              style={{ flex: 1, width: '100%', border: 'none' }}
+            >
+              <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', height: '100%', padding: spacing[5],
+                color: 'var(--text-dim)', textAlign: 'center',
+              }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: 8, marginBottom: spacing[2],
+                  border: '2px solid var(--border-dim)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
+                  color: 'var(--text-dim)',
+                }}>PDF</div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: spacing[1] }}>
+                  PDF preview unavailable
+                </div>
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    padding: `${spacing[1]}px ${spacing[3]}px`,
+                    borderRadius: 6,
+                    border: 'none',
+                    background: 'var(--mongo)',
+                    color: '#fff',
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 600, fontSize: 12,
+                    textDecoration: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Download PDF
+                </a>
+              </div>
+            </object>
           </div>
 
-          {/* Right: Extracted data */}
+          {/* Right: Single scrollable view */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-            {/* Tabs */}
-            <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border-dim)', flexShrink: 0 }}>
-              {[
-                { id: 'structured', label: 'Extracted Fields' },
-                { id: 'text', label: 'Text Summary' },
-                { id: 'raw', label: 'Raw JSON' },
-              ].map((tab) => (
-                <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)}
-                  style={{
-                    padding: `${spacing[2]}px ${spacing[3]}px`, border: 'none', cursor: 'pointer',
-                    background: activeTab === tab.id ? 'var(--bg-base)' : 'var(--bg-surface)',
-                    color: activeTab === tab.id ? 'var(--mongo)' : 'var(--text-dim)',
-                    fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 600,
-                    borderBottom: activeTab === tab.id ? '2px solid var(--mongo)' : '2px solid transparent',
-                  }}>
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Tab content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: spacing[3] }}>
               {loading ? (
-                <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)', fontSize: 12 }}>Loading...</div>
+                <div style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  justifyContent: 'center', height: '100%', color: 'var(--text-dim)',
+                }}>
+                  <div style={{
+                    width: 24, height: 24, borderRadius: '50%',
+                    border: '2px solid var(--border-base)',
+                    borderTopColor: 'var(--mongo)',
+                    animation: 'spin 0.8s linear infinite',
+                    marginBottom: spacing[2],
+                  }} />
+                  <div style={{
+                    fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 500,
+                  }}>
+                    Loading document data...
+                  </div>
+                </div>
               ) : !data ? (
-                <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)', fontSize: 12 }}>Failed to load document data.</div>
-              ) : activeTab === 'structured' ? (
-                <StructuredView data={data.structured_data} />
-              ) : activeTab === 'text' ? (
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-                  {data.extracted_text || 'No text summary available.'}
+                <div style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  justifyContent: 'center', height: '100%', color: 'var(--text-dim)',
+                }}>
+                  <div style={{
+                    width: 24, height: 24, borderRadius: '50%',
+                    border: '2px solid var(--danger)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700,
+                    color: 'var(--danger)', marginBottom: spacing[2],
+                  }}>!</div>
+                  <div style={{
+                    fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 500,
+                  }}>
+                    Failed to load document data
+                  </div>
+                  <div style={{ fontSize: 10, marginTop: spacing[1] }}>Is the backend running?</div>
                 </div>
               ) : (
-                <pre style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 10, lineHeight: 1.5,
-                  color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0,
-                }}>
-                  {JSON.stringify(data, null, 2)}
-                </pre>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[3] }}>
+
+                  {/* 1. AI Attribution Banner */}
+                  <div style={{
+                    background: 'var(--agent-cyan-dim)',
+                    borderLeft: '3px solid var(--agent-cyan)',
+                    padding: `${spacing[1]}px ${spacing[2]}px`,
+                    width: '100%',
+                  }}>
+                    <span style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 10,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                      color: 'var(--agent-cyan)',
+                    }}>
+                      Extracted by Claude Haiku 4.5 · voyage-multimodal-3.5 embeddings
+                    </span>
+                  </div>
+
+                  {/* 2. Extracted Fields Section */}
+                  <div>
+                    <div style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                      color: 'var(--text-dim)',
+                      marginBottom: spacing[2],
+                    }}>
+                      Extracted Data
+                    </div>
+                    <ExtractedFields data={data.structured_data} />
+                  </div>
+
+                  {/* 3. AI-Generated Summary Section */}
+                  {data.extracted_text && (
+                    <div>
+                      <div style={{
+                        fontFamily: 'var(--font-display)',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        color: 'var(--text-dim)',
+                        marginBottom: spacing[2],
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        gap: spacing[1],
+                      }}>
+                        <span>AI-Generated Summary</span>
+                        <span style={{
+                          fontWeight: 500,
+                          fontSize: 10,
+                          textTransform: 'none',
+                          letterSpacing: 'normal',
+                          color: 'var(--text-dim)',
+                          opacity: 0.7,
+                        }}>
+                          (generated during document ingestion)
+                        </span>
+                      </div>
+                      <div style={{
+                        fontFamily: 'var(--font-body)',
+                        fontSize: 13,
+                        color: 'var(--text-secondary)',
+                        lineHeight: 1.7,
+                        whiteSpace: 'pre-wrap',
+                        background: 'var(--bg-surface)',
+                        padding: spacing[3],
+                        borderRadius: 8,
+                        border: '1px solid var(--border-dim)',
+                      }}>
+                        {data.extracted_text}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 4. MongoDB Document Section (collapsible) */}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setMongoExpanded((prev) => !prev)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: 0,
+                        fontFamily: 'var(--font-display)',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        color: 'var(--text-dim)',
+                        marginBottom: mongoExpanded ? spacing[2] : 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: spacing[1],
+                      }}
+                    >
+                      <span>MongoDB Document {mongoExpanded ? '\u25BE' : '\u25B8'}</span>
+                    </button>
+                    {mongoExpanded && (
+                      <pre style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 11,
+                        lineHeight: 1.6,
+                        color: 'var(--text-secondary)',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-all',
+                        margin: 0,
+                        marginTop: spacing[2],
+                        padding: spacing[3],
+                        background: 'var(--bg-surface)',
+                        borderRadius: 8,
+                        border: '1px solid var(--border-dim)',
+                      }}>
+                        {JSON.stringify(data, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+
+                </div>
               )}
             </div>
           </div>
@@ -159,35 +374,64 @@ export default function DocumentViewer({ docId, onClose }) {
   );
 }
 
-function StructuredView({ data }) {
+function ExtractedFields({ data }) {
   if (!data || typeof data !== 'object') {
-    return <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>No structured data available.</div>;
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', height: 200,
+        border: '1px dashed var(--border-dim)', borderRadius: 8,
+        color: 'var(--text-dim)', background: 'var(--bg-surface)',
+      }}>
+        <div style={{
+          fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 500,
+        }}>
+          No structured data available
+        </div>
+      </div>
+    );
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[2] }}>
-      {Object.entries(data).filter(([k]) => k !== 'text_summary' && k !== 'raw_response' && k !== 'error').map(([key, value]) => (
-        <div key={key} style={{
-          padding: '8px 12px', background: 'var(--bg-surface)',
-          borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-dim)',
-        }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[1] }}>
-            {key.replace(/_/g, ' ')}
-          </div>
-          {typeof value === 'object' && value !== null ? (
-            <pre style={{
-              fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-secondary)',
-              whiteSpace: 'pre-wrap', margin: 0, lineHeight: 1.5,
+      {Object.entries(data)
+        .filter(([k]) => k !== 'text_summary' && k !== 'raw_response' && k !== 'error')
+        .map(([key, value]) => (
+          <div key={key} style={{
+            padding: `${spacing[2]}px ${spacing[2]}px`,
+            background: 'var(--bg-surface)',
+            borderRadius: 8,
+            border: '1px solid var(--border-dim)',
+          }}>
+            <div style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 10,
+              fontWeight: 700,
+              color: 'var(--text-dim)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              marginBottom: spacing[1],
             }}>
-              {JSON.stringify(value, null, 2)}
-            </pre>
-          ) : (
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>
-              {String(value)}
+              {key.replace(/_/g, ' ')}
             </div>
-          )}
-        </div>
-      ))}
+            {typeof value === 'object' && value !== null ? (
+              <pre style={{
+                fontFamily: 'var(--font-mono)', fontSize: 11,
+                color: 'var(--text-secondary)',
+                whiteSpace: 'pre-wrap', margin: 0, lineHeight: 1.5,
+              }}>
+                {JSON.stringify(value, null, 2)}
+              </pre>
+            ) : (
+              <div style={{
+                fontFamily: 'var(--font-mono)', fontSize: 13,
+                color: 'var(--text-primary)', fontWeight: 600,
+              }}>
+                {String(value)}
+              </div>
+            )}
+          </div>
+        ))}
     </div>
   );
 }

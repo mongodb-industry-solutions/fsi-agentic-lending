@@ -9,7 +9,7 @@ const INITIAL_DOCUMENTS = [
     id: 'gov-id',
     type: 'Government IDs',
     docType: 'government_id',
-    icon: '\u{1FA2A}',
+    abbr: 'ID',
     fileName: 'ID_MarcusDelgado_AB_DL.pdf',
     size: '1.1 MB',
     pages: 2,
@@ -20,7 +20,7 @@ const INITIAL_DOCUMENTS = [
     id: 'employment',
     type: 'Employment Letters',
     docType: 'employment_letter',
-    icon: '\u{1F4BC}',
+    abbr: 'EMP',
     fileName: 'EmploymentLetter_TechNova.pdf',
     size: '412 KB',
     pages: 1,
@@ -31,7 +31,7 @@ const INITIAL_DOCUMENTS = [
     id: 'paystubs',
     type: 'Pay Stubs (6)',
     docType: 'paystubs',
-    icon: '\u{1F4C4}',
+    abbr: 'PAY',
     fileName: 'PayStubs_Delgado_Q4Q1.pdf',
     size: '1.8 MB',
     pages: 6,
@@ -42,7 +42,7 @@ const INITIAL_DOCUMENTS = [
     id: 'tax',
     type: 'CRA Tax Notices',
     docType: 'income_tax',
-    icon: '\u{1F4CB}',
+    abbr: 'TAX',
     fileName: 'NOA_2025_Delgado.pdf',
     size: '624 KB',
     pages: 4,
@@ -53,7 +53,7 @@ const INITIAL_DOCUMENTS = [
     id: 'bank',
     type: 'Bank Statements (3mo)',
     docType: 'bank_statements',
-    icon: '\u{1F3E6}',
+    abbr: 'BNK',
     fileName: 'TD_Statement_Jan-Mar2026.pdf',
     size: '1.4 MB',
     pages: 8,
@@ -64,7 +64,7 @@ const INITIAL_DOCUMENTS = [
     id: 'purchase',
     type: 'Purchase Agreement',
     docType: 'purchase_agreement',
-    icon: '\u{1F3E0}',
+    abbr: 'PSA',
     fileName: 'PurchaseAgreement_4718Coronation.pdf',
     size: '2.3 MB',
     pages: 12,
@@ -75,7 +75,7 @@ const INITIAL_DOCUMENTS = [
     id: 'investments',
     type: 'Investment Statements',
     docType: 'investment_statements',
-    icon: '\u{1F4CA}',
+    abbr: 'INV',
     fileName: 'RRSP_Investments_Delgado.pdf',
     size: '986 KB',
     pages: 3,
@@ -86,7 +86,7 @@ const INITIAL_DOCUMENTS = [
     id: 'property',
     type: 'Existing Property Docs',
     docType: 'other_property_docs',
-    icon: '\u{1F3E2}',
+    abbr: 'PTY',
     fileName: 'Condo_10180_104St_Edmonton.pdf',
     size: '1.6 MB',
     pages: 5,
@@ -97,7 +97,7 @@ const INITIAL_DOCUMENTS = [
     id: 'application',
     type: 'Mortgage Application',
     docType: 'mortgage_application',
-    icon: '\u{1F4DD}',
+    abbr: 'APP',
     fileName: 'MortgageApp_Delgado_APP-2026-00001.pdf',
     size: '542 KB',
     pages: 8,
@@ -108,7 +108,7 @@ const INITIAL_DOCUMENTS = [
     id: 'utilities',
     type: 'Utility Bills',
     docType: 'utility_bills',
-    icon: '\u26A1',
+    abbr: 'UTL',
     fileName: 'Utilities_Enmax_Feb2026.pdf',
     size: '218 KB',
     pages: 2,
@@ -119,7 +119,7 @@ const INITIAL_DOCUMENTS = [
     id: 'credit',
     type: 'Credit Reports',
     docType: 'credit_report',
-    icon: '\u{1F4B3}',
+    abbr: 'CRD',
     fileName: 'Equifax_Delgado_Mar2026.pdf',
     size: '1.3 MB',
     pages: 6,
@@ -130,7 +130,7 @@ const INITIAL_DOCUMENTS = [
     id: 'carloan',
     type: 'Car Loan Statement',
     docType: 'car_loan_statement',
-    icon: '\u{1F697}',
+    abbr: 'CAR',
     fileName: 'Scotiabank_AutoLoan_Delgado.pdf',
     size: '324 KB',
     pages: 2,
@@ -141,7 +141,7 @@ const INITIAL_DOCUMENTS = [
     id: 'proptax',
     type: 'Property Tax Notice',
     docType: 'property_tax',
-    icon: '\u{1F3DB}',
+    abbr: 'PTX',
     fileName: 'PropertyTax_Calgary_2026.pdf',
     size: '186 KB',
     pages: 1,
@@ -152,7 +152,7 @@ const INITIAL_DOCUMENTS = [
     id: 'inspection',
     type: 'Property Inspection',
     docType: 'property_inspection',
-    icon: '\u{1F50D}',
+    abbr: 'INS',
     fileName: 'Inspection_4718Coronation.pdf',
     size: '3.2 MB',
     pages: 14,
@@ -163,7 +163,7 @@ const INITIAL_DOCUMENTS = [
 
 function inferDocType(filename) {
   const name = filename.toLowerCase();
-  if (name.includes('id') || name.includes('government')) return 'government_id';
+  if (name.includes('government') || name.includes('gov_id') || name.includes('driver') || name.includes('licence') || name.includes('license') || name.includes('passport')) return 'government_id';
   if (name.includes('employment')) return 'employment_letter';
   if (name.includes('paystub') || name.includes('pay_stub')) return 'paystubs';
   if (name.includes('tax') && !name.includes('property')) return 'income_tax';
@@ -199,10 +199,17 @@ function DocCard({ doc, onViewDoc }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: 22,
         flexShrink: 0,
       }}>
-        {doc.icon}
+        <span style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 10,
+          fontWeight: 700,
+          color: 'var(--text-dim)',
+          letterSpacing: '0.02em',
+        }}>
+          {doc.abbr || 'DOC'}
+        </span>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
@@ -220,7 +227,7 @@ function DocCard({ doc, onViewDoc }) {
                 flexShrink: 0,
               }}
             >
-              <span style={{ fontSize: 11 }}>📄</span> View
+              View
             </button>
           )}
         </div>
@@ -236,7 +243,7 @@ function DocCard({ doc, onViewDoc }) {
             color: doc.status === 'error' ? 'var(--danger)' : doc.status === 'uploading' ? 'var(--hitl-amber)' : 'var(--success)',
             fontWeight: 600,
           }}>
-            {doc.status === 'uploading' ? '⏳ Uploading...' : doc.status === 'error' ? '✕ Error' : '✓ Uploaded'}
+            {doc.status === 'uploading' ? 'Uploading...' : doc.status === 'error' ? 'Error' : 'Uploaded'}
           </span>
         </div>
         <div style={{
@@ -252,7 +259,6 @@ function DocCard({ doc, onViewDoc }) {
           fontWeight: 600,
           color: 'var(--voyage)',
         }}>
-          <span style={{ fontSize: 10 }}>{'\u{1F9EC}'}</span>
           Processed by voyage-multimodal-3.5
         </div>
       </div>
@@ -267,9 +273,9 @@ export default function DocumentUpload({ applicationId }) {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    // Try the provided applicationId, or fall back to the demo app
-    const appId = applicationId || 'APP-2026-00001';
-    apiGet(`/applications/${appId}/documents`).then((docs) => {
+    if (!applicationId) return;
+
+    apiGet(`/applications/${applicationId}/documents`).then((docs) => {
       if (docs && Array.isArray(docs) && docs.length > 0) {
         setDocuments(prev => prev.map(d => {
           const match = docs.find(bd => bd.doc_type === d.docType);
@@ -351,7 +357,13 @@ export default function DocumentUpload({ applicationId }) {
           cursor: 'pointer',
         }}
       >
-        <div style={{ fontSize: 28, marginBottom: 6 }}>📂</div>
+        <div style={{
+          width: 40, height: 40, borderRadius: 8, marginBottom: 8,
+          border: '2px dashed var(--border-base)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--text-dim)', fontSize: 16, fontWeight: 700,
+          marginLeft: 'auto', marginRight: 'auto',
+        }}>+</div>
         <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)', marginBottom: 2 }}>
           Drag & drop files here or click to browse
         </div>

@@ -1,5 +1,7 @@
 """Underwriting Agent — calculates risk, GDS/TDS, and makes lending decisions."""
 import os
+import logging
+from datetime import datetime, timezone
 
 from agents.state import LendFlowState
 from agents.tools import (
@@ -10,6 +12,9 @@ from agents.tools import (
     log_agent_activity,
     update_application_status,
 )
+from db.mdb import get_db
+
+logger = logging.getLogger(__name__)
 from agents.prompts import UNDERWRITER_PROMPT
 from agents.tool_schemas import UNDERWRITING_ANALYSIS_TOOL
 from bedrock.anthropic_chat_completions import BedrockAnthropicChatCompletions
@@ -36,7 +41,7 @@ ESCALATE_TDS = float(os.getenv("ESCALATE_TDS", "0.41"))
 
 
 @traceable(name="underwriter_node")
-def underwriter_node(state: LendFlowState) -> dict:
+def underwriter_node(state: LendFlowState, **kwargs) -> dict:
     """Assess risk and make underwriting decision."""
     app_id = state["application_id"]
 
@@ -285,6 +290,44 @@ Risk Tier: {risk_tier}
 
     if decision == "escalate":
         update_application_status(app_id, "review", f"Escalated to officer review — {decision_reasoning}")
+        # Write advisory intervention so borrower knows what's happening
+        try:
+            db = get_db()
+            borrower_reasons = []
+            if purchase_price > ESCALATE_PURCHASE_PRICE:
+                borrower_reasons.append("your property value requires additional review")
+            if effective_gds > ESCALATE_GDS or effective_tds > ESCALATE_TDS:
+                borrower_reasons.append("your debt-to-income ratios are being reviewed for accuracy")
+            if risk_tier in ("B", "C"):
+                borrower_reasons.append("additional verification is needed for your application profile")
+            db["interventions"].insert_one({
+                "application_id": app_id,
+                "type": "additional_info_required",
+                "status": "pending",
+                "internal_context": {
+                    "source_node": "underwriter",
+                    "risk_flag": "escalation_review",
+                    "severity": "advisory",
+                    "decision_reasoning": decision_reasoning,
+                    "risk_score": float(risk_score),
+                    "risk_tier": risk_tier,
+                },
+                "borrower_context": {
+                    "summary": "Your application has been escalated for a detailed review by a loan officer.",
+                    "action_required": "No immediate action needed. " + (
+                        "The review was triggered because " + " and ".join(borrower_reasons) + "."
+                        if borrower_reasons else
+                        "A loan officer will reach out if additional information is required."
+                    ),
+                    "document_types_accepted": [],
+                },
+                "resolution": None,
+                "created_at": datetime.now(timezone.utc),
+                "resolved_at": None,
+            })
+            log_agent_activity(app_id, "underwriter", "intervention", "Created escalation advisory intervention")
+        except Exception as e:
+            logger.warning(f"Failed to create escalation intervention: {e}")
     elif decision == "decline":
         update_application_status(app_id, "declined", decision_reasoning)
     else:

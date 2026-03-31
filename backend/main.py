@@ -46,11 +46,13 @@ from routes.applications import router as applications_router
 from routes.documents import router as documents_router
 from routes.hitl import router as hitl_router
 from routes.agent import router as agent_router
+from routes.chat import router as chat_router
 
 app.include_router(applications_router, prefix="/api")
 app.include_router(documents_router, prefix="/api")
 app.include_router(hitl_router, prefix="/api")
 app.include_router(agent_router, prefix="/api")
+app.include_router(chat_router, prefix="/api")
 
 
 @app.get("/")

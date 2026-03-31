@@ -116,7 +116,7 @@ export default function NotificationFeed({ notifications }) {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
                 <span style={{ fontWeight: 600, fontSize: isSubEvent ? 10 : 11, color: style.accent }}>
-                  {n.stage.icon} {n.stage.label}
+                  {n.stage.label}
                 </span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)' }}>
                   {formatTime(n.time)}

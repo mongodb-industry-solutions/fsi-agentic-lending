@@ -71,16 +71,16 @@ const PROVENANCE_RECORDS = [
 ];
 
 const ADDITIONAL_CONTEXT = [
-  { label: 'Employment Verification', value: 'Marcus: 8+ years at TechNova Systems Inc. · Sofia: 9+ years at Covenant Health', icon: '💼' },
-  { label: 'Savings Reserves', value: '12 months of payments ($49,104) in verified savings + RRSP + investments', icon: '🏦' },
-  { label: 'Existing Property', value: 'Edmonton condo at 10180 104 St NW — rented at $2,200/mo, mortgage $231,450 remaining', icon: '📊' },
+  { label: 'Employment Verification', value: 'Marcus: 8+ years at TechNova Systems Inc. · Sofia: 9+ years at Covenant Health' },
+  { label: 'Savings Reserves', value: '12 months of payments ($49,104) in verified savings + RRSP + investments' },
+  { label: 'Existing Property', value: 'Edmonton condo at 10180 104 St NW — rented at $2,200/mo, mortgage $231,450 remaining' },
 ];
 
 const POLICY_BOUNDS = [
-  { rule: 'Auto-approve if score > 80 and GDS < 36%', icon: '✓' },
-  { rule: 'Escalate if property value > $500,000', icon: '🔒' },
-  { rule: 'Escalate on ≥3 hard inquiries in 180 days', icon: '🔒' },
-  { rule: 'Auto-decline if GDS > 50% or score < 35', icon: '✕' },
+  { rule: 'Auto-approve if score > 80 and GDS < 36%', marker: 'PASS' },
+  { rule: 'Escalate if property value > $500,000', marker: 'ESC' },
+  { rule: 'Escalate on ≥3 hard inquiries in 180 days', marker: 'ESC' },
+  { rule: 'Auto-decline if GDS > 50% or score < 35', marker: 'FAIL' },
 ];
 
 const AUDIT_STAGES = [
@@ -109,7 +109,7 @@ function ModifiedParamsBadge({ settings }) {
       background: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)',
       fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-mono)',
     }}>
-      ⚙ {mods.join(' · ')}
+      {mods.join(' · ')}
     </div>
   );
 }
@@ -130,7 +130,7 @@ function ObserveConfirmBar({ currentStage, nextLabel, onContinue, onTakeOver }) 
     }}>
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>
-          👁 Observe Mode — Stage complete: {WORKFLOW_STAGES[currentStage].label}
+          Observe Mode — Stage complete: {WORKFLOW_STAGES[currentStage].label}
         </div>
         <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
           {nextLabel ? `Ready to advance to ${nextLabel}. Confirm to continue.` : 'All stages complete. Proceed to officer review.'}
@@ -174,14 +174,19 @@ function PolicyBoundsIndicator({ exceeded }) {
         fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
         color: exceeded ? 'var(--hitl-amber)' : 'var(--tool-blue)', marginBottom: 6,
       }}>
-        {exceeded ? '⚠ Boundary Exceeded — Escalating' : '🔒 Active Policy Bounds'}
+        {exceeded ? 'Boundary Exceeded — Escalating' : 'Active Policy Bounds'}
       </div>
       {POLICY_BOUNDS.map((b, i) => (
         <div key={i} style={{
           fontSize: 9, color: 'var(--text-secondary)', lineHeight: 1.6,
           opacity: exceeded && i >= 2 ? 1 : 0.8,
         }}>
-          <span style={{ marginRight: 4, color: exceeded && i === 2 ? 'var(--hitl-amber)' : 'var(--text-dim)' }}>{b.icon}</span>
+          <span style={{
+            display: 'inline-block', fontFamily: 'var(--font-mono)', fontSize: 7, fontWeight: 700,
+            padding: '1px 3px', borderRadius: 2, marginRight: 4,
+            background: b.marker === 'PASS' ? 'var(--success-dim)' : b.marker === 'FAIL' ? 'var(--danger-dim)' : 'var(--hitl-amber-dim)',
+            color: b.marker === 'PASS' ? 'var(--success)' : b.marker === 'FAIL' ? 'var(--danger)' : 'var(--hitl-amber)',
+          }}>{b.marker}</span>
           {b.rule}
           {exceeded && i === 2 && (
             <span style={{ marginLeft: 4, fontSize: 8, fontWeight: 700, color: 'var(--hitl-amber)' }}>← TRIGGERED</span>
@@ -219,7 +224,7 @@ function AutoAuditSummary({ stageTimestamps, approvalDetails, onRollback, onAcce
             background: 'var(--success-dim)', color: 'var(--success)',
             fontWeight: 700, fontSize: 11,
           }}>
-            ✅ Autonomous Approval Complete
+            Autonomous Approval Complete
           </span>
         </div>
         <span style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
@@ -332,7 +337,7 @@ function ManualWorkspace({ onApprove, onDecline, addToast }) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
         <div style={{ padding: 20, background: 'var(--success-dim)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--success)', textAlign: 'center', maxWidth: 360 }}>
-          <div style={{ fontSize: 24, marginBottom: 4 }}>✅</div>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 4px', fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 800, color: 'var(--success)' }}>&#10003;</div>
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16, color: 'var(--success)' }}>MANUALLY APPROVED</div>
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
             {PAYLOAD.product} @ {rate.toFixed(3)}% · {PAYLOAD.applicant}
@@ -367,7 +372,7 @@ function ManualWorkspace({ onApprove, onDecline, addToast }) {
           border: '1px solid var(--border-dim)',
           fontSize: 10, color: 'var(--hitl-amber)', fontWeight: 600,
         }}>
-          ⚠ Agent activity log paused — manual review in progress
+          Agent activity log paused — manual review in progress
         </div>
 
         {/* Applicant card */}
@@ -461,11 +466,11 @@ function HITLReviewCard({ onApprove, onDecline, addToast }) {
 
   const handleRequestContext = () => {
     setFetchingContext(true);
-    if (addToast) addToast({ type: 'info', icon: '🔎', title: 'Fetching Context', message: 'Agent is retrieving additional applicant data...' });
+    if (addToast) addToast({ type: 'info', title: 'Fetching Context', message: 'Agent is retrieving additional applicant data...' });
     setTimeout(() => {
       setFetchingContext(false);
       setExtraContext(ADDITIONAL_CONTEXT);
-      if (addToast) addToast({ type: 'success', icon: '📋', title: 'Context Retrieved', message: '3 additional data points available for review.' });
+      if (addToast) addToast({ type: 'success', title: 'Context Retrieved', message: '3 additional data points available for review.' });
     }, 2000);
   };
 
@@ -480,7 +485,7 @@ function HITLReviewCard({ onApprove, onDecline, addToast }) {
       const parts = [`Rate: ${details.rate}`];
       if (modFields.conditions) parts.push(`Condition: ${modFields.conditions}`);
       if (modFields.requestDocs) parts.push('Additional docs requested');
-      addToast({ type: 'success', icon: '✅', title: 'Approved with Modifications', message: parts.join(' · ') });
+      addToast({ type: 'success', title: 'Approved with Modifications', message: parts.join(' · ') });
     }
     onApprove(details);
   };
@@ -624,7 +629,7 @@ function HITLReviewCard({ onApprove, onDecline, addToast }) {
           </div>
           {extraContext.map((ctx) => (
             <div key={ctx.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 4 }}>
-              <span style={{ fontSize: 12 }}>{ctx.icon}</span>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--success)', flexShrink: 0, marginTop: 5 }} />
               <div>
                 <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-primary)' }}>{ctx.label}</div>
                 <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{ctx.value}</div>
@@ -805,7 +810,7 @@ function HITLReviewCard({ onApprove, onDecline, addToast }) {
           cursor: fetchingContext || extraContext ? 'default' : 'pointer',
           opacity: extraContext ? 0.5 : 1,
         }}>
-          {fetchingContext ? '⏳ Fetching...' : extraContext ? '✓ Context Loaded' : '🔎 Request More Context'}
+          {fetchingContext ? 'Fetching...' : extraContext ? 'Context Loaded' : 'Request More Context'}
         </button>
         <button type="button" onClick={() => onDecline?.()} style={{
           flex: '1 1 auto', padding: 10, borderRadius: 'var(--radius-md)',
@@ -938,22 +943,22 @@ export default function LoanOfficerDashboard() {
       if (stage >= WORKFLOW_STAGES.length) {
         setHitlReached(true);
         if (autonomyLevel === 'auto') {
-          addToast({ type: 'info', icon: '🚀', title: 'Full Auto', message: 'Agent auto-approved application per Full Auto policy.' });
+          addToast({ type: 'info', title: 'Full Auto', message: 'Agent auto-approved application per Full Auto policy.' });
           setTimeout(() => {
             setApproved(true);
             setApprovalDetails({ mode: 'auto', rate: PAYLOAD.proposedRate });
           }, 1500);
         } else {
-          addToast({ type: 'warning', icon: '✋', title: 'HITL Review Required', message: 'Agent workflow paused. APP-2026-00001 awaiting your decision.' });
+          addToast({ type: 'warning', title: 'HITL Review Required', message: 'Agent workflow paused. APP-2026-00001 awaiting your decision.' });
         }
         return;
       }
       setWorkflowStage(stage);
-      addToast({ type: 'info', icon: '⚙️', title: `Stage: ${WORKFLOW_STAGES[stage].label}`, message: `Processing ${WORKFLOW_STAGES[stage].label.toLowerCase()} for Marcus & Sofia Delgado.` });
+      addToast({ type: 'info', title: `Stage: ${WORKFLOW_STAGES[stage].label}`, message: `Processing ${WORKFLOW_STAGES[stage].label.toLowerCase()} for Marcus & Sofia Delgado.` });
       timerRef.current = setTimeout(advance, 4000);
     };
 
-    addToast({ type: 'info', icon: '▶', title: 'Workflow Started', message: `Processing ${WORKFLOW_STAGES[0].label.toLowerCase()} for Marcus & Sofia Delgado.` });
+    addToast({ type: 'info', title: 'Workflow Started', message: `Processing ${WORKFLOW_STAGES[0].label.toLowerCase()} for Marcus & Sofia Delgado.` });
     timerRef.current = setTimeout(advance, 4000);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [workflowPhase]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -965,7 +970,7 @@ export default function LoanOfficerDashboard() {
     if (autonomyLevel === 'observe') {
       setWorkflowPhase('observe-step');
       stageTimestampsRef.current = [Date.now()];
-      addToast({ type: 'info', icon: '👁', title: 'Observe Mode', message: `Processing ${WORKFLOW_STAGES[0].label.toLowerCase()}. Waiting for your confirmation to advance.` });
+      addToast({ type: 'info', title: 'Observe Mode', message: `Processing ${WORKFLOW_STAGES[0].label.toLowerCase()}. Waiting for your confirmation to advance.` });
     } else {
       setWorkflowPhase('executing');
     }
@@ -976,16 +981,16 @@ export default function LoanOfficerDashboard() {
     stageTimestampsRef.current.push(Date.now());
     if (nextStage >= WORKFLOW_STAGES.length) {
       setHitlReached(true);
-      addToast({ type: 'warning', icon: '✋', title: 'HITL Review Required', message: 'All stages complete. APP-2026-00001 awaiting your decision.' });
+      addToast({ type: 'warning', title: 'HITL Review Required', message: 'All stages complete. APP-2026-00001 awaiting your decision.' });
       return;
     }
     setWorkflowStage(nextStage);
-    addToast({ type: 'info', icon: '👁', title: `Stage: ${WORKFLOW_STAGES[nextStage].label}`, message: `Processing ${WORKFLOW_STAGES[nextStage].label.toLowerCase()}. Confirm to advance.` });
+    addToast({ type: 'info', title: `Stage: ${WORKFLOW_STAGES[nextStage].label}`, message: `Processing ${WORKFLOW_STAGES[nextStage].label.toLowerCase()}. Confirm to advance.` });
   }, [workflowStage, addToast]);
 
   const handleManual = useCallback(() => {
     setWorkflowPhase('manual');
-    addToast({ type: 'info', icon: '👤', title: 'Manual Mode', message: 'Agent bypassed. You are handling this application directly.' });
+    addToast({ type: 'info', title: 'Manual Mode', message: 'Agent bypassed. You are handling this application directly.' });
   }, [addToast]);
 
   const handleApprove = useCallback(async (details) => {
@@ -993,7 +998,7 @@ export default function LoanOfficerDashboard() {
     setApprovalDetails(details || { mode: 'recommended', rate: PAYLOAD.proposedRate });
     const rate = details?.rate || PAYLOAD.proposedRate;
     const suffix = details?.conditions ? ` · Conditions: ${details.conditions}` : '';
-    addToast({ type: 'success', icon: '✅', title: 'Loan Approved', message: `${PAYLOAD.product} @ ${rate} for ${PAYLOAD.applicant}.${suffix}` });
+    addToast({ type: 'success', title: 'Loan Approved', message: `${PAYLOAD.product} @ ${rate} for ${PAYLOAD.applicant}.${suffix}` });
 
     // Also submit to backend if we have a matching live application
     const liveApp = liveApplications.find((a) => a.application_id === selectedApp);
@@ -1009,7 +1014,7 @@ export default function LoanOfficerDashboard() {
   const handleDecline = useCallback(async () => {
     setApproved(true);
     setApprovalDetails({ mode: 'declined' });
-    addToast({ type: 'warning', icon: '✕', title: 'Application Declined', message: `${PAYLOAD.applicant} — declined after manual review.` });
+    addToast({ type: 'warning', title: 'Application Declined', message: `${PAYLOAD.applicant} — declined after manual review.` });
 
     const liveApp = liveApplications.find((a) => a.application_id === selectedApp);
     const appId = liveApp?.application_id || selectedApp;
@@ -1040,9 +1045,9 @@ export default function LoanOfficerDashboard() {
     if (!isPrimaryApp) return null;
     if (approved) return { label: '✓ Approved', bg: 'var(--success-dim)', color: 'var(--success)' };
     if (hitlReached) return { label: '⏸ Awaiting Review', bg: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)' };
-    if (workflowPhase === 'preview') return { label: '📋 Plan Ready', bg: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' };
-    if (workflowPhase === 'manual') return { label: '👤 Manual Mode', bg: 'var(--bg-raised)', color: 'var(--text-secondary)' };
-    if (workflowPhase === 'observe-step') return { label: `👁 Observe: ${currentWorkflow.label}`, bg: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' };
+    if (workflowPhase === 'preview') return { label: 'Plan Ready', bg: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' };
+    if (workflowPhase === 'manual') return { label: 'Manual Mode', bg: 'var(--bg-raised)', color: 'var(--text-secondary)' };
+    if (workflowPhase === 'observe-step') return { label: `Observe: ${currentWorkflow.label}`, bg: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' };
     return { label: `Processing: ${currentWorkflow.label}`, bg: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' };
   };
 
@@ -1148,11 +1153,11 @@ export default function LoanOfficerDashboard() {
                 }}>
                   <span style={{ fontWeight: 700, color: 'var(--text-primary)', marginRight: 6 }}>
                     {workflowPhase === 'preview'
-                      ? '📋 Execution Plan'
+                      ? 'Execution Plan'
                       : workflowPhase === 'observe-step'
-                        ? hitlReached ? '✋ HITL Gate' : `👁 Observe: ${currentWorkflow.label}`
+                        ? hitlReached ? 'HITL Gate' : `Observe: ${currentWorkflow.label}`
                         : hitlReached
-                          ? '✋ HITL Gate'
+                          ? 'HITL Gate'
                           : `Stage: ${currentWorkflow.label}`
                     }
                   </span>
@@ -1173,7 +1178,7 @@ export default function LoanOfficerDashboard() {
             ) : !isPrimaryApp ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-dim)', fontSize: 13 }}>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
+                  <div style={{ width: 48, height: 48, borderRadius: 8, border: '2px dashed var(--border-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: 'var(--text-dim)' }}>APP</div>
                   {selectedAppDetail ? (
                     <>
                       <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>
@@ -1210,7 +1215,7 @@ export default function LoanOfficerDashboard() {
           {isPrimaryApp && approved && approvalDetails?.mode !== 'auto' && (
             <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)', background: 'var(--bg-base)', textAlign: 'center' }}>
               <div style={{ padding: 14, background: 'var(--success-dim)', borderRadius: 'var(--radius-md)', border: '1px solid var(--success)' }}>
-                <div style={{ fontSize: 24, marginBottom: 4 }}>✅</div>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 4px', fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 800, color: 'var(--success)' }}>&#10003;</div>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16, color: 'var(--success)' }}>LOAN APPROVED</div>
                 <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
                   {PAYLOAD.product} @ {approvalDetails?.rate || PAYLOAD.proposedRate} · {PAYLOAD.monthlyPayment}/mo · Workflow resumed from checkpoint

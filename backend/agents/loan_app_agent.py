@@ -1,5 +1,7 @@
 """Loan Application Agent — processes documents, verifies identity, pulls credit."""
 import json
+import logging
+from datetime import datetime, timezone
 
 from agents.state import LendFlowState
 from agents.tools import (
@@ -11,6 +13,9 @@ from agents.tools import (
 )
 from agents.prompts import LOAN_APP_AGENT_PROMPT
 from bedrock.anthropic_chat_completions import BedrockAnthropicChatCompletions
+from db.mdb import get_db
+
+logger = logging.getLogger(__name__)
 
 try:
     from langsmith import traceable
@@ -29,7 +34,7 @@ def _get_llm():
 
 
 @traceable(name="loan_app_node")
-def loan_app_node(state: LendFlowState) -> dict:
+def loan_app_node(state: LendFlowState, **kwargs) -> dict:
     """Process loan application documents and verify borrower information."""
     app_id = state["application_id"]
 
@@ -93,6 +98,37 @@ def loan_app_node(state: LendFlowState) -> dict:
         update_application_status(app_id, "underwriting", "Documents verified — proceeding to underwriting")
     else:
         log_agent_activity(app_id, "loan_app_agent", "verification", f"Only {doc_count} documents found — minimum 10 required")
+        # Write intervention for missing documents
+        try:
+            db = get_db()
+            existing_types = {d.get("doc_type") for d in documents}
+            required_types = {"government_id", "employment_letter", "paystubs", "income_tax",
+                              "bank_statements", "purchase_agreement", "mortgage_application",
+                              "credit_report", "investment_statements", "utility_bills"}
+            missing = required_types - existing_types
+            if missing:
+                db["interventions"].insert_one({
+                    "application_id": app_id,
+                    "type": "missing_document",
+                    "status": "pending",
+                    "internal_context": {
+                        "source_node": "loan_app_agent",
+                        "risk_flag": "incomplete_documentation",
+                        "severity": "advisory",
+                        "missing_types": list(missing),
+                    },
+                    "borrower_context": {
+                        "summary": f"We noticed {len(missing)} document(s) may be missing from your application.",
+                        "action_required": "Please upload the missing documents to strengthen your application.",
+                        "document_types_accepted": list(missing),
+                    },
+                    "resolution": None,
+                    "created_at": datetime.now(timezone.utc),
+                    "resolved_at": None,
+                })
+                log_agent_activity(app_id, "loan_app_agent", "intervention", f"Created missing_document intervention for {len(missing)} types")
+        except Exception as e:
+            logger.warning(f"Failed to create intervention: {e}")
 
     return {
         "documents_verified": documents_verified,

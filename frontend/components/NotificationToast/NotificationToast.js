@@ -98,9 +98,11 @@ function Toast({ toast, onDismiss }) {
       }}
       onClick={dismiss}
     >
-      <span style={{ fontSize: 14, flexShrink: 0 }}>
-        {toast.icon || "🔔"}
-      </span>
+      <span style={{
+        width: 8, height: 8, borderRadius: '50%',
+        background: colors.border,
+        flexShrink: 0, marginTop: 4,
+      }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         {toast.title && (
           <div

@@ -4,31 +4,6 @@ import { useState } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import TextInput from '@leafygreen-ui/text-input';
 
-const INITIAL_DATA = {
-  firstName: 'Marcus',
-  middleInitial: 'A',
-  lastName: 'Delgado',
-  email: 'marcus.delgado@email.com',
-  phone: '(587) 555-0147',
-  sin: '***-***-482',
-  address: '4821 Varsity Drive NW, Apt 305, Edmonton, AB T5K 2M4',
-  employer: 'TechNova Systems Inc.',
-  jobTitle: 'Senior Software Engineer',
-  yearsEmployed: '8',
-  annualIncome: '128500',
-  coApplicantName: 'Sofia Delgado',
-  coApplicantIncome: '94200',
-  propertyAddress: '4718 Coronation Drive SW, Calgary, AB T3E 4Y2',
-  annualPropertyTax: '6815',
-  loanAmount: '875000',
-  loanPurpose: 'Purchase',
-  propertyType: 'Detached Home',
-  productType: '5yr Fixed (25yr Amort)',
-  downPayment: '175000',
-  existingDebt: '1842',
-  creditScore: '784',
-};
-
 function FormSection({ title, children }) {
   return (
     <div style={{ marginBottom: spacing[5] }}>
@@ -63,8 +38,8 @@ function Field({ label, value, onChange, type = 'text', span2 = false, readOnly 
   );
 }
 
-export default function ApplicationForm({ onSubmit }) {
-  const [form, setForm] = useState(INITIAL_DATA);
+export default function ApplicationForm({ onSubmit, borrowerProfile }) {
+  const [form, setForm] = useState(borrowerProfile || {});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {

@@ -3,7 +3,7 @@ from agents.state import LendFlowState
 from agents.tools import log_agent_activity
 
 
-def supervisor_node(state: LendFlowState) -> dict:
+def supervisor_node(state: LendFlowState, **kwargs) -> dict:
     """Decide which agent should handle the next step."""
     app_id = state["application_id"]
     autonomy = state.get("autonomy_level", "bounded")
@@ -60,6 +60,6 @@ def supervisor_node(state: LendFlowState) -> dict:
     return {"current_agent": natural_next, "retry_count": 0}
 
 
-def route_from_supervisor(state: LendFlowState) -> str:
+def route_from_supervisor(state: LendFlowState, **kwargs) -> str:
     """Conditional edge function — returns the next node name."""
     return state.get("current_agent", "loan_app")

@@ -17,9 +17,9 @@ from agents.tools import log_agent_activity, update_application_status
 def safe_node(node_fn):
     """Catches errors and writes to state instead of crashing the graph."""
     @functools.wraps(node_fn)
-    def wrapper(state: LendFlowState) -> dict:
+    def wrapper(state: LendFlowState, **kwargs) -> dict:
         try:
-            return node_fn(state)
+            return node_fn(state, **kwargs)
         except Exception as e:
             app_id = state.get("application_id", "unknown")
             log_agent_activity(app_id, node_fn.__name__, "error", str(e)[:500])
@@ -30,7 +30,7 @@ def safe_node(node_fn):
     return wrapper
 
 
-def hitl_gate(state: LendFlowState) -> dict:
+def hitl_gate(state: LendFlowState, **kwargs) -> dict:
     """HITL gate — pauses execution for officer review via LangGraph interrupt()."""
     app_id = state["application_id"]
 
@@ -105,7 +105,7 @@ def hitl_gate(state: LendFlowState) -> dict:
     return state_updates
 
 
-def completion_node(state: LendFlowState) -> dict:
+def completion_node(state: LendFlowState, **kwargs) -> dict:
     """Final node — logs completion."""
     app_id = state["application_id"]
     decision = state.get("decision", "unknown")

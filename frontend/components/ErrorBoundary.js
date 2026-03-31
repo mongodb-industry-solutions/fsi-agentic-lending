@@ -22,7 +22,13 @@ class ErrorBoundary extends React.Component {
           padding: 40, textAlign: 'center',
           color: 'var(--text-secondary)', fontSize: 13,
         }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>⚠</div>
+          <div style={{
+            width: 40, height: 40, borderRadius: '50%', marginBottom: 12,
+            border: '2px solid var(--danger)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700,
+            color: 'var(--danger)', marginLeft: 'auto', marginRight: 'auto',
+          }}>!</div>
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, marginBottom: 8, color: 'var(--text-primary)' }}>
             Something went wrong
           </div>

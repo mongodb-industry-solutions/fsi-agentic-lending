@@ -57,4 +57,17 @@ COLLECTIONS = {
             {"keys": [("loan_id", 1), ("timestamp", -1)]},
         ],
     },
+    "conversations": {
+        "description": "Application Agent chat history (borrower PII — separate retention policy)",
+        "indexes": [
+            {"keys": [("application_id", 1)], "unique": True},
+        ],
+    },
+    "interventions": {
+        "description": "Pipeline-to-borrower action items (shared mailbox between pipeline and app agent)",
+        "indexes": [
+            {"keys": [("application_id", 1), ("status", 1)]},
+            {"keys": [("created_at", -1)]},
+        ],
+    },
 }

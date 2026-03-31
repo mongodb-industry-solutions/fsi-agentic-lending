@@ -5,9 +5,9 @@ import { spacing } from '@leafygreen-ui/tokens';
 import { apiGet } from '../../lib/api';
 
 const SCREENS = [
-  { id: "borrower", label: "Borrower Portal", icon: "👤" },
-  { id: "officer", label: "Loan Officer", icon: "🏦" },
-  { id: "demo", label: "Demo Flow", icon: "▶" },
+  { id: "borrower", label: "Borrower Portal" },
+  { id: "officer", label: "Loan Officer" },
+  { id: "demo", label: "Demo Flow" },
 ];
 
 export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
@@ -64,7 +64,7 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
             fontFamily: "var(--font-display)",
             fontWeight: 800,
             fontSize: 16,
-            color: "#ffffff",
+            color: "var(--text-inverse, #fff)",
             position: "relative",
             overflow: "hidden",
           }}
@@ -86,10 +86,10 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
             fontWeight: 700,
             fontSize: 16,
             letterSpacing: -0.3,
-            color: "#FFFFFF",
+            color: "var(--text-inverse, #fff)",
           }}
         >
-          Lend<em style={{ fontStyle: "normal", color: "#00ED64" }}>Flow</em>{" "}
+          Lend<em style={{ fontStyle: "normal", color: "var(--mongo)" }}>Flow</em>{" "}
           AI
         </span>
       </div>
@@ -123,7 +123,7 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
                   : "rgba(255,255,255,0.08)",
               color:
                 activeScreen === screen.id
-                  ? "#00ED64"
+                  ? "var(--mongo)"
                   : "rgba(255,255,255,0.7)",
               fontFamily: "var(--font-display)",
               fontSize: 12,
@@ -132,7 +132,6 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
               transition: "all 0.3s",
             }}
           >
-            <span style={{ fontSize: 13 }}>{screen.icon}</span>
             {screen.label}
           </button>
         ))}
@@ -172,7 +171,7 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
                 width: 6,
                 height: 6,
                 borderRadius: "50%",
-                background: chip.on ? "#00ED64" : "#DB3030",
+                background: chip.on ? "var(--mongo)" : "var(--danger)",
                 boxShadow: chip.on ? "0 0 6px rgba(0,237,100,0.4)" : "none",
               }}
             />

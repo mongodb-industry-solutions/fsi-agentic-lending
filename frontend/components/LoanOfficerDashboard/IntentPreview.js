@@ -9,7 +9,7 @@ const PLAN_STEPS = [
     label: 'Document Verification',
     tool: 'voyage-multimodal-3.5',
     est: '~480ms',
-    icon: '🧬',
+    step: 1,
     description: 'Extract and embed CRA notices, bank statements, and pay stubs using multimodal AI',
     editable: { skipable: true, label: 'Run document verification' },
   },
@@ -18,7 +18,7 @@ const PLAN_STEPS = [
     label: 'Credit Bureau Pull',
     tool: 'Equifax API',
     est: '~120ms',
-    icon: '📋',
+    step: 2,
     description: 'Retrieve credit report and score from primary bureau',
     editable: { skipable: false },
   },
@@ -27,7 +27,7 @@ const PLAN_STEPS = [
     label: 'Open Banking Enrichment',
     tool: 'Plaid Connect',
     est: '~95ms',
-    icon: '🏦',
+    step: 3,
     description: 'Pull 12-month transaction history for cash flow analysis',
     editable: { skipable: true, label: 'Include banking data' },
   },
@@ -36,7 +36,7 @@ const PLAN_STEPS = [
     label: 'Risk Scoring',
     tool: 'db.riskScores.aggregate()',
     est: '~18ms',
-    icon: '📊',
+    step: 4,
     description: '7-stage aggregation pipeline covering GDS, LTV, credit depth, cash flow, employment stability, collateral, and comparable analysis',
     editable: {
       skipable: false,
@@ -48,7 +48,7 @@ const PLAN_STEPS = [
     label: 'Policy Compliance Check',
     tool: 'Atlas Vector Search',
     est: '~12ms',
-    icon: '🔎',
+    step: 5,
     description: 'RAG query against institutional lending policies and regulatory requirements',
     editable: { skipable: false },
   },
@@ -57,7 +57,7 @@ const PLAN_STEPS = [
     label: 'Fraud Detection',
     tool: '$graphLookup',
     est: '~24ms',
-    icon: '🕸',
+    step: 6,
     description: '3-hop entity graph traversal across linked entities for anomaly detection',
     editable: {
       skipable: true,
@@ -163,8 +163,17 @@ export default function IntentPreview({ applicationId, onProceed, onManual }) {
 
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {step.icon} {step.label}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    <span style={{
+                      width: 18, height: 18, borderRadius: '50%',
+                      background: step.status === 'complete' ? 'var(--success)' : 'var(--bg-raised)',
+                      border: step.status === 'complete' ? 'none' : '1.5px solid var(--border-base)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 9, fontWeight: 700,
+                      color: step.status === 'complete' ? '#fff' : 'var(--text-dim)',
+                      flexShrink: 0,
+                    }}>{step.status === 'complete' ? '\u2713' : step.step}</span>
+                    {step.label}
                   </span>
                   <span style={{
                     fontFamily: 'var(--font-mono)',

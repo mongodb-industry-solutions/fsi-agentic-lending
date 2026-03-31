@@ -61,6 +61,13 @@ def main():
         else:
             raise
 
+    # Ensure standard collections exist (conversations, interventions, etc.)
+    for coll_name in COLLECTIONS:
+        if "time_series" not in COLLECTIONS[coll_name]:
+            if coll_name not in db.list_collection_names():
+                db.create_collection(coll_name)
+                print(f"  Created collection: {coll_name}")
+
     # Create standard indexes
     for coll_name, coll_config in COLLECTIONS.items():
         if "time_series" in coll_config:

@@ -3,10 +3,10 @@
 import { useState } from 'react';
 
 const LEVELS = [
-  { id: 'observe', label: 'Observe Only', icon: '👁', description: 'Agent suggests but takes no action. You control every step.' },
-  { id: 'suggest', label: 'Suggest & Confirm', icon: '🤝', description: 'Agent plans and proposes. You approve before execution.' },
-  { id: 'bounded', label: 'Act Within Limits', icon: '⚡', description: 'Agent executes within policy bounds. Escalates edge cases.' },
-  { id: 'auto', label: 'Full Auto', icon: '🚀', description: 'Agent handles end-to-end autonomously.' },
+  { id: 'observe', label: 'Observe Only', description: 'Agent suggests but takes no action. You control every step.' },
+  { id: 'suggest', label: 'Suggest & Confirm', description: 'Agent plans and proposes. You approve before execution.' },
+  { id: 'bounded', label: 'Act Within Limits', description: 'Agent executes within policy bounds. Escalates edge cases.' },
+  { id: 'auto', label: 'Full Auto', description: 'Agent handles end-to-end autonomously.' },
 ];
 
 export default function AutonomyDial({ value, onChange }) {
@@ -66,7 +66,7 @@ export default function AutonomyDial({ value, onChange }) {
                 whiteSpace: 'nowrap',
               }}
             >
-              {level.icon} {level.label}
+              {level.label}
             </button>
           );
         })}

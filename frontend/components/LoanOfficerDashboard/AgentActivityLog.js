@@ -10,7 +10,7 @@ const ACTIVITY_TEMPLATES = [
     action: 'Routing to Loan Application Agent',
     op: 'db.loanApplications.insertOne()',
     latency: '4ms',
-    icon: '🧭',
+    icon: null,
     reasoning: 'Application MD-00001 classified as standard origination. Loan Application Agent selected based on product type (5yr Fixed) and document completeness (14/14 required docs present).',
     details: {
       input: '{ applicantId: "MD-00001", product: "5YR_FIXED_25", docs: 14 }',
@@ -25,7 +25,7 @@ const ACTIVITY_TEMPLATES = [
     action: 'Multi-document ingestion started',
     op: 'watch(loanApplications)',
     latency: '—',
-    icon: '📝',
+    icon: null,
     reasoning: 'Initiating Change Stream listener on loanApplications collection to track document processing events in real-time. This enables reactive pipeline orchestration.',
     details: {
       input: '{ collection: "loanApplications", pipeline: [{ $match: { appId: "MD-00001" } }] }',
@@ -40,7 +40,7 @@ const ACTIVITY_TEMPLATES = [
     action: 'Multimodal embedding: CRA tax notice image + text',
     op: 'voyage-multimodal-3.5.embed()',
     latency: '38ms',
-    icon: '🧬',
+    icon: null,
     reasoning: 'CRA tax notice selected for multimodal processing because it contains both structured text fields (employer, income) and visual layout cues (box positions) that improve extraction accuracy by 12% vs text-only.',
     details: {
       input: '{ docType: "CRA_NOA", pages: 2, mode: "image+text", year: 2025 }',
@@ -55,7 +55,7 @@ const ACTIVITY_TEMPLATES = [
     action: 'Credit bureau pull: Equifax',
     op: 'db.creditReports.findOne()',
     latency: '2ms',
-    icon: '📋',
+    icon: null,
     reasoning: 'Selected Equifax as primary Canadian bureau per policy §2.1.3. Cached report found — last refreshed 4 hours ago, within 24h freshness policy.',
     details: {
       input: '{ sin_hash: "sha256:a8f2...", bureau: "equifax" }',
@@ -70,7 +70,7 @@ const ACTIVITY_TEMPLATES = [
     action: 'Multimodal embedding: Bank Statement pages',
     op: 'voyage-multimodal-3.5.embed()',
     latency: '42ms',
-    icon: '🧬',
+    icon: null,
     reasoning: 'Bank statement requires multimodal processing for table extraction across 4 pages. Column alignment detected via vision encoder improves transaction categorization accuracy.',
     details: {
       input: '{ docType: "bank_statement", pages: 4, mode: "image+text", months: 3 }',
@@ -85,7 +85,7 @@ const ACTIVITY_TEMPLATES = [
     action: 'Open banking data enrichment via Plaid',
     op: 'db.loanApplications.updateOne()',
     latency: '3ms',
-    icon: '🏦',
+    icon: null,
     reasoning: 'Plaid data cross-referenced against bank statement to validate stated income. 12-month average monthly deposit ($18,150) aligns within 3% of reported combined income ($18,558/mo).',
     details: {
       input: '{ plaidToken: "access-sandbox-...", months: 12 }',
@@ -100,7 +100,7 @@ const ACTIVITY_TEMPLATES = [
     action: 'Cross-validation complete. Profile assembled.',
     op: 'db.checkpoints.insert()',
     latency: '6ms',
-    icon: '📝',
+    icon: null,
     reasoning: 'All data sources reconciled. No discrepancies found between T4 income ($222,700), Plaid deposits ($217,800 annualized), and stated income ($222,700). Profile ready for underwriting.',
     details: {
       input: '{ sources: ["CRA_NOA", "bank_stmt", "credit", "plaid"], appId: "MD-00001" }',
@@ -115,7 +115,7 @@ const ACTIVITY_TEMPLATES = [
     action: 'Routing to Underwriting Agent',
     op: 'state.transition()',
     latency: '1ms',
-    icon: '🧭',
+    icon: null,
     reasoning: 'Origination phase complete with zero discrepancies. Routing to Underwriting Agent for risk assessment. Standard flow — no expedited or manual override flags present.',
     details: {
       input: '{ from: "origination", checkpoint: "cp_78342_01" }',
@@ -130,7 +130,7 @@ const ACTIVITY_TEMPLATES = [
     action: 'Aggregation pipeline: 7-stage risk scoring',
     op: 'db.riskScores.aggregate()',
     latency: '18ms',
-    icon: '📊',
+    icon: null,
     reasoning: 'Executed 7-stage pipeline: GDS (31.2% — moderate), LTV (80.0% — acceptable), credit depth (10 tradelines, 9yr history — strong), cash flow (positive, 48% savings rate — strong), employment stability (8yr+ current — excellent), collateral ($875K appraised — sufficient), comparable analysis (median Calgary rate 4.79%).',
     details: {
       input: '{ pipeline: "7_stage_risk", appId: "MD-00001" }',
@@ -145,7 +145,7 @@ const ACTIVITY_TEMPLATES = [
     action: 'Policy RAG via Atlas Vector Search',
     op: 'db.policies.$vectorSearch()',
     latency: '12ms',
-    icon: '🔎',
+    icon: null,
     reasoning: 'Queried institutional policy base with risk profile vector. Top 3 matches: §4.2.1 (hard inquiry threshold), §3.1.4 (property value >$500K review), §3.2.1 (GDS boundary with activity flags). All three triggered review conditions.',
     details: {
       input: '{ query_vector: "[risk_profile_embed]", k: 5, index: "policy_vectors" }',
@@ -160,7 +160,7 @@ const ACTIVITY_TEMPLATES = [
     action: '$graphLookup fraud scan: 3-hop, 2847 entities',
     op: 'db.entities.$graphLookup()',
     latency: '24ms',
-    icon: '🕸',
+    icon: null,
     reasoning: 'Graph traversal found 2,847 linked entities within 3 hops. No known fraud indicators detected. Highest-risk connection: shared address with 2 other recent applicants (flagged low — common multi-unit property).',
     details: {
       input: '{ startWith: "MD-00001", maxDepth: 3, connectFrom: "entity_links" }',
@@ -175,7 +175,7 @@ const ACTIVITY_TEMPLATES = [
     action: 'Cash flow analysis complete. Score: 72 (B+)',
     op: 'db.riskScores.insertOne()',
     latency: '4ms',
-    icon: '🧠',
+    icon: null,
     reasoning: 'Final composite score: 72/100 (B+ tier). Score depressed from A-range primarily by 3 hard inquiries in 6 months (§4.2.1 penalty: -8pts). Without inquiry penalty, projected score would be 80 (A-). Recommended rate: 4.89% (B+ base + 12.5bps inquiry surcharge).',
     details: {
       input: '{ factors: ["gds", "ltv", "credit", "cashflow", "employment", "collateral", "comps"] }',
@@ -190,7 +190,7 @@ const ACTIVITY_TEMPLATES = [
     action: 'interrupt() triggered — pending officer review',
     op: 'db.checkpoints.insert()',
     latency: '6ms',
-    icon: '✋',
+    icon: null,
     reasoning: 'Three policy rules triggered mandatory human review: (1) §4.2.1 — 3 hard inquiries in 180 days, (2) §3.1.4 — property value exceeding $500K, (3) §3.2.1 — GDS at 31.2% with recent credit activity. Workflow state persisted to checkpoint for seamless resume after officer decision.',
     details: {
       input: '{ triggers: ["§4.2.1", "§3.1.4", "§3.2.1"], score: 72, amount: 875000 }',
@@ -238,7 +238,7 @@ export default function AgentActivityLog({ onEvent, applicationId }) {
             action: event.action || '',
             op: '', // Live events don't have a separate op field
             latency: '\u2014',
-            icon: event.agent === 'underwriter' ? '\ud83d\udcca' : event.agent === 'supervisor' ? '\ud83e\udded' : '\ud83d\udcdd',
+            icon: null,
             reasoning: event.detail || '',
             details: null,
             time: new Date(event.timestamp || Date.now()).toLocaleTimeString(),
@@ -418,8 +418,15 @@ export default function AgentActivityLog({ onEvent, applicationId }) {
                 onClick={() => setExpandedId(isExpanded ? null : entry.id)}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                  <span style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-primary)' }}>
-                    {entry.icon} {entry.agent}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: 11, color: 'var(--text-primary)' }}>
+                    <span style={{
+                      width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                      background: entry.category === 'supervisor' ? 'var(--mongo)'
+                        : entry.category === 'underwriting' ? 'var(--tool-blue)'
+                        : entry.category === 'hitl' ? 'var(--hitl-amber)'
+                        : 'var(--agent-cyan)',
+                    }} />
+                    {entry.agent}
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)' }}>
