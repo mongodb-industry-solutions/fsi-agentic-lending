@@ -54,6 +54,7 @@ app.include_router(agent_router, prefix="/api")
 
 
 @app.get("/")
+@app.get("/api")
 async def health():
     try:
         db = get_db()
