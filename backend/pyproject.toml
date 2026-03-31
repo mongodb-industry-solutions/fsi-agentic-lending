@@ -17,6 +17,7 @@ dependencies = [
     "langchain-aws>=0.3",
     "langsmith>=0.3",
     "python-json-logger>=2.0.0",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
