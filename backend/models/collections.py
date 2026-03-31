@@ -7,7 +7,7 @@ COLLECTIONS = {
     "borrowers": {
         "description": "Applicant identity and demographics",
         "indexes": [
-            {"keys": [("email", 1)], "unique": True},
+            {"keys": [("application_id", 1), ("full_name", 1)]},
         ],
     },
     "applications": {
