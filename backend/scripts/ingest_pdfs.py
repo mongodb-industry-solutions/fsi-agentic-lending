@@ -19,6 +19,7 @@ load_dotenv()
 
 from db.mdb import MongoDBConnector
 from services.extraction_service import extract_from_pdf, EXTRACTION_PROMPTS
+from services.embedding_service import embed_text, embed_texts
 
 # PDF directory
 PDF_DIR = Path(__file__).resolve().parent.parent.parent / "docs" / "synthetic data"
@@ -162,6 +163,19 @@ def create_policies(db):
         policy["effective_date"] = now
         policy["created_at"] = now
 
+    # Generate embeddings for policies
+    print("  Generating policy embeddings...")
+    try:
+        policy_texts = [p["content"] for p in policies]
+        embeddings = embed_texts(policy_texts, input_type="document")
+        for policy, emb in zip(policies, embeddings):
+            policy["embedding"] = emb
+        print(f"  Embedded {len(embeddings)} policies")
+    except Exception as e:
+        print(f"  Warning: policy embedding failed: {e}")
+        for policy in policies:
+            policy["embedding"] = None
+
     for policy in policies:
         db["underwriting_policies"].update_one(
             {"policy_id": policy["policy_id"]},
@@ -260,12 +274,20 @@ def main():
             extraction_data[doc_type] = extracted
 
             # Store in documents collection
+            text_for_embedding = extracted.get("text_summary", json.dumps(extracted, indent=2))
+            try:
+                embedding = embed_text(text_for_embedding, input_type="document")
+            except Exception as e:
+                print(f"  Warning: embedding failed: {e}")
+                embedding = None
+
             doc_record = {
                 "application_id": APPLICATION_ID,
                 "doc_type": doc_type,
                 "filename": pdf_path.name,
-                "extracted_text": extracted.get("text_summary", json.dumps(extracted, indent=2)),
+                "extracted_text": text_for_embedding,
                 "structured_data": extracted,
+                "embedding": embedding,
                 "status": "parsed",
                 "created_at": datetime.now(timezone.utc),
             }

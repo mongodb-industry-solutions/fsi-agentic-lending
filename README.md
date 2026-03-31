@@ -70,7 +70,7 @@ End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangG
 │   ┌─────────────┐  ┌──────────────┐  ┌────────────────┐  ┌──────────────┐ │
 │   │ Document    │  │ Atlas Vector │  │ Aggregation    │  │ Change       │ │
 │   │ Model       │  │ Search       │  │ Framework      │  │ Streams      │ │
-│   │             │  │ (autoEmbed)  │  │                │  │              │ │
+│   │             │  │ (Voyage AI)  │  │                │  │              │ │
 │   │ applications│  │              │  │ 7-stage risk   │  │ Real-time    │ │
 │   │ borrowers   │  │ documents    │  │ scoring        │  │ WebSocket    │ │
 │   │ documents   │  │ policies     │  │ pipeline       │  │ SSE feeds    │ │
@@ -157,7 +157,7 @@ End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangG
 | Capability | How It's Used | Grade |
 |-----------|--------------|-------|
 | **Document Model** | Loan applications grow through lifecycle stages — one document, no schema migrations | A |
-| **Atlas Vector Search** | Policy RAG via Voyage AI autoEmbed — `queryString` (text), not `queryVector` | A |
+| **Atlas Vector Search** | Policy RAG via Voyage AI multimodal embeddings (voyage-multimodal-3.5) — `queryVector` with pre-computed embeddings | A |
 | **Aggregation Framework** | 7-stage risk scoring pipeline ($match→$lookup×2→$addFields×3→$project) | A |
 | **Change Streams** | Real-time WebSocket queue + SSE status/activity feeds, labeled in UI | A |
 | **Time Series** | Payment history with $setWindowFields (rolling 90-day analysis), EWS signals | A- |
@@ -171,7 +171,7 @@ End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangG
 | Frontend | Next.js 15 (App Router), LeafyGreen UI, Euclid Circular A |
 | Backend | FastAPI, LangGraph, Python 3.13 |
 | Database | MongoDB Atlas (7 collections + 3 LangGraph infra) |
-| AI/ML | AWS Bedrock Claude Haiku 4 (tool_use for structured output), Voyage AI autoEmbed |
+| AI/ML | AWS Bedrock Claude Haiku 4 (tool_use for structured output), Voyage AI multimodal embeddings (voyage-multimodal-3.5) |
 | Observability | LangSmith (@traceable on all LLM calls + agent nodes) |
 | Deployment | Docker Compose (local), Kanopy/K8s (staging/prod) |
 
@@ -220,7 +220,7 @@ Application queue (real-time via WebSocket + MongoDB Change Stream with "Change 
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
 - MongoDB Atlas cluster (M10+ for Change Streams, or M0 without real-time features)
 - AWS credentials with Bedrock access (Claude Haiku 4)
-- (Optional) Voyage AI API key configured at Atlas project level for autoEmbed
+- Voyage AI API key (`VOYAGE_API_KEY`) for multimodal embeddings (voyage-multimodal-3.5)
 - (Optional) LangSmith API key for observability
 
 ## Quick Start
@@ -272,6 +272,7 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | `MONGODB_URI` | Yes | MongoDB Atlas connection string |
 | `DATABASE_NAME` | Yes | Database name (default: `lendflow`) |
 | `CHATCOMPLETIONS_MODEL_ID` | Yes | Bedrock inference profile ARN or model ID |
+| `VOYAGE_API_KEY` | Yes | Voyage AI API key for multimodal embeddings |
 | `AWS_REGION` | No | AWS region (default: `us-east-1`) |
 | `ORIGINS` | No | CORS origins (default: `http://localhost:3000`) |
 | `CURRENT_5YR_FIXED_RATE` | No | Mortgage rate (default: `0.0489`) |
@@ -331,9 +332,9 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 |-----------|------|---------|-------------|
 | `borrowers` | Standard | Applicant profiles | Polymorphic income sources |
 | `applications` | Standard | Loan state machine | Status history with audit trail |
-| `documents` | Standard | Extracted PDF data | Atlas autoEmbed for vector search |
+| `documents` | Standard | Extracted PDF data | Voyage AI embeddings for vector search |
 | `credit_reports` | Standard | Credit bureau data | Per-borrower scoring, sorted by borrower order |
-| `underwriting_policies` | Standard | Policy text for RAG | Atlas autoEmbed, 15 Canadian mortgage rules |
+| `underwriting_policies` | Standard | Policy text for RAG | Voyage AI embeddings, 15 Canadian mortgage rules |
 | `payments` | **Time Series** | Payment history | $setWindowFields rolling 90-day analysis |
 | `agent_activity` | **Time Series** | Agent action log | Real-time SSE streaming via Change Stream |
 | `checkpoints` | LangGraph | Graph state snapshots | MongoDBSaver interrupt/resume |

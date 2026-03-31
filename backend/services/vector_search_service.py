@@ -1,25 +1,28 @@
-"""Vector search service — uses Atlas autoEmbed for semantic queries."""
-import logging
+"""Vector search service — uses Voyage AI embeddings for semantic queries."""
 from db.mdb import get_db as _get_db
 from services.application_service import serialize_doc
+from services.embedding_service import embed_query
+import logging
 
 logger = logging.getLogger(__name__)
 
 
 def search_documents(query: str, application_id: str = None, limit: int = 5) -> list[dict]:
-    """Search documents using Atlas Vector Search with autoEmbed.
-
-    With autoEmbed, we pass queryString (text) instead of queryVector.
-    Atlas handles text-to-vector conversion automatically.
-    """
+    """Search documents using Atlas Vector Search with Voyage AI embeddings."""
     db = _get_db()
+
+    try:
+        query_vector = embed_query(query)
+    except Exception as e:
+        logger.error(f"Query embedding failed: {e}")
+        return []
 
     pipeline = [
         {
             "$vectorSearch": {
-                "index": "documents_auto_embed_idx",
-                "path": "extracted_text",
-                "queryString": query,
+                "index": "documents_vector_idx",
+                "path": "embedding",
+                "queryVector": query_vector,
                 "numCandidates": 50,
                 "limit": limit,
             }
@@ -35,26 +38,29 @@ def search_documents(query: str, application_id: str = None, limit: int = 5) -> 
         },
     ]
 
-    # Filter by application if specified
     if application_id:
         pipeline[0]["$vectorSearch"]["filter"] = {"application_id": application_id}
 
     results = db["documents"].aggregate(pipeline)
-    docs = [serialize_doc(r) for r in results]
-    logger.info(f"search_documents query='{query}' app_id={application_id} returned {len(docs)} results")
-    return docs
+    return [serialize_doc(r) for r in results]
 
 
 def search_policies(query: str, limit: int = 5) -> list[dict]:
-    """Search underwriting policies using Atlas Vector Search with autoEmbed."""
+    """Search underwriting policies using Atlas Vector Search with Voyage AI embeddings."""
     db = _get_db()
+
+    try:
+        query_vector = embed_query(query)
+    except Exception as e:
+        logger.error(f"Query embedding failed: {e}")
+        return []
 
     pipeline = [
         {
             "$vectorSearch": {
-                "index": "policies_auto_embed_idx",
-                "path": "content",
-                "queryString": query,
+                "index": "policies_vector_idx",
+                "path": "embedding",
+                "queryVector": query_vector,
                 "numCandidates": 50,
                 "limit": limit,
             }
@@ -71,6 +77,4 @@ def search_policies(query: str, limit: int = 5) -> list[dict]:
     ]
 
     results = db["underwriting_policies"].aggregate(pipeline)
-    docs = [serialize_doc(r) for r in results]
-    logger.info(f"search_policies query='{query}' returned {len(docs)} results")
-    return docs
+    return [serialize_doc(r) for r in results]

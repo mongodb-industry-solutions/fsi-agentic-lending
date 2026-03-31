@@ -1,6 +1,7 @@
 """Document API routes."""
 import asyncio
 import json
+import logging
 import re
 import uuid
 from datetime import datetime, timezone
@@ -14,7 +15,10 @@ from models.schemas import VectorSearchRequest
 from services import document_service, vector_search_service
 from services.extraction_service import extract_from_pdf, EXTRACTION_PROMPTS
 from services.application_service import serialize_doc
+from services.embedding_service import embed_text as _embed_text
 from db.mdb import get_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["documents"])
 
@@ -145,13 +149,22 @@ async def upload_document(
     except Exception as e:
         extraction = {"text_summary": f"Extraction failed: {str(e)}", "error": str(e)}
 
+    # Generate embedding
+    text_for_embedding = extraction.get("text_summary", json.dumps(extraction, indent=2))
+    try:
+        embedding = await asyncio.to_thread(_embed_text, text_for_embedding, "document")
+    except Exception as e:
+        logger.warning(f"Embedding generation failed: {e}")
+        embedding = None
+
     # Store in MongoDB
     doc_record = {
         "application_id": app_id,
         "doc_type": doc_type,
         "filename": safe_name,
-        "extracted_text": extraction.get("text_summary", json.dumps(extraction, indent=2)),
+        "extracted_text": text_for_embedding,
         "structured_data": extraction,
+        "embedding": embedding,
         "status": "parsed" if "error" not in extraction else "error",
         "created_at": datetime.now(timezone.utc),
     }

@@ -4,6 +4,7 @@ import os
 import time as _time
 from datetime import datetime, timezone
 from db.mdb import get_db as _get_db
+from services.embedding_service import embed_query as _embed_query
 
 
 def get_application_documents(application_id: str) -> list[dict]:
@@ -49,19 +50,16 @@ def get_application_summary(application_id: str) -> dict:
 
 
 def search_policies(query: str, limit: int = 5) -> list[dict]:
-    """Search underwriting policies via Atlas Vector Search (autoEmbed).
-
-    With autoEmbed, we pass queryString instead of queryVector.
-    """
+    """Search underwriting policies via Atlas Vector Search with Voyage AI embeddings."""
     db = _get_db()
-
     try:
+        query_vector = _embed_query(query)
         pipeline = [
             {
                 "$vectorSearch": {
-                    "index": "policies_auto_embed_idx",
-                    "path": "content",
-                    "queryString": query,
+                    "index": "policies_vector_idx",
+                    "path": "embedding",
+                    "queryVector": query_vector,
                     "numCandidates": 50,
                     "limit": limit,
                 }
@@ -83,7 +81,7 @@ def search_policies(query: str, limit: int = 5) -> list[dict]:
         return [{
             "policy_id": "SEARCH_UNAVAILABLE",
             "title": "Policy Search Unavailable",
-            "content": f"Atlas Vector Search failed: {str(e)[:200]}. Manual policy review required.",
+            "content": f"Vector search failed: {str(e)[:200]}. Manual policy review required.",
             "score": 0,
         }]
 

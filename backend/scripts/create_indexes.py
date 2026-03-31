@@ -72,44 +72,55 @@ def main():
                 unique=idx.get("unique", False),
             )
 
-    # Create Atlas Vector Search indexes with autoEmbed
-    # These use the Atlas Search API, not standard createIndex
-    print("\nCreating Atlas Vector Search indexes (autoEmbed)...")
+    # Create Atlas Vector Search indexes (manual embeddings via Voyage AI)
+    print("\nCreating Atlas Vector Search indexes...")
 
-    auto_embed_indexes = [
+    vector_indexes = [
         {
             "collection": "documents",
-            "name": "documents_auto_embed_idx",
-            "field_path": "extracted_text",
+            "name": "documents_vector_idx",
+            "definition": {
+                "fields": [
+                    {
+                        "type": "vector",
+                        "path": "embedding",
+                        "numDimensions": 1024,
+                        "similarity": "cosine",
+                    },
+                    {
+                        "type": "filter",
+                        "path": "application_id",
+                    },
+                ]
+            },
         },
         {
             "collection": "underwriting_policies",
-            "name": "policies_auto_embed_idx",
-            "field_path": "content",
+            "name": "policies_vector_idx",
+            "definition": {
+                "fields": [
+                    {
+                        "type": "vector",
+                        "path": "embedding",
+                        "numDimensions": 1024,
+                        "similarity": "cosine",
+                    },
+                ]
+            },
         },
     ]
 
-    for idx_config in auto_embed_indexes:
+    for idx_config in vector_indexes:
         coll = db[idx_config["collection"]]
         try:
             coll.create_search_index({
                 "name": idx_config["name"],
                 "type": "vectorSearch",
-                "definition": {
-                    "fields": [
-                        {
-                            "type": "autoEmbed",
-                            "path": idx_config["field_path"],
-                            "model": "voyage-ai/voyage-4",
-                            "numDimensions": 1024,
-                            "similarity": "cosine",
-                        }
-                    ]
-                }
+                "definition": idx_config["definition"],
             })
-            print(f"  Created autoEmbed index: {idx_config['name']} on {idx_config['collection']}.{idx_config['field_path']}")
+            print(f"  Created vector index: {idx_config['name']} on {idx_config['collection']}")
         except Exception as e:
-            if "already exists" in str(e) or "duplicate" in str(e).lower():
+            if "already exists" in str(e).lower() or "duplicate" in str(e).lower():
                 print(f"  {idx_config['name']} already exists, skipping")
             else:
                 print(f"  Warning: {e}")
