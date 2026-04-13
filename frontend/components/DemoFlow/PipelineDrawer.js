@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { palette } from '@leafygreen-ui/palette';
 import { spacing } from '@leafygreen-ui/tokens';
 import { uiTokens } from '../../lib/uiTokens';
@@ -8,13 +8,29 @@ import PipelineTimeline from './PipelineTimeline';
 
 export default function PipelineDrawer({ steps, stepIndex, onEntryHover, highlightNodeId }) {
   const [open, setOpen] = useState(false);
+  const panelRef = useRef(null);
+  const toggleBtnRef = useRef(null);
   const toggle = useCallback(() => setOpen((v) => !v), []);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        toggleBtnRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [open]);
 
   return (
     <>
       <button
+        ref={toggleBtnRef}
         onClick={toggle}
         aria-label={open ? 'Close pipeline activity' : 'Open pipeline activity'}
+        aria-expanded={open}
         style={{
           position: 'absolute',
           right: open ? 380 : 0,
@@ -48,6 +64,9 @@ export default function PipelineDrawer({ steps, stepIndex, onEntryHover, highlig
       </button>
 
       <div
+        ref={panelRef}
+        role="region"
+        aria-label="Pipeline activity log"
         style={{
           position: 'absolute',
           right: 0,

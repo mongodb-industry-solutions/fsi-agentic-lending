@@ -76,7 +76,7 @@ export default function PipelineTimeline({
           width: `${steps.length > 0 ? ((stepIndex + 1) / steps.length) * 100 : 0}%`,
           background: 'var(--mongo)',
           borderRadius: 2,
-          transition: 'width 0.6s ease-out',
+          transition: 'width 400ms cubic-bezier(0.33, 1, 0.68, 1)',
         }} />
       </div>
       <div style={{

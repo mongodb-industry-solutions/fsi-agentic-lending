@@ -120,7 +120,6 @@ export default function Demo() {
         isPlaying={engine.isPlaying}
         speed={engine.speed}
         setSpeed={engine.setSpeed}
-        elapsedMs={engine.elapsedMs}
         onGoToScene={engine.goToScene}
         onPlay={engine.play}
         onPause={engine.pause}

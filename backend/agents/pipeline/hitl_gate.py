@@ -70,6 +70,11 @@ def hitl_gate(state: LendFlowState, **kwargs) -> dict:
     officer_id = decision.get("officer_id", "unknown")
     new_status = "approved" if action == "approve" else ("processing" if action == "modify_and_continue" else "declined")
     log_agent_activity(app_id, "hitl_gate", "resume", f"Officer {officer_id}: {action}. {notes}")
-    update_application_status(app_id, new_status, f"Officer {action}d the application. {notes}")
+    _status_detail = {
+        "approve": "Officer approved the application.",
+        "decline": "Officer declined the application.",
+        "modify_and_continue": "Officer requested changes; application returned to processing.",
+    }.get(action, f"Officer action: {action}.")
+    update_application_status(app_id, new_status, f"{_status_detail} {notes}".strip())
 
     return state_updates

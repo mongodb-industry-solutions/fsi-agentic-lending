@@ -53,7 +53,7 @@ function FactorBars({ factors, revealCount }) {
           <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 10, animation: 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' }}>
             <div style={{ width: 130, fontSize: 11, color: 'var(--text-secondary)', textAlign: 'right', flexShrink: 0 }}>{f.label}</div>
             <div style={{ flex: 1, height: 18, background: 'var(--bg-raised)', borderRadius: 4, position: 'relative', overflow: 'hidden' }}>
-              <div style={{ position: 'absolute', top: 0, left: isNeg ? undefined : 0, right: isNeg ? 0 : undefined, height: '100%', width: `${width}%`, background: f.color, borderRadius: 4, opacity: 0.7, transition: 'width 0.6s ease-out' }} />
+              <div style={{ position: 'absolute', top: 0, left: isNeg ? undefined : 0, right: isNeg ? 0 : undefined, height: '100%', width: `${width}%`, background: f.color, borderRadius: 4, opacity: 0.7, transition: 'width 400ms cubic-bezier(0.33, 1, 0.68, 1)' }} />
             </div>
             <div style={{ width: 40, fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: isNeg ? 'var(--danger)' : 'var(--mongo)', textAlign: 'right' }}>
               {isNeg ? '' : '+'}{f.points}
@@ -73,7 +73,7 @@ function RiskRing({ score, maxScore = 100, tier, fico }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: spacing[400] }}>
       <svg width={110} height={110} viewBox="0 0 110 110">
         <circle cx={55} cy={55} r={r} fill="none" stroke="var(--border-dim)" strokeWidth={7} />
-        <circle cx={55} cy={55} r={r} fill="none" stroke="var(--mongo)" strokeWidth={7} strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} transform="rotate(-90 55 55)" style={{ transition: 'stroke-dashoffset 1s ease-out' }} />
+        <circle cx={55} cy={55} r={r} fill="none" stroke="var(--mongo)" strokeWidth={7} strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} transform="rotate(-90 55 55)" style={{ transition: 'stroke-dashoffset 600ms cubic-bezier(0.33, 1, 0.68, 1)' }} />
         <text x={55} y={50} textAnchor="middle" fill="var(--text-primary)" fontFamily="var(--font-mono)" fontSize={24} fontWeight={800}>{score}</text>
         <text x={55} y={68} textAnchor="middle" fill="var(--text-dim)" fontFamily="var(--font-mono)" fontSize={10}>/ {maxScore}</text>
       </svg>

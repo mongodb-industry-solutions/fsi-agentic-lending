@@ -120,7 +120,6 @@ function StatusBadge({ status }) {
 }
 
 export default function FundingScene({ sceneStep, currentStepData }) {
-  const started = sceneStep >= 0;
   const [currentStatus, setCurrentStatus] = useState('approved');
   const [hoveredNode, setHoveredNode] = useState(null);
   const [timelineHighlight, setTimelineHighlight] = useState(null);

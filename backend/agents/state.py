@@ -75,7 +75,7 @@ _STATE_DEFAULTS: dict = {
     "decision": lambda: None,
     "decision_reasoning": lambda: "",
     "officer_notes": lambda: None,
-    "autonomy_level": str,
+    "autonomy_level": lambda: "bounded",
     "last_error": lambda: None,
     "retry_count": lambda: 0,
     "started_at": lambda: datetime.now(timezone.utc).isoformat(),

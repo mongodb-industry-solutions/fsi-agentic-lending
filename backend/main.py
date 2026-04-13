@@ -25,6 +25,8 @@ except ImportError:
 
 from db.mdb import get_db
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(
     title="Agentic Lending Platform",
     description="Agentic lending platform API powered by MongoDB Atlas and LangGraph",
@@ -71,9 +73,10 @@ async def health():
         await asyncio.to_thread(db.command, "ping")
         return {"status": "ok", "service": "lendflow-ai", "mongodb": "connected"}
     except Exception as e:
+        logger.error("Health check failed: %s", e)
         return JSONResponse(
             status_code=503,
-            content={"status": "degraded", "service": "lendflow-ai", "mongodb": f"error: {str(e)}"}
+            content={"status": "degraded", "service": "lendflow-ai", "mongodb": "unavailable"}
         )
 
 
@@ -84,7 +87,8 @@ async def readiness():
         db = get_db()
         await asyncio.to_thread(db.command, "ping")
         from agents.graph import get_graph
-        get_graph()  # Verify graph can compile
+        get_graph()
         return {"status": "ready"}
     except Exception as e:
-        return JSONResponse(status_code=503, content={"status": "not_ready", "error": str(e)})
+        logger.error("Readiness check failed: %s", e)
+        return JSONResponse(status_code=503, content={"status": "not_ready"})

@@ -317,4 +317,7 @@ class BedrockAnthropicChatCompletions(BedrockClient):
         model_response = json.loads(response["body"].read())
         self._log_usage(model_response, "predict_messages")
         blocks = model_response.get("content", [])
-        return " ".join(b["text"] for b in blocks if b.get("type") == "text" and "text" in b)
+        return " ".join(
+            b["text"] for b in blocks
+            if b.get("type") == "text" and isinstance(b.get("text"), str)
+        )

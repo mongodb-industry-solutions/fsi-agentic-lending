@@ -60,7 +60,7 @@ class HITLDecisionRequest(BaseModel):
     officer_notes: str = ""
     conditions: list[str] = []
     overrides: HITLOverrides = HITLOverrides()
-    officer_id: str = ""
+    officer_id: str = Field(..., min_length=1)
 
 
 class VectorSearchRequest(BaseModel):

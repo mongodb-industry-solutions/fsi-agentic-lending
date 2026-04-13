@@ -164,7 +164,7 @@ export function apiSSE(path, onEvent, onError, { maxRetries = 5 } = {}) {
       try {
         const data = JSON.parse(event.data);
         onEvent(data);
-        if (data.type === 'complete' || data.type === 'error') {
+        if (data.type === 'complete' || data.type === 'error' || data.type === 'hitl_waiting') {
           source.close();
           closed = true;
         }

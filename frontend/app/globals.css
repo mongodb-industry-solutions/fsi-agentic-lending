@@ -153,7 +153,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* ===================== SCREEN TRANSITIONS ===================== */
 .screen-content {
-  animation: screenEnter 0.35s ease-out forwards;
+  animation: screenEnter 220ms cubic-bezier(0.33, 1, 0.68, 1) forwards;
 }
 
 @keyframes screenEnter {
@@ -169,7 +169,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* ===================== SCENE TRANSITIONS ===================== */
 .scene-content {
-  animation: sceneEnter 0.4s ease-out forwards;
+  animation: sceneEnter 220ms cubic-bezier(0.33, 1, 0.68, 1) forwards;
 }
 
 @keyframes sceneEnter {

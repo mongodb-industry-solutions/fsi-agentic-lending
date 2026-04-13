@@ -62,7 +62,7 @@ def search_policies(query: str, limit: int = 5, projection: dict | None = None) 
         return list(db["underwriting_policies"].aggregate(pipeline))
     except Exception as e:
         logger.error(f"Policy vector search failed: {e}")
-        return [{**_SEARCH_UNAVAILABLE_SENTINEL, "content": f"Vector search failed: {str(e)[:200]}. Manual policy review required."}]
+        return [_SEARCH_UNAVAILABLE_SENTINEL]
 
 
 def search_documents(query: str, application_id: str | None = None, limit: int = 5) -> list[dict]:

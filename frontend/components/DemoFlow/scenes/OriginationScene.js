@@ -56,10 +56,6 @@ const DOCUMENTS = [
 const OPEN_BANKING_DATA = {
   provider: 'Plaid',
   connected: true,
-  income: [
-    { month: 'Jul', value: 11865 }, { month: 'Aug', value: 11865 }, { month: 'Sep', value: 11865 },
-    { month: 'Oct', value: 12340 }, { month: 'Nov', value: 11865 }, { month: 'Dec', value: 14230 },
-  ],
   summary: {
     avgMonthlyIncome: '$12,338',
     recurringExpenses: '$8,420',
@@ -77,54 +73,6 @@ const VALIDATIONS = [
   { check: 'Income cross-ref: CRA vs Pay Stub vs Bank', pass: true, detail: 'All 3 sources within 2% variance' },
   { check: 'Policy RAG: GDS within limits', pass: true, detail: 'GDS 0.312 < max 0.39 per guideline' },
 ];
-
-const STAT_ITEMS = [
-  { label: 'Documents Processed', value: '3', color: 'var(--mongo)' },
-  { label: 'Fields Extracted', value: '28', color: 'var(--agent-cyan)' },
-  { label: 'Validations Passed', value: '5', color: 'var(--success)' },
-  { label: 'Checkpoints', value: '1', color: 'var(--hitl-amber)' },
-];
-
-function AnimatedCounter({ target, active }) {
-  const [display, setDisplay] = useState(0);
-  const rafRef = useRef(null);
-
-  useEffect(() => {
-    if (!active) { setDisplay(0); return; }
-    let start = null;
-    const num = parseFloat(target);
-    const step = (ts) => {
-      if (!start) start = ts;
-      const progress = Math.min((ts - start) / 1200, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplay(Math.round(num * eased));
-      if (progress < 1) rafRef.current = requestAnimationFrame(step);
-    };
-    rafRef.current = requestAnimationFrame(step);
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [active, target]);
-
-  return active ? display : '—';
-}
-
-function ConfidenceBadge({ value }) {
-  const color = value >= 99 ? 'var(--success)' : value >= 95 ? 'var(--mongo)' : 'var(--hitl-amber)';
-  return (
-    <span
-      style={{
-        fontFamily: 'var(--font-mono)',
-        fontSize: 10,
-        fontWeight: 700,
-        padding: `${spacing[50]}px ${spacing[150]}px`,
-        borderRadius: 4,
-        background: value >= 99 ? 'var(--success-dim)' : value >= 95 ? 'var(--mongo-dim)' : 'var(--hitl-amber-dim)',
-        color,
-      }}
-    >
-      {value}%
-    </span>
-  );
-}
 
 function useProgressiveReveal(total, active, intervalMs = 150) {
   const [count, setCount] = useState(0);
@@ -206,25 +154,7 @@ function OpenBankingCard() {
   );
 }
 
-function AbandonmentIndicator() {
-  return (
-    <div style={{ display: 'flex', gap: spacing[200], marginTop: 10, animation: 'slideDown 0.3s ease-out' }}>
-      <div style={{ flex: 1, padding: `${spacing[200]}px 10px`, background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--danger)', borderLeftWidth: 3 }}>
-        <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[50] }}>Traditional</div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 800, color: 'var(--danger)' }}>18 min</div>
-        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>68% abandon</div>
-      </div>
-      <div style={{ flex: 1, padding: `${spacing[200]}px 10px`, background: 'var(--mongo-dim)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--mongo)', borderLeftWidth: 3 }}>
-        <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[50] }}>Agentic</div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 800, color: 'var(--mongo)' }}>2.4 min</div>
-        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>12% abandon</div>
-      </div>
-    </div>
-  );
-}
-
 export default function OriginationScene({ sceneStep, currentStepData }) {
-  const started = sceneStep >= 0;
   const showExtraction = sceneStep >= 3;
   const showOpenBanking = sceneStep >= 4;
   const showProfile = sceneStep >= 5;
@@ -234,9 +164,6 @@ export default function OriginationScene({ sceneStep, currentStepData }) {
 
   const handleNodeHover = useCallback((nodeId) => setHoveredNode(nodeId), []);
   const handleTimelineHover = useCallback((nodeId) => setTimelineHighlight(nodeId), []);
-
-  const hasExtraction = sceneStep >= 3;
-
 
   const activeDoc = DOCUMENTS[activeDocIdx];
   const visibleFieldCount = useProgressiveReveal(activeDoc.fields.length, showExtraction, 120);

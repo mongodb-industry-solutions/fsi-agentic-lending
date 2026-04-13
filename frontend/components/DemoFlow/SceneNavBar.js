@@ -16,7 +16,6 @@ export default function SceneNavBar({
   isPlaying,
   speed,
   setSpeed,
-  elapsedMs,
   onGoToScene,
   onPlay,
   onPause,
@@ -80,7 +79,7 @@ export default function SceneNavBar({
                   height: 2,
                   borderRadius: 1,
                   background: visited ? 'var(--mongo)' : 'var(--border-dim)',
-                  transition: 'background 0.4s ease',
+                  transition: 'background 220ms cubic-bezier(0.33, 1, 0.68, 1)',
                   margin: `0 ${spacing[50]}px`,
                 }} />
               )}

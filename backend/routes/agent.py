@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
+from pymongo.errors import DuplicateKeyError
 from db.mdb import get_db as _get_db
 from services import application_service
 from agents.graph import get_graph
@@ -35,33 +36,25 @@ router = APIRouter(tags=["agent"])
 def _acquire_pipeline_lock(app_id: str) -> bool:
     """Attempt to acquire a distributed pipeline lock via MongoDB.
 
-    Uses findOneAndUpdate with an atomic compare-and-swap so that only one
+    Uses insert with unique ``_id`` as an atomic compare-and-swap so only one
     process / pod can run the pipeline for a given application at a time.
+    Release deletes the document; the TTL index on ``locked_at`` acts as a
+    safety net for locks orphaned by crashes.
     """
     db = _get_db()
-    result = db["pipeline_locks"].find_one_and_update(
-        {"_id": app_id, "locked": False},
-        {"$set": {"locked": True, "locked_at": datetime.now(timezone.utc)}},
-        upsert=False,
-    )
-    if result is not None:
-        return True
     try:
         db["pipeline_locks"].insert_one({
-            "_id": app_id, "locked": True,
+            "_id": app_id,
             "locked_at": datetime.now(timezone.utc),
         })
         return True
-    except Exception:
+    except DuplicateKeyError:
         return False
 
 
 def _release_pipeline_lock(app_id: str):
     db = _get_db()
-    db["pipeline_locks"].update_one(
-        {"_id": app_id},
-        {"$set": {"locked": False, "locked_at": None}},
-    )
+    db["pipeline_locks"].delete_one({"_id": app_id})
 
 
 
@@ -75,7 +68,7 @@ async def run_agent(app_id: str, autonomy_level: str = "bounded"):
         raise HTTPException(status_code=404, detail="Application not found")
 
     if not _acquire_pipeline_lock(app_id):
-        return {"status": "already_running", "application_id": app_id}
+        raise HTTPException(status_code=409, detail="Pipeline already running for this application")
 
     # Update status to processing
     application_service.update_application_status(app_id, "processing", "Agent pipeline started")
