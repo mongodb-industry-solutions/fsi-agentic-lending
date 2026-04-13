@@ -11,121 +11,17 @@ export default function StatusTracker({ onNotification, applicationId, applicati
   const [activeStage, setActiveStage] = useState(0);
   const [timestamps, setTimestamps] = useState([]);
   const [expandedStage, setExpandedStage] = useState(null);
-  const [actionPaused, setActionPaused] = useState(false);
-  const [actionUploading, setActionUploading] = useState(false);
   const [sseConnected, setSseConnected] = useState(false);
   const [isDeclined, setIsDeclined] = useState(false);
   const [stampAnimated, setStampAnimated] = useState(false);
   const [activityEvents, setActivityEvents] = useState({});
   const [feedCollapsed, setFeedCollapsed] = useState(false);
-  const timerRef = useRef(null);
   const stageIdxRef = useRef(0);
   const activitySourceRef = useRef(null);
 
   const sendNotification = useCallback((stage, time, extra) => {
     if (onNotification) onNotification({ stage, time, ...extra });
   }, [onNotification]);
-
-  const advanceStageLoop = useCallback(() => {
-    stageIdxRef.current++;
-    if (stageIdxRef.current >= STAGES.length) return;
-
-    const stage = STAGES[stageIdxRef.current];
-    const now = new Date();
-    setActiveStage(stageIdxRef.current);
-    setTimestamps((prev) => [...prev, now]);
-    sendNotification(stage, now);
-
-    if (stage.interventions) {
-      stage.interventions.forEach((intv, idx) => {
-        setTimeout(() => {
-          sendNotification(
-            { id: `${stage.id}-issue-${idx}`, label: `Issue Detected`, icon: null, detail: intv.issue },
-            new Date(),
-            { subType: 'intervention-issue', parentStage: stage.id }
-          );
-          setTimeout(() => {
-            sendNotification(
-              { id: `${stage.id}-fix-${idx}`, label: `Resolved by AI`, icon: null, detail: intv.resolution },
-              new Date(),
-              { subType: 'intervention-resolved', parentStage: stage.id }
-            );
-          }, 800);
-        }, 600 + idx * 1600);
-      });
-    }
-
-    if (stage.type === 'action-required') {
-      setActionPaused(true);
-      return;
-    }
-
-    if (stageIdxRef.current < STAGES.length - 1) {
-      timerRef.current = setTimeout(advanceStageLoop, STAGES[stageIdxRef.current + 1].delayMs);
-    }
-  }, [sendNotification]);
-
-  const advanceFromAction = useCallback(() => {
-    if (!actionPaused) return;
-    setActionUploading(true);
-    sendNotification(
-      { id: 'action-uploading', label: 'Document Uploading', icon: null, detail: 'Uploading December 2025 bank statement...' },
-      new Date(),
-      { subType: 'action-progress' }
-    );
-    setTimeout(() => {
-      setActionUploading(false);
-      setActionPaused(false);
-      sendNotification(
-        { id: 'action-complete', label: 'Document Received', icon: null, detail: 'Additional bank statement verified. Processing resumed.' },
-        new Date(),
-        { subType: 'action-resolved' }
-      );
-      stageIdxRef.current++;
-      if (stageIdxRef.current < STAGES.length) {
-        const now = new Date();
-        setActiveStage(stageIdxRef.current);
-        setTimestamps((prev) => [...prev, now]);
-        sendNotification(STAGES[stageIdxRef.current], now);
-        const nextStage = STAGES[stageIdxRef.current];
-        if (nextStage.interventions) {
-          nextStage.interventions.forEach((intv, idx) => {
-            setTimeout(() => {
-              sendNotification(
-                { id: `${nextStage.id}-issue-${idx}`, label: `Issue Detected`, icon: null, detail: intv.issue },
-                new Date(),
-                { subType: 'intervention-issue', parentStage: nextStage.id }
-              );
-              setTimeout(() => {
-                sendNotification(
-                  { id: `${nextStage.id}-fix-${idx}`, label: `Resolved by AI`, icon: null, detail: intv.resolution },
-                  new Date(),
-                  { subType: 'intervention-resolved', parentStage: nextStage.id }
-                );
-              }, 800);
-            }, 600 + idx * 1600);
-          });
-        }
-        if (stageIdxRef.current < STAGES.length - 1) {
-          timerRef.current = setTimeout(advanceStageLoop, STAGES[stageIdxRef.current + 1].delayMs);
-        }
-      }
-    }, 2000);
-  }, [actionPaused, sendNotification, advanceStageLoop]);
-
-  useEffect(() => {
-    if (sseConnected) return;
-
-    stageIdxRef.current = 0;
-    setTimestamps([new Date()]);
-    sendNotification(STAGES[0], new Date());
-
-    if (STAGES.length > 1) {
-      timerRef.current = setTimeout(advanceStageLoop, STAGES[1].delayMs);
-    }
-
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [sseConnected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // SSE connection for real-time backend status
   useEffect(() => {
@@ -134,7 +30,6 @@ export default function StatusTracker({ onNotification, applicationId, applicati
     const source = apiSSE(
       `/applications/${applicationId}/status`,
       (event) => {
-        if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
         setSseConnected(true);
 
         if (event.type === 'status' && event.status) {
@@ -144,7 +39,6 @@ export default function StatusTracker({ onNotification, applicationId, applicati
           }
           const targetIdx = STATUS_TO_STAGE[event.status];
           if (targetIdx !== undefined && targetIdx >= 0 && targetIdx > stageIdxRef.current) {
-            if (timerRef.current) clearTimeout(timerRef.current);
             const now = new Date();
             const newTimestamps = [];
             while (stageIdxRef.current < targetIdx) {
@@ -160,7 +54,7 @@ export default function StatusTracker({ onNotification, applicationId, applicati
     );
 
     return () => source?.close();
-  }, [applicationId]);
+  }, [applicationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // SSE: agent activity feed
   useEffect(() => {
@@ -191,22 +85,9 @@ export default function StatusTracker({ onNotification, applicationId, applicati
 
   const isComplete = activeStage >= STAGES.length - 1;
   const currentStage = STAGES[activeStage];
-  const isActionStage = currentStage?.type === 'action-required' && actionPaused;
 
-  const statusLabel = isDeclined ? 'Declined' : isComplete ? 'Complete' : isActionStage ? 'Action Needed' : 'Processing';
-  const statusColor = isDeclined ? 'var(--danger)' : isComplete ? 'var(--success)' : isActionStage ? 'var(--hitl-amber)' : 'var(--mongo)';
-
-  const estimatedRemaining = useMemo(() => {
-    if (isComplete) return null;
-    let remaining = 0;
-    for (let i = activeStage + 1; i < STAGES.length; i++) {
-      remaining += STAGES[i].delayMs;
-    }
-    if (isActionStage) remaining += 2000;
-    const seconds = Math.ceil(remaining / 1000);
-    if (seconds < 60) return `~${seconds}s remaining`;
-    return `~${Math.ceil(seconds / 60)}min remaining`;
-  }, [activeStage, isComplete, isActionStage]);
+  const statusLabel = isDeclined ? 'Declined' : isComplete ? 'Complete' : 'Processing';
+  const statusColor = isDeclined ? 'var(--danger)' : isComplete ? 'var(--success)' : 'var(--mongo)';
 
   const interventionsResolved = useMemo(() => {
     let count = 0;
@@ -218,38 +99,97 @@ export default function StatusTracker({ onNotification, applicationId, applicati
     return count;
   }, [activeStage]);
 
-  const currentAgentStatus = isActionStage
-    ? currentStage.agentStatus
-    : actionUploading
-      ? 'Processing your uploaded document...'
-      : (currentStage?.agentStatusActive && activeStage === STAGES.indexOf(currentStage) && !isComplete)
-        ? currentStage.agentStatusActive || currentStage.agentStatus
-        : currentStage?.agentStatus;
+  const currentAgentStatus = (currentStage?.agentStatusActive && !isComplete)
+    ? currentStage.agentStatusActive || currentStage.agentStatus
+    : currentStage?.agentStatus;
 
   const assistantColor = isComplete
     ? 'var(--success)'
-    : isActionStage
-      ? 'var(--hitl-amber)'
-      : 'var(--agent-cyan)';
+    : 'var(--agent-cyan)';
 
   const assistantBg = isComplete
     ? 'var(--success-dim)'
-    : isActionStage
-      ? 'var(--hitl-amber-dim)'
-      : 'var(--agent-cyan-dim)';
+    : 'var(--agent-cyan-dim)';
+
+  if (!sseConnected) {
+    return (
+      <div style={{ flex: 1, overflowY: 'auto', padding: `20px ${spacing[4]}px` }}>
+        <div style={{
+          padding: spacing[3],
+          background: 'var(--bg-surface)',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--border-dim)',
+          marginBottom: spacing[3],
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18, color: 'var(--text-primary)' }}>
+              {applicationData
+                ? `${applicationData.firstName}${applicationData.coApplicantName ? ` & ${applicationData.coApplicantName.split(' ')[0]}` : ''} ${applicationData.lastName}`
+                : 'Application Status'}
+            </div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
+              {applicationData
+                ? `${applicationId || ''} · $${Number(applicationData.loanAmount).toLocaleString('en-US')} · ${applicationData.productType || ''}`
+                : applicationId || 'Waiting for connection...'}
+            </div>
+          </div>
+          <div style={{
+            padding: '6px 14px',
+            borderRadius: 20,
+            background: 'var(--hitl-amber-dim)',
+            color: 'var(--hitl-amber)',
+            fontFamily: 'var(--font-display)',
+            fontWeight: 700,
+            fontSize: 11,
+          }}>
+            Connecting
+          </div>
+        </div>
+
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: `${spacing[6]}px 0`,
+          gap: spacing[3],
+        }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: '50%',
+            border: '3px solid var(--border-dim)',
+            borderTopColor: 'var(--mongo)',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+          <div style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 600,
+            fontSize: 13,
+            color: 'var(--text-secondary)',
+          }}>
+            Connecting to backend...
+          </div>
+          <div style={{
+            fontSize: 11,
+            color: 'var(--text-dim)',
+            textAlign: 'center',
+            maxWidth: 300,
+            lineHeight: 1.5,
+          }}>
+            Waiting for real-time status updates from the processing pipeline.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: `20px ${spacing[4]}px` }}>
-      {applicationId && !sseConnected && (
-        <div style={{ padding: '6px 12px', background: 'var(--hitl-amber-dim)', borderRadius: 'var(--radius-sm)', fontSize: 10, color: 'var(--hitl-amber)', marginBottom: spacing[2] }}>
-          Connecting to backend...
-        </div>
-      )}
-      {sseConnected && (
-        <span style={{ fontSize: 9, color: 'var(--mongo)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-          MongoDB Change Streams
-        </span>
-      )}
+      <span style={{ fontSize: 9, color: 'var(--mongo)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+        MongoDB Change Streams
+      </span>
       {/* Summary card */}
       <div style={{
         padding: spacing[3],
@@ -265,18 +205,18 @@ export default function StatusTracker({ onNotification, applicationId, applicati
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18, color: 'var(--text-primary)' }}>
             {applicationData
               ? `${applicationData.firstName}${applicationData.coApplicantName ? ` & ${applicationData.coApplicantName.split(' ')[0]}` : ''} ${applicationData.lastName}`
-              : 'Marcus & Sofia Delgado'}
+              : 'Application Status'}
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
             {applicationData
-              ? `${applicationId || 'APP-2026-00001'} · $${Number(applicationData.loanAmount).toLocaleString('en-US')} · ${applicationData.productType || '5yr Fixed (25yr Amort)'}`
-              : 'APP-2026-00001 · $875,000 · 5yr Fixed (25yr Amort)'}
+              ? `${applicationId || ''} · $${Number(applicationData.loanAmount).toLocaleString('en-US')} · ${applicationData.productType || ''}`
+              : applicationId || ''}
           </div>
         </div>
         <div style={{
           padding: '6px 14px',
           borderRadius: 20,
-          background: statusColor === 'var(--success)' ? 'var(--success-dim)' : statusColor === 'var(--danger)' ? 'var(--danger-dim)' : statusColor === 'var(--hitl-amber)' ? 'var(--hitl-amber-dim)' : 'var(--mongo-dim)',
+          background: statusColor === 'var(--success)' ? 'var(--success-dim)' : statusColor === 'var(--danger)' ? 'var(--danger-dim)' : 'var(--mongo-dim)',
           color: statusColor,
           fontFamily: 'var(--font-display)',
           fontWeight: 700,
@@ -297,7 +237,7 @@ export default function StatusTracker({ onNotification, applicationId, applicati
         alignItems: 'center',
         gap: 10,
       }}>
-        {!isComplete && !isActionStage && (
+        {!isComplete && (
           <div style={{
             width: 8, height: 8, borderRadius: '50%',
             background: assistantColor,
@@ -305,9 +245,6 @@ export default function StatusTracker({ onNotification, applicationId, applicati
             animation: 'pulse 1.5s infinite',
             flexShrink: 0,
           }} />
-        )}
-        {isActionStage && (
-          <span style={{ fontSize: 14, flexShrink: 0 }}>⚠</span>
         )}
         {isComplete && (
           <span style={{ fontSize: 14, flexShrink: 0 }}>✅</span>
@@ -318,7 +255,7 @@ export default function StatusTracker({ onNotification, applicationId, applicati
               fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12,
               color: assistantColor, marginBottom: 2,
             }}>
-              {isComplete ? 'All Steps Complete' : isActionStage ? 'Your Action Needed' : 'AI Assistant'}
+              {isComplete ? 'All Steps Complete' : 'AI Assistant'}
             </div>
             {interventionsResolved > 0 && (
               <span style={{
@@ -334,14 +271,6 @@ export default function StatusTracker({ onNotification, applicationId, applicati
             {currentAgentStatus}
           </div>
         </div>
-        {estimatedRemaining && (
-          <div style={{
-            fontFamily: 'var(--font-mono)', fontSize: 10,
-            color: 'var(--text-dim)', whiteSpace: 'nowrap', flexShrink: 0,
-          }}>
-            {estimatedRemaining}
-          </div>
-        )}
       </div>
 
       {/* Segmented progress rail */}
@@ -384,12 +313,9 @@ export default function StatusTracker({ onNotification, applicationId, applicati
             isDeclined={isDeclined}
             stampAnimated={stampAnimated}
             onStampAnimated={() => setStampAnimated(true)}
-            actionPaused={actionPaused}
-            actionUploading={actionUploading}
             feedCollapsed={feedCollapsed}
             onToggleFeed={() => setFeedCollapsed((p) => !p)}
             onToggleExpand={setExpandedStage}
-            onAdvanceFromAction={advanceFromAction}
           />
         ))}
       </div>

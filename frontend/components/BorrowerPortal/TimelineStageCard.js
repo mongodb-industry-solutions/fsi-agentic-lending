@@ -14,12 +14,9 @@ export function TimelineStageCard({
   isDeclined,
   stampAnimated,
   onStampAnimated,
-  actionPaused,
-  actionUploading,
   feedCollapsed,
   onToggleFeed,
   onToggleExpand,
-  onAdvanceFromAction,
 }) {
   const isCompleted = index < activeStage;
   const isActive = index === activeStage;
@@ -28,16 +25,12 @@ export function TimelineStageCard({
   const canExpand = isCompleted;
   const hasInterventions = stage.type === 'intervention';
   const isActionReq = stage.type === 'action-required';
-  const isActiveAction = isActive && isActionReq && actionPaused;
   const isComplete = activeStage >= STAGES.length - 1;
 
   let dotBg, dotBorder;
   if (isCompleted) {
     dotBg = 'var(--success)';
     dotBorder = 'var(--success)';
-  } else if (isActiveAction) {
-    dotBg = 'var(--hitl-amber)';
-    dotBorder = 'var(--hitl-amber)';
   } else if (isActive && hasInterventions) {
     dotBg = 'var(--hitl-amber)';
     dotBorder = 'var(--hitl-amber)';
@@ -50,10 +43,7 @@ export function TimelineStageCard({
   }
 
   let cardBg, cardBorder;
-  if (isActiveAction) {
-    cardBg = 'var(--hitl-amber-dim)';
-    cardBorder = 'var(--hitl-amber)';
-  } else if (isActive && hasInterventions) {
+  if (isActive && hasInterventions) {
     cardBg = 'var(--hitl-amber-dim)';
     cardBorder = 'var(--hitl-amber)';
   } else if (isActive) {
@@ -70,11 +60,9 @@ export function TimelineStageCard({
     cardBorder = 'var(--border-dim)';
   }
 
-  const labelColor = isActiveAction
+  const labelColor = isActive && hasInterventions
     ? 'var(--hitl-amber)'
-    : isActive && hasInterventions
-      ? 'var(--hitl-amber)'
-      : isActive
+    : isActive
         ? 'var(--mongo)'
         : isCompleted
           ? 'var(--text-primary)'
@@ -103,7 +91,7 @@ export function TimelineStageCard({
         animation: isActive ? 'pulse 1.5s infinite'
           : (isCompleted && index === activeStage - 1) ? 'completionBurst 300ms cubic-bezier(0.33, 1, 0.68, 1)' : undefined,
       }}>
-        {isCompleted ? '✓' : isActive ? (isActiveAction ? '!' : stage.icon) : ''}
+        {isCompleted ? '✓' : isActive ? stage.icon : ''}
       </div>
 
       {/* Content */}
@@ -160,16 +148,6 @@ export function TimelineStageCard({
                 ISSUES DETECTED
               </span>
             )}
-            {isActiveAction && (
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 3,
-                padding: '2px 8px', borderRadius: 8,
-                background: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)',
-                fontSize: 9, fontWeight: 700, fontFamily: 'var(--font-mono)',
-              }}>
-                ACTION NEEDED
-              </span>
-            )}
             {isCompleted && isActionReq && (
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 3,
@@ -223,36 +201,8 @@ export function TimelineStageCard({
           </div>
         )}
 
-        {/* Action-required: upload button */}
-        {isActiveAction && (
-          <div style={{ marginTop: 10 }}>
-            <div style={{
-              padding: '8px 10px', marginBottom: 8,
-              background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)',
-              fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5,
-              borderLeft: '2px solid var(--hitl-amber)',
-            }}>
-              {stage.actionDetail}
-            </div>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onAdvanceFromAction(); }}
-              disabled={actionUploading}
-              style={{
-                padding: '8px 16px', borderRadius: 'var(--radius-md)',
-                border: 'none', background: actionUploading ? 'var(--text-dim)' : 'var(--mongo)',
-                color: '#fff', fontFamily: 'var(--font-display)',
-                fontWeight: 700, fontSize: 11, cursor: actionUploading ? 'default' : 'pointer',
-                width: '100%',
-              }}
-            >
-              {actionUploading ? '📤 Uploading & Verifying...' : `📎 ${stage.actionLabel}`}
-            </button>
-          </div>
-        )}
-
         {/* Active processing indicator */}
-        {isActive && !isActiveAction && !isComplete && (
+        {isActive && !isComplete && (
           stageEvents.length > 0
             ? <ThinkingStrip events={stageEvents} />
             : (
