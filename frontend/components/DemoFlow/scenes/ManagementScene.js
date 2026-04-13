@@ -10,7 +10,7 @@ import PipelineTimeline from '../PipelineTimeline';
 import { apiGet } from '../../../lib/api';
 
 const DEFAULT_STATS = [
-  { label: 'Active Loans', value: 4287, format: (v) => v.toLocaleString(), color: 'var(--mongo)' },
+  { label: 'Active Loans', value: 4287, format: (v) => v.toLocaleString('en-US'), color: 'var(--mongo)' },
   { label: 'Portfolio Value', value: 1.2, format: (v) => `$${v.toFixed(1)}B`, color: 'var(--agent-cyan)' },
   { label: 'Delinquency Rate', value: 2.4, format: (v) => `${v.toFixed(1)}%`, color: 'var(--hitl-amber)' },
   { label: 'EWS Alerts', value: 23, format: (v) => `${Math.round(v)} active`, color: 'var(--danger)' },
@@ -411,7 +411,7 @@ export default function ManagementScene({ sceneStep, currentStepData }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
               {(liveStats
                 ? [
-                    { label: 'Active Loans', value: liveStats.active_loans, format: (v) => v.toLocaleString(), color: 'var(--mongo)' },
+                    { label: 'Active Loans', value: liveStats.active_loans, format: (v) => v.toLocaleString('en-US'), color: 'var(--mongo)' },
                     { label: 'Total Outstanding', value: liveStats.total_outstanding, format: (v) => `$${(v / 1000).toFixed(0)}K`, color: 'var(--agent-cyan)' },
                     { label: 'Delinquency Rate', value: liveStats.delinquency_rate, format: (v) => `${v.toFixed(1)}%`, color: 'var(--hitl-amber)' },
                     { label: 'EWS Alerts', value: liveStats.delinquent_count || 0, format: (v) => `${Math.round(v)} active`, color: 'var(--danger)' },

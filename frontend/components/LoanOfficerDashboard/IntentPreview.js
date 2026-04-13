@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { apiGet, apiPost } from '../../lib/api';
+import { apiGet } from '../../lib/api';
 
 const PLAN_STEPS = [
   {
@@ -275,10 +275,7 @@ export default function IntentPreview({ applicationId, onProceed, onManual }) {
       </div>
 
       <div style={{ display: 'flex', gap: 10 }}>
-        <button type="button" onClick={async () => {
-          if (applicationId) {
-            await apiPost(`/agent/${applicationId}/run?autonomy_level=bounded`);
-          }
+        <button type="button" onClick={() => {
           if (onProceed) onProceed(settings);
         }} style={{
           flex: 2,

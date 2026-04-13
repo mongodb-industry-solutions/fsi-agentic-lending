@@ -238,7 +238,7 @@ export default function StatusPane({ applicationId, applicationData }) {
               fontWeight: 600,
               color: 'var(--text-primary)',
             }}>
-              ${Number(applicationData.loanAmount).toLocaleString()}
+              ${Number(applicationData.loanAmount).toLocaleString('en-US')}
             </div>
           </div>
         )}

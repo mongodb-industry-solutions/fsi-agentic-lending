@@ -1,6 +1,7 @@
 "use client";
 
 import Badge from '@leafygreen-ui/badge';
+import { spacing } from '@leafygreen-ui/tokens';
 
 function getStatusVariant(status) {
   const map = {
@@ -35,7 +36,7 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
   const formatted = applications.map(app => ({
     id: app.application_id || app.id,
     name: app.borrower_names?.join(' & ') || app.name || 'Unknown',
-    amount: typeof app.loan_amount === 'number' ? `$${app.loan_amount.toLocaleString()}` : (app.amount || ''),
+    amount: typeof app.loan_amount === 'number' ? `$${app.loan_amount.toLocaleString('en-US')}` : (app.amount || ''),
     product: app.product || '',
     status: app.status || 'submitted',
     statusLabel: (app.status || 'submitted').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
@@ -77,8 +78,25 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {formatted.length === 0 && (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-dim)', fontSize: 11 }}>
-            No applications yet. Submit one from the Borrower Portal.
+          <div style={{
+            margin: spacing[3], padding: spacing[4], textAlign: 'center',
+            border: '2px dashed var(--border-dim)', borderRadius: 8,
+            background: '#FAFBFA',
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 8,
+              border: '2px dashed var(--border-dim)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 8px',
+              fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
+              color: 'var(--text-dim)', opacity: 0.5,
+            }}>0</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>
+              No applications yet
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+              Submit one from the Borrower Portal.
+            </div>
           </div>
         )}
         {formatted.map((app) => {

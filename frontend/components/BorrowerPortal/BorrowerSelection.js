@@ -79,8 +79,8 @@ function ActiveCard({ profile, onClick }) {
       {/* Details */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[2] }}>
         <DetailRow label="Property" value={profile.propertyAddress} />
-        <DetailRow label="Loan Amount" value={`$${Number(profile.loanAmount).toLocaleString()}`} mono />
-        <DetailRow label="Down Payment" value={`$${Number(profile.downPayment).toLocaleString()}`} mono />
+        <DetailRow label="Loan Amount" value={`$${Number(profile.loanAmount).toLocaleString('en-US')}`} mono />
+        <DetailRow label="Down Payment" value={`$${Number(profile.downPayment).toLocaleString('en-US')}`} mono />
         <DetailRow label="Co-Applicant" value={profile.coApplicantName} />
       </div>
 
