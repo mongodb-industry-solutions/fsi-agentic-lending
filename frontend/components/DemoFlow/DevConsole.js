@@ -54,7 +54,7 @@ export default function DevConsole({ steps, stepIndex }) {
         role="button"
         tabIndex={0}
         onClick={() => setExpanded((p) => !p)}
-        onKeyDown={(e) => e.key === 'Enter' && setExpanded((p) => !p)}
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setExpanded((p) => !p))}
         onFocus={(e) => { e.currentTarget.style.boxShadow = uiTokens.focusRing; }}
         onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
         style={{

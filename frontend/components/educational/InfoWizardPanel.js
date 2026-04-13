@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import Icon from '@leafygreen-ui/icon';
+import { spacing } from '@leafygreen-ui/tokens';
 import { CAPABILITIES } from '../../lib/data/capabilities';
 import { architectureContent } from '../../lib/data/narrativeContent';
 import InsightCard from '../insights/InsightCard';
 import CodeSnippet from '../CodeSnippet/CodeSnippet';
 import { useEducationalContext } from './useEducationalContext';
 import { colorMap, dimMap } from '../../lib/data/colorMaps';
+import { uiTokens } from '../../lib/uiTokens';
 
 const screenTitles = {
   borrower: 'Borrower Portal — Technology Reference',
@@ -25,7 +27,7 @@ function SectionHeader({ children }) {
       position: 'sticky',
       top: 0,
       zIndex: 2,
-      padding: '10px 16px',
+      padding: `${spacing[200]}px ${spacing[3]}px`,
       background: 'var(--bg-base)',
       borderBottom: '1px solid var(--border-dim)',
       fontSize: 10,
@@ -53,55 +55,55 @@ function CapabilitySection({ cap }) {
       }
       icon={null}
     >
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: spacing[1] }}>
         {cap.oneLiner}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 8 }}>
+      <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: spacing[2] }}>
         {cap.description}
       </div>
       <div style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 4,
-        padding: '2px 8px',
+        gap: spacing[1],
+        padding: `2px ${spacing[2]}px`,
         borderRadius: 8,
         background: dim,
         fontSize: 10,
         color: accent,
         fontWeight: 600,
-        marginBottom: 8,
+        marginBottom: spacing[2],
       }}>
         Replaces: {cap.replaces}
       </div>
       <CodeSnippet code={cap.code} />
-      <div style={{ marginTop: 6, fontSize: 9, color: 'var(--text-dim)' }}>
+      <div style={{ marginTop: spacing[150], fontSize: 9, color: 'var(--text-dim)' }}>
         {cap.demoScene}
       </div>
     </InsightCard>
   );
 }
 
-const agentIcons = { supervisor: '🧠', loanAppAgent: '📋', underwritingAgent: '📊', servicingAgent: '🔄' };
+const agentGlyphs = { supervisor: 'Beaker', loanAppAgent: 'File', underwritingAgent: 'Charts', servicingAgent: 'Refresh' };
 
 function AgentSection({ agentKey }) {
   const agent = architectureContent.agentDescriptions[agentKey];
   if (!agent) return null;
 
   return (
-    <InsightCard title={agent.name} icon={agentIcons[agentKey] ?? '🤖'}>
-      <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 8 }}>
+    <InsightCard title={agent.name} icon={<Icon glyph={agentGlyphs[agentKey] ?? 'Apps'} size={14} />}>
+      <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: spacing[2] }}>
         {agent.responsibilities}
       </div>
       {agent.tools && (
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 4 }}>Tools</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+        <div style={{ marginBottom: spacing[2] }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[1] }}>Tools</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing[1] }}>
             {agent.tools.map((tool, i) => (
               <span key={i} style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 3,
-                padding: '2px 6px',
+                padding: `2px ${spacing[150]}px`,
                 borderRadius: 8,
                 fontSize: 9,
                 fontWeight: 600,
@@ -122,15 +124,15 @@ function AgentSection({ agentKey }) {
         </div>
       )}
       {agent.capabilities && (
-        <div style={{ marginTop: 6 }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 4 }}>Capabilities</div>
+        <div style={{ marginTop: spacing[150] }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[1] }}>Capabilities</div>
           <ul style={{ margin: 0, paddingLeft: 14, fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
             {agent.capabilities.map((c, i) => <li key={i}>{c}</li>)}
           </ul>
         </div>
       )}
       {agent.productionNote && (
-        <div style={{ marginTop: 8, padding: '6px 8px', background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)', fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+        <div style={{ marginTop: spacing[2], padding: `${spacing[150]}px ${spacing[2]}px`, background: 'var(--bg-raised)', borderRadius: 8, fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.5 }}>
           {agent.productionNote}
         </div>
       )}
@@ -141,15 +143,15 @@ function AgentSection({ agentKey }) {
 function HITLSection() {
   const hitl = architectureContent.hitlExplanation;
   return (
-    <InsightCard title={hitl.title} icon="🛡">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+    <InsightCard title={hitl.title} icon={<Icon glyph="Lock" size={14} />}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[150], marginBottom: spacing[200] }}>
         {hitl.tiers.map((t, i) => (
           <div key={i} style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
-            padding: '6px 8px',
-            borderRadius: 'var(--radius-sm)',
+            gap: spacing[2],
+            padding: `${spacing[150]}px ${spacing[2]}px`,
+            borderRadius: 8,
             background: 'var(--bg-raised)',
             fontSize: 10,
           }}>
@@ -164,7 +166,7 @@ function HITLSection() {
           </div>
         ))}
       </div>
-      <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 8 }}>
+      <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: spacing[2] }}>
         {hitl.persistence}
       </div>
       <CodeSnippet code={hitl.codeSample} />
@@ -263,7 +265,7 @@ export default function InfoWizardPanel({ isOpen, onClose, activeScreen = 'demo'
           maxWidth: '100vw',
           background: 'var(--bg-base)',
           borderLeft: '1px solid var(--border-base)',
-          boxShadow: '-4px 0 24px rgba(0,0,0,0.08)',
+          boxShadow: uiTokens.shadowElevated,
           transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
           transition: 'transform 0.3s ease',
           display: 'flex',
@@ -275,14 +277,14 @@ export default function InfoWizardPanel({ isOpen, onClose, activeScreen = 'demo'
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 8,
-          padding: '12px 16px',
+          gap: spacing[2],
+          padding: `${spacing[3]}px ${spacing[3]}px`,
           borderBottom: '1px solid var(--border-dim)',
           flexShrink: 0,
         }}>
-          <span style={{ fontSize: 16 }}>📖</span>
+          <Icon glyph="University" size={16} />
           <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>
+            <div style={{ fontFamily: uiTokens.font, fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>
               {title}
             </div>
             <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
@@ -292,6 +294,8 @@ export default function InfoWizardPanel({ isOpen, onClose, activeScreen = 'demo'
           <button
             type="button"
             onClick={onClose}
+            onFocus={(e) => { e.currentTarget.style.boxShadow = uiTokens.focusRing; }}
+            onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
             aria-label="Close panel"
             style={{
               background: 'none',
@@ -299,8 +303,9 @@ export default function InfoWizardPanel({ isOpen, onClose, activeScreen = 'demo'
               cursor: 'pointer',
               color: 'var(--text-dim)',
               fontSize: 18,
-              padding: 4,
+              padding: spacing[1],
               lineHeight: 1,
+              outline: 'none',
             }}
           >
             ×
@@ -311,8 +316,8 @@ export default function InfoWizardPanel({ isOpen, onClose, activeScreen = 'demo'
         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
           {/* Stack overview */}
           <SectionHeader>Stack Overview</SectionHeader>
-          <div style={{ padding: '12px 16px' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+          <div style={{ padding: `${spacing[3]}px ${spacing[3]}px` }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: spacing[1] }}>
               {architectureContent.pageTitle}
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
@@ -322,7 +327,7 @@ export default function InfoWizardPanel({ isOpen, onClose, activeScreen = 'demo'
 
           {/* MongoDB Capabilities */}
           <SectionHeader>MongoDB Capabilities ({CAPABILITIES.length})</SectionHeader>
-          <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ padding: `${spacing[2]}px ${spacing[3]}px`, display: 'flex', flexDirection: 'column', gap: spacing[2] }}>
             {CAPABILITIES.map((cap) => (
               <div key={cap.id} data-section={cap.id}>
                 <CapabilitySection cap={cap} />
@@ -332,7 +337,7 @@ export default function InfoWizardPanel({ isOpen, onClose, activeScreen = 'demo'
 
           {/* Agents */}
           <SectionHeader>AI Agents</SectionHeader>
-          <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ padding: `${spacing[2]}px ${spacing[3]}px`, display: 'flex', flexDirection: 'column', gap: spacing[2] }}>
             {Object.keys(architectureContent.agentDescriptions).map((key) => (
               <div key={key} data-section={key}>
                 <AgentSection agentKey={key} />
@@ -342,7 +347,7 @@ export default function InfoWizardPanel({ isOpen, onClose, activeScreen = 'demo'
 
           {/* HITL */}
           <SectionHeader>Human-in-the-Loop</SectionHeader>
-          <div style={{ padding: '8px 12px' }} data-section="hitl">
+          <div style={{ padding: `${spacing[2]}px ${spacing[3]}px` }} data-section="hitl">
             <HITLSection />
           </div>
 
@@ -350,7 +355,7 @@ export default function InfoWizardPanel({ isOpen, onClose, activeScreen = 'demo'
 
         {/* Footer */}
         <div style={{
-          padding: '10px 16px',
+          padding: `${spacing[200]}px ${spacing[3]}px`,
           borderTop: '1px solid var(--border-dim)',
           display: 'flex',
           alignItems: 'center',
@@ -366,9 +371,11 @@ export default function InfoWizardPanel({ isOpen, onClose, activeScreen = 'demo'
               resetAll();
               onClose();
             }}
+            onFocus={(e) => { e.currentTarget.style.boxShadow = uiTokens.focusRing; }}
+            onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
             style={{
-              padding: '4px 10px',
-              borderRadius: 'var(--radius-sm)',
+              padding: `${spacing[1]}px ${spacing[200]}px`,
+              borderRadius: 8,
               border: '1px solid var(--border-dim)',
               background: 'transparent',
               color: 'var(--text-dim)',
@@ -376,6 +383,7 @@ export default function InfoWizardPanel({ isOpen, onClose, activeScreen = 'demo'
               fontWeight: 600,
               cursor: 'pointer',
               transition: 'all 0.2s',
+              outline: 'none',
             }}
           >
             Reset Tour

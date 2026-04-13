@@ -28,12 +28,12 @@ function DocCard({ doc, onViewDoc }) {
   return (
     <div
       style={{
-        padding: 14,
+        padding: 10,
         background: 'var(--bg-surface)',
         borderRadius: 8,
         border: '1px solid var(--border-dim)',
         display: 'flex',
-        gap: 12,
+        gap: 8,
         alignItems: 'flex-start',
         transition: 'transform 220ms cubic-bezier(0.33, 1, 0.68, 1), box-shadow 220ms cubic-bezier(0.33, 1, 0.68, 1)',
         transform: hovered ? 'translateY(-2px)' : 'none',
@@ -43,7 +43,7 @@ function DocCard({ doc, onViewDoc }) {
       onMouseLeave={() => setHovered(false)}
     >
       <div style={{
-        width: 48, height: 56,
+        width: 32, height: 38,
         background: 'var(--bg-raised)',
         borderRadius: 6,
         border: '1px solid var(--border-dim)',
@@ -54,7 +54,7 @@ function DocCard({ doc, onViewDoc }) {
       }}>
         <span style={{
           fontFamily: 'var(--font-mono)',
-          fontSize: 10,
+          fontSize: 9,
           fontWeight: 700,
           color: 'var(--text-dim)',
           letterSpacing: '0.02em',
@@ -64,14 +64,14 @@ function DocCard({ doc, onViewDoc }) {
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-          <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)', flex: 1, minWidth: 0 }}>{doc.type}</div>
+          <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.type}</div>
           {doc.mongoId && (
             <button
               type="button"
               onClick={() => onViewDoc(doc.mongoId)}
               title="View document details"
               style={{
-                padding: '3px 10px', borderRadius: 6,
+                padding: '2px 8px', borderRadius: 6,
                 border: '1px solid var(--border-dim)', background: 'var(--bg-surface)',
                 color: 'var(--mongo)', fontSize: 10, fontFamily: 'var(--font-display)',
                 fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
@@ -86,10 +86,10 @@ function DocCard({ doc, onViewDoc }) {
             </button>
           )}
         </div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {doc.fileName}
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 9, color: 'var(--text-dim)' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
           <span>{doc.size}</span>
           <span style={{ opacity: 0.5 }}>|</span>
           <span>{doc.pages} page{doc.pages > 1 ? 's' : ''}</span>
@@ -100,21 +100,6 @@ function DocCard({ doc, onViewDoc }) {
           }}>
             {doc.status === 'error' ? 'Error' : 'Uploaded'}
           </span>
-        </div>
-        <div style={{
-          marginTop: 6,
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 4,
-          padding: '2px 8px',
-          borderRadius: 10,
-          background: 'var(--voyage-dim)',
-          border: '1px solid var(--voyage)',
-          fontSize: 9,
-          fontWeight: 600,
-          color: 'var(--voyage)',
-        }}>
-          Processed by voyage-multimodal-3.5
         </div>
       </div>
     </div>
@@ -151,7 +136,7 @@ export default function DocumentUpload({ applicationId, borrowerProfile }) {
           : '14 documents prepared for this application. Click View to inspect extracted data.'}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: spacing[4] }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: spacing[4] }}>
         {documents.map((doc, index) => (
           <div key={doc.id} style={{
             animation: `cardEnter 0.3s cubic-bezier(0.4, 0, 0.2, 1) ${index * 0.04}s both`,

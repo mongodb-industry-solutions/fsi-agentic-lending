@@ -2,6 +2,7 @@
 
 import Icon from "@leafygreen-ui/icon";
 import { colorMap, dimMap, borderMap } from "../../lib/data/colorMaps";
+import { uiTokens } from "../../lib/uiTokens";
 
 export { colorMap, dimMap } from "../../lib/data/colorMaps";
 
@@ -31,12 +32,18 @@ export default function FeatureBadge({
     border: `1px solid ${active ? border : "var(--border-dim)"}`,
     opacity: active ? 1 : 0.7,
     transition: "all 0.3s",
-    ...(onClick ? { cursor: "pointer" } : {}),
+    ...(onClick ? { cursor: "pointer", outline: "none" } : {}),
   };
 
   const Wrapper = onClick ? "button" : "span";
   const wrapperProps = onClick
-    ? { type: "button", onClick, style: badgeStyle }
+    ? {
+        type: "button",
+        onClick,
+        style: badgeStyle,
+        onFocus: (e) => { e.currentTarget.style.boxShadow = uiTokens.focusRing; },
+        onBlur: (e) => { e.currentTarget.style.boxShadow = "none"; },
+      }
     : { style: badgeStyle };
 
   return (

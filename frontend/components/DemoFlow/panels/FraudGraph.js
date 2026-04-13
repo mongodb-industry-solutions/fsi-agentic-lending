@@ -129,7 +129,7 @@ export default function FraudGraph({ width: widthProp, height: heightProp, hopRe
     // Labels for applicant and hover
     ctx.font = `11px ${uiTokens.font}`;
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'var(--text-primary)';
+    ctx.fillStyle = palette.gray.dark3;
     if (hoverNode) {
       const n = nodesToShow.find((x) => x.id === hoverNode);
       const pos = positions.get(hoverNode);

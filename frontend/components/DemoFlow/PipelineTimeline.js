@@ -96,7 +96,7 @@ export default function PipelineTimeline({
           {entries.length} entries
         </span>
       </div>
-      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: spacing[1] }}>
         {entries.map((e, i) => {
           const isHighlighted = highlightNodeId && e.nodeId === highlightNodeId;
           const isLatest = i === entries.length - 1;
@@ -120,7 +120,7 @@ export default function PipelineTimeline({
                   animation: isLatest ? 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' : undefined,
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontWeight: 700, fontSize: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: spacing[1], fontWeight: 700, fontSize: 12 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: spacing[1] }}>
                     {e.glyph && <Icon glyph={e.glyph} size={12} fill={e.color} />}
                     <span style={{ color: e.color }}>{e.agent}</span>

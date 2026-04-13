@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { spacing } from '@leafygreen-ui/tokens';
 import { uiTokens } from '../../lib/uiTokens';
 
 function CollapsibleSection({ title, defaultOpen = false, children }) {
@@ -60,7 +61,7 @@ export default function TechRecap({ elapsedMs, activeFeatures }) {
   return (
     <div
       style={{
-        padding: 24,
+        padding: spacing[4],
         background: 'var(--bg-surface)',
         borderRadius: 8,
         border: '1px solid var(--border-dim)',
@@ -71,7 +72,7 @@ export default function TechRecap({ elapsedMs, activeFeatures }) {
           fontFamily: uiTokens.font,
           fontSize: 18,
           fontWeight: 700,
-          marginBottom: 16,
+          marginBottom: spacing[3],
         }}
       >
         Demo Complete — Full Technical Summary
@@ -82,13 +83,13 @@ export default function TechRecap({ elapsedMs, activeFeatures }) {
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
-            gap: 12,
-            marginBottom: 20,
+            gap: spacing[3],
+            marginBottom: spacing[400],
           }}
         >
           {stats.map((s) => (
             <div key={s.label}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>{s.label}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: spacing[1] }}>{s.label}</div>
               <div style={{ fontFamily: uiTokens.monoFont, fontSize: 20, fontWeight: 700, color: s.color }}>
                 {s.value}
               </div>
@@ -98,9 +99,9 @@ export default function TechRecap({ elapsedMs, activeFeatures }) {
       </CollapsibleSection>
 
       <CollapsibleSection title="Tech Stack" defaultOpen={true}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[2], marginBottom: spacing[400] }}>
           {techStack.map((t) => (
-            <div key={t.category} style={{ display: 'flex', gap: 12, fontSize: 12, lineHeight: 1.5 }}>
+            <div key={t.category} style={{ display: 'flex', gap: spacing[3], fontSize: 12, lineHeight: 1.5 }}>
               <span
                 style={{
                   fontFamily: uiTokens.font,
@@ -120,16 +121,16 @@ export default function TechRecap({ elapsedMs, activeFeatures }) {
 
       <CollapsibleSection title="Cross-Lifecycle Intelligence" defaultOpen={false}>
         {/* Cross-Lifecycle Intelligence */}
-        <div style={{ padding: 16, background: 'var(--bg-base)', borderRadius: 8, border: '1px dashed var(--mongo)', marginBottom: 16 }}>
+        <div style={{ padding: spacing[3], background: 'var(--bg-base)', borderRadius: 8, border: '1px dashed var(--mongo)', marginBottom: spacing[3] }}>
           {crossLifecycle.map((cl) => (
-            <div key={cl.from + cl.to} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 11 }}>
+            <div key={cl.from + cl.to} style={{ display: 'flex', alignItems: 'center', gap: spacing[2], marginBottom: spacing[150], fontSize: 11 }}>
               <span style={{ fontFamily: uiTokens.monoFont, fontWeight: 700, color: 'var(--agent-cyan)', flexShrink: 0 }}>{cl.from}</span>
               <span style={{ color: 'var(--text-dim)' }}>→</span>
               <span style={{ fontFamily: uiTokens.monoFont, fontWeight: 700, color: 'var(--voyage)', flexShrink: 0 }}>{cl.to}</span>
               <span style={{ color: 'var(--text-secondary)', flex: 1 }}>{cl.insight}</span>
             </div>
           ))}
-          <div style={{ fontSize: 12, color: 'var(--mongo)', fontWeight: 700, marginTop: 8 }}>
+          <div style={{ fontSize: 12, color: 'var(--mongo)', fontWeight: 700, marginTop: spacing[2] }}>
             One platform. Full lifecycle. Continuous learning.
           </div>
         </div>
@@ -137,10 +138,10 @@ export default function TechRecap({ elapsedMs, activeFeatures }) {
 
       <CollapsibleSection title="By the Numbers" defaultOpen={false}>
         {/* By the Numbers */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: spacing[200], marginBottom: spacing[3] }}>
           {impactNumbers.map((n) => (
-            <div key={n.label} style={{ padding: '10px 12px', background: 'var(--mongo-dim)', borderRadius: 8, textAlign: 'center' }}>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 4 }}>{n.label}</div>
+            <div key={n.label} style={{ padding: `${spacing[200]}px ${spacing[3]}px`, background: 'var(--mongo-dim)', borderRadius: 8, textAlign: 'center' }}>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[1] }}>{n.label}</div>
               <div style={{ fontFamily: uiTokens.monoFont, fontSize: 14, fontWeight: 800, color: 'var(--mongo)' }}>{n.value}</div>
             </div>
           ))}
@@ -154,9 +155,9 @@ export default function TechRecap({ elapsedMs, activeFeatures }) {
           fontWeight: 700,
           fontFamily: uiTokens.font,
           textAlign: 'center',
-          padding: '12px 0',
+          padding: `${spacing[3]}px 0`,
           borderTop: '1px solid var(--border-dim)',
-          marginTop: 8,
+          marginTop: spacing[2],
         }}
       >
         {featuresUsed} capabilities · 1 platform · Zero data shipping

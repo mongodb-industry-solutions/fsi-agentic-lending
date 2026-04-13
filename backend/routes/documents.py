@@ -29,7 +29,18 @@ def _validate_app_id(app_id: str):
     if not APP_ID_PATTERN.match(app_id):
         raise HTTPException(status_code=400, detail=f"Invalid application ID format: {app_id}")
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+def _resolve_project_root() -> Path:
+    """Resolve project root, handling both source layout and Docker flat layout.
+
+    Source repo:  fsi-agentic-lending/backend/routes/documents.py  (3 up)
+    Docker image: /app/routes/documents.py                         (2 up)
+    """
+    two_up = Path(__file__).resolve().parent.parent
+    if (two_up / "docs").is_dir():
+        return two_up
+    return two_up.parent
+
+_PROJECT_ROOT = _resolve_project_root()
 UPLOAD_DIR = _PROJECT_ROOT / "docs" / "uploads"
 
 VALID_DOC_TYPES = set(EXTRACTION_PROMPTS.keys()) | {"unknown"}

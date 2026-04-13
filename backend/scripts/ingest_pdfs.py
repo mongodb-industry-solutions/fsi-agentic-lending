@@ -21,8 +21,14 @@ from db.mdb import MongoDBConnector
 from services.extraction_service import extract_from_pdf, EXTRACTION_PROMPTS
 from services.embedding_service import embed_texts, embed_document
 
-# PDF directory
-PDF_DIR = Path(__file__).resolve().parent.parent.parent / "docs" / "synthetic data"
+def _resolve_project_root() -> Path:
+    """Resolve project root, handling both source layout and Docker flat layout."""
+    two_up = Path(__file__).resolve().parent.parent
+    if (two_up / "docs").is_dir():
+        return two_up
+    return two_up.parent
+
+PDF_DIR = _resolve_project_root() / "docs" / "synthetic data"
 
 # Document type mapping (filename prefix -> doc_type)
 DOC_TYPES = {
