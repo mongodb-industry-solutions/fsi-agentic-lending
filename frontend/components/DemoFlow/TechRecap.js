@@ -134,7 +134,7 @@ export default function TechRecap({ elapsedMs, activeFeatures }) {
 
       <CollapsibleSection title="By the Numbers" defaultOpen={false}>
         {/* By the Numbers */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10, marginBottom: 16 }}>
           {impactNumbers.map((n) => (
             <div key={n.label} style={{ padding: '10px 12px', background: 'var(--mongo-dim)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
               <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 4 }}>{n.label}</div>

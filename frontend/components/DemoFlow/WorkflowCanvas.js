@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useCallback } from 'react';
 import { RELEVANT_NODES } from '../../lib/data/demoScenes';
+import { NODE_COLORS } from '../../lib/data/nodeColors';
 
 const NODE_TYPES = {
   agent: 'agent',
@@ -12,25 +13,25 @@ const NODE_TYPES = {
 };
 
 const NODES = {
-  supervisor:    { label: 'Supervisor',           icon: '🧭', color: '#00684A', w: 120, h: 44, type: NODE_TYPES.agent },
-  appAgent:      { label: 'Loan App Agent',       icon: '📝', color: '#0891b2', w: 114, h: 42, type: NODE_TYPES.agent },
-  underwriter:   { label: 'Underwriting',         icon: '🧠', color: '#2563eb', w: 120, h: 42, type: NODE_TYPES.agent },
-  renewalAgent:  { label: 'Renewal Agent',        icon: '🔄', color: '#6341e0', w: 114, h: 42, type: NODE_TYPES.agent },
-  creditAPI:     { label: 'Credit Bureau',        icon: '📋', color: '#64748b', w: 104, h: 34, type: NODE_TYPES.tool },
-  voyageEmbed:   { label: 'Voyage MM 3.5',        icon: '🧬', color: '#6341e0', w: 104, h: 34, type: NODE_TYPES.tool },
-  vectorSearch:  { label: 'Vector Search',        icon: '🔎', color: '#6341e0', w: 110, h: 34, type: NODE_TYPES.tool },
-  graphLookup:   { label: '$graphLookup',         icon: '🕸', color: '#dc2626', w: 104, h: 34, type: NODE_TYPES.tool },
-  aggregation:   { label: 'Aggregation',          icon: '📊', color: '#0891b2', w: 104, h: 34, type: NODE_TYPES.tool },
-  changeStream:  { label: 'Change Streams',       icon: '📡', color: '#059669', w: 110, h: 34, type: NODE_TYPES.output },
-  timeSeries:    { label: 'Time Series',          icon: '⏱', color: '#6341e0', w: 96,  h: 34, type: NODE_TYPES.tool },
-  hitlGate:      { label: 'HITL Gate',            icon: '✋', color: '#d97706', w: 96,  h: 42, type: NODE_TYPES.gate },
-  checkpoint:    { label: 'Checkpointer',         icon: '💾', color: '#d97706', w: 110, h: 34, type: NODE_TYPES.storage },
-  memory:        { label: 'Memory Store',         icon: '🧠', color: '#00684A', w: 110, h: 34, type: NODE_TYPES.storage },
-  mongoAtlas:    { label: 'MongoDB Atlas',        icon: '🍃', color: '#00684A', w: 140, h: 46, type: NODE_TYPES.storage },
-  decision:      { label: 'DECISION',             icon: '✅', color: '#00684A', w: 100, h: 42, type: NODE_TYPES.gate },
-  fundingEngine: { label: 'Funding Engine',       icon: '💰', color: '#059669', w: 114, h: 38, type: NODE_TYPES.output },
-  ledger:        { label: 'Loan Ledger',          icon: '📒', color: '#059669', w: 100, h: 34, type: NODE_TYPES.storage },
-  renewalOffer:  { label: 'Renewal Offer',        icon: '📋', color: '#6341e0', w: 110, h: 34, type: NODE_TYPES.output },
+  supervisor:    { label: 'Supervisor',           icon: '🧭', color: NODE_COLORS.supervisor, w: 120, h: 44, type: NODE_TYPES.agent },
+  appAgent:      { label: 'Loan App Agent',       icon: '📝', color: NODE_COLORS.appAgent,   w: 114, h: 42, type: NODE_TYPES.agent },
+  underwriter:   { label: 'Underwriting',         icon: '🧠', color: NODE_COLORS.underwriter, w: 120, h: 42, type: NODE_TYPES.agent },
+  renewalAgent:  { label: 'Renewal Agent',        icon: '🔄', color: NODE_COLORS.renewalAgent, w: 114, h: 42, type: NODE_TYPES.agent },
+  creditAPI:     { label: 'Credit Bureau',        icon: '📋', color: NODE_COLORS.creditAPI,   w: 104, h: 34, type: NODE_TYPES.tool },
+  voyageEmbed:   { label: 'Voyage MM 3.5',        icon: '🧬', color: NODE_COLORS.voyageEmbed, w: 104, h: 34, type: NODE_TYPES.tool },
+  vectorSearch:  { label: 'Vector Search',        icon: '🔎', color: NODE_COLORS.vectorSearch, w: 110, h: 34, type: NODE_TYPES.tool },
+  graphLookup:   { label: '$graphLookup',         icon: '🕸', color: NODE_COLORS.graphLookup, w: 104, h: 34, type: NODE_TYPES.tool },
+  aggregation:   { label: 'Aggregation',          icon: '📊', color: NODE_COLORS.aggregation, w: 104, h: 34, type: NODE_TYPES.tool },
+  changeStream:  { label: 'Change Streams',       icon: '📡', color: NODE_COLORS.changeStream, w: 110, h: 34, type: NODE_TYPES.output },
+  timeSeries:    { label: 'Time Series',          icon: '⏱', color: NODE_COLORS.timeSeries,  w: 96,  h: 34, type: NODE_TYPES.tool },
+  hitlGate:      { label: 'HITL Gate',            icon: '✋', color: NODE_COLORS.hitlGate,    w: 96,  h: 42, type: NODE_TYPES.gate },
+  checkpoint:    { label: 'Checkpointer',         icon: '💾', color: NODE_COLORS.checkpoint,  w: 110, h: 34, type: NODE_TYPES.storage },
+  memory:        { label: 'Memory Store',         icon: '🧠', color: NODE_COLORS.memory,      w: 110, h: 34, type: NODE_TYPES.storage },
+  mongoAtlas:    { label: 'MongoDB Atlas',        icon: '🍃', color: NODE_COLORS.mongoAtlas,  w: 140, h: 46, type: NODE_TYPES.storage },
+  decision:      { label: 'DECISION',             icon: '✅', color: NODE_COLORS.decision,    w: 100, h: 42, type: NODE_TYPES.gate },
+  fundingEngine: { label: 'Funding Engine',       icon: '💰', color: NODE_COLORS.fundingEngine, w: 114, h: 38, type: NODE_TYPES.output },
+  ledger:        { label: 'Loan Ledger',          icon: '📒', color: NODE_COLORS.fundingEngine, w: 100, h: 34, type: NODE_TYPES.storage },
+  renewalOffer:  { label: 'Renewal Offer',        icon: '📋', color: NODE_COLORS.renewalAgent, w: 110, h: 34, type: NODE_TYPES.output },
 };
 
 const EDGES = [
@@ -335,7 +336,7 @@ export default function WorkflowCanvas({
       STAGE_COLUMNS.forEach((col) => {
         const cx = col.px * W;
         const isCurrentStage = currentScene === col.key;
-        ctx.font = `700 8px "Manrope"`;
+        ctx.font = `700 8px "Euclid Circular A", Manrope, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         ctx.fillStyle = isCurrentStage
@@ -417,7 +418,7 @@ export default function WorkflowCanvas({
           const labelText = EDGE_LABELS[key];
           if (labelText) {
             const labelPt = quadPoint(pa.x, pa.y, mx, my, pb.x, pb.y, 0.5);
-            ctx.font = '500 7px "Manrope"';
+            ctx.font = '500 7px "Euclid Circular A", Manrope, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             const tw = ctx.measureText(labelText).width + 6;
@@ -455,7 +456,7 @@ export default function WorkflowCanvas({
         // Completed edge checkmark
         if (isActive && bothCompleted) {
           const midPt = quadPoint(pa.x, pa.y, mx, my, pb.x, pb.y, 0.5);
-          ctx.font = '700 7px "Manrope"';
+          ctx.font = '700 7px "Euclid Circular A", Manrope, sans-serif';
           ctx.fillStyle = '#059669';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
@@ -574,11 +575,11 @@ export default function WorkflowCanvas({
           ctx.textBaseline = 'middle';
           ctx.fillText(n.icon, pos.x, pos.y - 7);
 
-          ctx.font = `700 9px "Manrope"`;
+          ctx.font = `700 9px "Euclid Circular A", Manrope, sans-serif`;
           ctx.fillStyle = isCompleted ? theme.textInactive : (isActive || isPulsing) ? theme.textActive : theme.textInactive;
           ctx.fillText(n.label, pos.x, pos.y + 9);
         } else {
-          ctx.font = `600 ${showIcon ? 8.5 : 7.5}px "Manrope"`;
+          ctx.font = `600 ${showIcon ? 8.5 : 7.5}px "Euclid Circular A", Manrope, sans-serif`;
           ctx.fillStyle = (isActive || isPulsing) ? theme.textActive : theme.textInactive;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
@@ -605,7 +606,7 @@ export default function WorkflowCanvas({
             ctx.arc(bx, by, 5, 0, Math.PI * 2);
             ctx.fillStyle = '#059669';
             ctx.fill();
-            ctx.font = '700 6px "Manrope"';
+            ctx.font = '700 6px "Euclid Circular A", Manrope, sans-serif';
             ctx.fillStyle = '#ffffff';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -631,7 +632,7 @@ export default function WorkflowCanvas({
         const status = state.pulseSet.has(hId) ? 'RUNNING' : isCompleted ? 'DONE' : isActive ? 'ACTIVE' : 'IDLE';
         const tooltipText = `${hNode.label}  ·  ${status}`;
 
-        ctx.font = '600 9px "Manrope"';
+        ctx.font = '600 9px "Euclid Circular A", Manrope, sans-serif';
         const tw = ctx.measureText(tooltipText).width + 14;
         const tx = Math.max(2, Math.min(hPos.x - tw / 2, W - tw - 2));
         const ty = hPos.y - (hNode.h / 2) - 22;

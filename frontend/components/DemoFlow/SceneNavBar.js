@@ -1,11 +1,13 @@
 "use client";
 
+import { spacing } from '@leafygreen-ui/tokens';
 import { SCENE_META } from '../../lib/data/demoScenes';
 
 const SPEEDS = [0.25, 0.5, 1, 2];
 
 export default function SceneNavBar({
   currentScene,
+  sceneStep,
   isPlaying,
   speed,
   setSpeed,
@@ -14,21 +16,23 @@ export default function SceneNavBar({
   onPlay,
   onPause,
   onStep,
+  onStepBack,
   onReset,
 }) {
+  const atStart = currentScene === 0 && sceneStep <= 0;
   return (
     <div
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 6,
-        padding: '6px 16px',
+        gap: spacing[150],
+        padding: `${spacing[150]}px ${spacing[3]}px`,
         background: 'var(--bg-base)',
         borderBottom: '1px solid var(--border-dim)',
         flexWrap: 'wrap',
       }}
     >
-      <div aria-label="Demo stages" style={{ display: 'flex', alignItems: 'center', gap: 0, flex: 1, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, flex: 1, minWidth: 0 }}>
         {SCENE_META.map((s, i) => {
           const active = i === currentScene;
           const visited = i < currentScene;
@@ -36,13 +40,12 @@ export default function SceneNavBar({
             <div key={s.key} style={{ display: 'flex', alignItems: 'center' }}>
               <button
                 type="button"
-                aria-current={active ? "step" : undefined}
                 onClick={() => onGoToScene(i)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 5,
-                  padding: '8px 14px',
+                  gap: spacing[100],
+                  padding: `${spacing[2]}px ${spacing[300]}px`,
                   borderRadius: 'var(--radius-sm)',
                   border: active ? '1px solid var(--mongo)' : '1px solid transparent',
                   background: active ? 'var(--mongo-dim)' : visited ? 'var(--bg-raised)' : 'transparent',
@@ -60,10 +63,12 @@ export default function SceneNavBar({
               </button>
               {i < SCENE_META.length - 1 && (
                 <div style={{
-                  width: 24, height: 2, borderRadius: 1,
+                  width: spacing[4],
+                  height: 2,
+                  borderRadius: 1,
                   background: visited ? 'var(--mongo)' : 'var(--border-dim)',
                   transition: 'background 0.4s ease',
-                  margin: '0 2px',
+                  margin: `0 ${spacing[50]}px`,
                 }} />
               )}
             </div>
@@ -71,29 +76,29 @@ export default function SceneNavBar({
         })}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: spacing[2] }}>
         <span
           style={{
-            fontFamily: 'var(--font-mono)',
             fontSize: 18,
             fontWeight: 700,
             color: 'var(--mongo)',
-            minWidth: 56,
+            minWidth: 140,
             textAlign: 'right',
           }}
         >
-          {(elapsedMs / 1000).toFixed(2)}s
+          <span style={{ fontFamily: 'var(--font-display)' }}>{SCENE_META[currentScene]?.title}</span>
+          {' · '}
+          <span style={{ fontFamily: 'var(--font-mono)' }}>{(elapsedMs / 1000).toFixed(2)}s</span>
         </span>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginLeft: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: spacing[50], marginLeft: spacing[2] }}>
           {SPEEDS.map((s) => (
             <button
               key={s}
               type="button"
               onClick={() => setSpeed(s)}
-              aria-label={`Set speed to ${s}x`}
               style={{
-                padding: '3px 8px',
+                padding: `${spacing[50]}px ${spacing[2]}px`,
                 borderRadius: 'var(--radius-sm)',
                 border: speed === s ? '1px solid var(--mongo)' : '1px solid var(--border-dim)',
                 background: speed === s ? 'var(--mongo-dim)' : 'transparent',
@@ -110,10 +115,30 @@ export default function SceneNavBar({
 
         <button
           type="button"
-          onClick={isPlaying ? onPause : onPlay}
-          aria-label={isPlaying ? 'Pause demo' : 'Play demo'}
+          onClick={onStepBack}
+          disabled={atStart}
           style={{
-            padding: '6px 14px',
+            padding: `${spacing[150]}px ${spacing[300]}px`,
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid var(--border-base)',
+            background: 'var(--bg-surface)',
+            color: 'var(--text-primary)',
+            fontFamily: 'var(--font-display)',
+            fontWeight: 600,
+            fontSize: 11,
+            cursor: atStart ? 'default' : 'pointer',
+            opacity: atStart ? 0.4 : 1,
+            transition: 'opacity 0.15s ease',
+          }}
+        >
+          ← Back
+        </button>
+
+        <button
+          type="button"
+          onClick={isPlaying ? onPause : onPlay}
+          style={{
+            padding: `${spacing[150]}px ${spacing[300]}px`,
             borderRadius: 'var(--radius-sm)',
             border: 'none',
             background: 'var(--mongo)',
@@ -130,9 +155,8 @@ export default function SceneNavBar({
         <button
           type="button"
           onClick={onStep}
-          aria-label="Step forward"
           style={{
-            padding: '6px 14px',
+            padding: `${spacing[150]}px ${spacing[300]}px`,
             borderRadius: 'var(--radius-sm)',
             border: '1px solid var(--border-base)',
             background: 'var(--bg-surface)',
@@ -149,9 +173,8 @@ export default function SceneNavBar({
         <button
           type="button"
           onClick={onReset}
-          aria-label="Reset demo"
           style={{
-            padding: '6px 10px',
+            padding: `${spacing[150]}px ${spacing[200]}px`,
             borderRadius: 'var(--radius-sm)',
             border: '1px solid var(--border-dim)',
             background: 'transparent',

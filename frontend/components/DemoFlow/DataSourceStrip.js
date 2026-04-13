@@ -69,14 +69,14 @@ function Pill({ item, status }) {
         fontSize: 9,
         fontWeight: 600,
         background: ingested
-          ? item._type === 'structured' ? 'rgba(0,237,100,0.08)' : 'rgba(59,130,246,0.08)'
+          ? item._type === 'structured' ? 'var(--mongo-bright-dim)' : 'var(--tool-blue-bg)'
           : 'var(--bg-raised)',
         color: ingested
           ? item._type === 'structured' ? 'var(--mongo)' : 'var(--tool-blue)'
           : 'var(--text-dim)',
         border: `1px solid ${
           ingested
-            ? item._type === 'structured' ? 'rgba(0,237,100,0.2)' : 'rgba(59,130,246,0.2)'
+            ? item._type === 'structured' ? 'var(--mongo-bright-border)' : 'var(--tool-blue-border)'
             : 'var(--border-dim)'
         }`,
         transition: 'all 0.4s ease-out',

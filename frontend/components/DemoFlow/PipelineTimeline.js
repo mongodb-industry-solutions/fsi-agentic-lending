@@ -1,23 +1,7 @@
 "use client";
 
 import { useMemo, useEffect, useRef } from 'react';
-
-const NODE_COLORS = {
-  supervisor: '#00684A',
-  appAgent: '#0891b2',
-  underwriter: '#2563eb',
-  renewalAgent: '#6341e0',
-  creditAPI: '#64748b',
-  voyageEmbed: '#6341e0',
-  vectorSearch: '#6341e0',
-  graphLookup: '#dc2626',
-  hitlGate: '#d97706',
-  decision: '#00684A',
-  fundingEngine: '#059669',
-  changeStream: '#059669',
-  mongoAtlas: '#00684A',
-  timeSeries: '#6341e0',
-};
+import { NODE_COLORS } from '../../lib/data/nodeColors';
 
 export default function PipelineTimeline({
   steps,

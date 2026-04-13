@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from db.mdb import get_db as _get_db
 from services import application_service
 from agents.graph import get_graph
-from agents.tools import log_agent_activity
+from agents.pipeline.tools import log_agent_activity
 
 logger = logging.getLogger(__name__)
 

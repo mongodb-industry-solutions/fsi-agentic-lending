@@ -8,6 +8,7 @@ import ApplicantCard from '../panels/ApplicantCard';
 import DataSourceStrip from '../DataSourceStrip';
 import PipelineTimeline from '../PipelineTimeline';
 import StatCard from '../../visualizations/StatCard';
+import { spacing } from '@leafygreen-ui/tokens';
 
 const DOCUMENTS = [
   {
@@ -123,7 +124,7 @@ function ConfidenceBadge({ value }) {
         fontFamily: 'var(--font-mono)',
         fontSize: 10,
         fontWeight: 700,
-        padding: '2px 6px',
+        padding: `${spacing[50]}px ${spacing[150]}px`,
         borderRadius: 4,
         background: value >= 99 ? 'var(--success-dim)' : value >= 95 ? 'var(--mongo-dim)' : 'var(--hitl-amber-dim)',
         color,
@@ -155,7 +156,7 @@ function useProgressiveReveal(total, active, intervalMs = 150) {
 
 function DocumentTabSwitcher({ activeDoc, onSelect, sceneStep }) {
   return (
-    <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+    <div style={{ display: 'flex', gap: spacing[100], marginBottom: 10 }}>
       {DOCUMENTS.map((doc, i) => {
         const available = i === 0 || sceneStep >= 3;
         const isActive = activeDoc === i;
@@ -166,7 +167,7 @@ function DocumentTabSwitcher({ activeDoc, onSelect, sceneStep }) {
             onClick={() => available && onSelect(i)}
             style={{
               flex: 1,
-              padding: '6px 8px',
+              padding: `${spacing[150]}px ${spacing[200]}px`,
               borderRadius: 'var(--radius-sm)',
               border: isActive ? '2px solid var(--mongo)' : '1px solid var(--border-dim)',
               background: isActive ? 'var(--mongo-dim)' : available ? 'var(--bg-surface)' : 'var(--bg-raised)',
@@ -179,7 +180,7 @@ function DocumentTabSwitcher({ activeDoc, onSelect, sceneStep }) {
               transition: 'all 0.2s',
             }}
           >
-            <span style={{ fontSize: 13, display: 'block', marginBottom: 2 }}>{doc.icon}</span>
+            <span style={{ fontSize: 13, display: 'block', marginBottom: spacing[50] }}>{doc.icon}</span>
             {doc.type}
           </button>
         );
@@ -191,29 +192,29 @@ function DocumentTabSwitcher({ activeDoc, onSelect, sceneStep }) {
 function OpenBankingCard() {
   const maxVal = Math.max(...OPEN_BANKING_DATA.income.map((d) => d.value));
   return (
-    <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--agent-cyan)', marginTop: 12, animation: 'slideDown 0.3s ease-out' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+    <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--agent-cyan)', marginTop: spacing[300], animation: 'slideDown 0.3s ease-out' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[200] }}>
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--agent-cyan)' }}>
           Open Banking Data
         </div>
-        <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)', fontWeight: 600 }}>
+        <span style={{ fontSize: 9, padding: `${spacing[50]}px ${spacing[200]}px`, borderRadius: 4, background: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)', fontWeight: 600 }}>
           Plaid Connected
         </span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 40, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 40, marginBottom: spacing[200] }}>
         {OPEN_BANKING_DATA.income.map((d, i) => {
           const h = (d.value / maxVal) * 36;
           return (
             <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
               <div style={{ width: '100%', height: h, background: 'var(--agent-cyan)', borderRadius: '2px 2px 0 0', opacity: 0.6, minHeight: 3 }} />
-              <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 2 }}>{d.month}</div>
+              <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: spacing[50] }}>{d.month}</div>
             </div>
           );
         })}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: spacing[150] }}>
         {Object.entries(OPEN_BANKING_DATA.summary).map(([key, val]) => (
-          <div key={key} style={{ padding: '4px 6px', background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)' }}>
+          <div key={key} style={{ padding: `${spacing[100]}px ${spacing[150]}px`, background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)' }}>
             <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 1 }}>
               {key.replace(/([A-Z])/g, ' $1').trim()}
             </div>
@@ -221,7 +222,7 @@ function OpenBankingCard() {
           </div>
         ))}
       </div>
-      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 6 }}>
+      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: spacing[150] }}>
         Aggregation Framework + Atlas Vector Search — cash flow underwriting
       </div>
     </div>
@@ -230,14 +231,14 @@ function OpenBankingCard() {
 
 function AbandonmentIndicator() {
   return (
-    <div style={{ display: 'flex', gap: 8, marginTop: 10, animation: 'slideDown 0.3s ease-out' }}>
-      <div style={{ flex: 1, padding: '8px 10px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--danger)', borderLeftWidth: 3 }}>
-        <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>Traditional</div>
+    <div style={{ display: 'flex', gap: spacing[200], marginTop: 10, animation: 'slideDown 0.3s ease-out' }}>
+      <div style={{ flex: 1, padding: `${spacing[200]}px 10px`, background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--danger)', borderLeftWidth: 3 }}>
+        <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[50] }}>Traditional</div>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 800, color: 'var(--danger)' }}>18 min</div>
         <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>68% abandon</div>
       </div>
-      <div style={{ flex: 1, padding: '8px 10px', background: 'var(--mongo-dim)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--mongo)', borderLeftWidth: 3 }}>
-        <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>Agentic</div>
+      <div style={{ flex: 1, padding: `${spacing[200]}px 10px`, background: 'var(--mongo-dim)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--mongo)', borderLeftWidth: 3 }}>
+        <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[50] }}>Agentic</div>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 800, color: 'var(--mongo)' }}>2.4 min</div>
         <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>12% abandon</div>
       </div>
@@ -284,11 +285,11 @@ export default function OriginationScene({ sceneStep, currentStepData }) {
       {started && (
         <div
           className="scene-stats-row"
-          style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--border-dim)' }}
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: spacing[300], padding: `${spacing[300]}px ${spacing[400]}px`, borderBottom: '1px solid var(--border-dim)' }}
         >
           {STAT_ITEMS.map((s) => (
             <div key={s.label} style={{ padding: '10px 14px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4, textTransform: 'uppercase', fontWeight: 600 }}>{s.label}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: spacing[100], textTransform: 'uppercase', fontWeight: 600 }}>{s.label}</div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 800, color: s.color }}>
                 <AnimatedCounter target={s.value} active={started} />
               </div>
@@ -316,8 +317,8 @@ export default function OriginationScene({ sceneStep, currentStepData }) {
             stepIndex={sceneStep}
             totalSteps={ORIGINATION_STEPS.length}
           />
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: spacing[400] }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: spacing[200], marginBottom: spacing[300] }}>
               <StatCard label="Documents" value={sceneStep >= 2 ? 4 : sceneStep >= 0 ? 2 : 0} color="var(--agent-cyan)" />
               <StatCard label="Fields Extracted" value={sceneStep >= 3 ? 47 : sceneStep >= 1 ? 12 : 0} color="var(--mongo)" />
               <StatCard label="Validations" value={sceneStep >= 4 ? 23 : sceneStep >= 2 ? 8 : 0} color="var(--success)" />
@@ -327,9 +328,9 @@ export default function OriginationScene({ sceneStep, currentStepData }) {
 
             {showExtraction && (
               <>
-                <div style={{ marginTop: 14, marginBottom: 8, fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ marginTop: 14, marginBottom: spacing[200], fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: spacing[150] }}>
                   Multi-Document Processing
-                  <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)', fontWeight: 600 }}>voyage-multimodal-3.5</span>
+                  <span style={{ fontSize: 9, padding: `${spacing[50]}px ${spacing[150]}px`, borderRadius: 4, background: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)', fontWeight: 600 }}>voyage-multimodal-3.5</span>
                 </div>
 
                 <DocumentTabSwitcher activeDoc={activeDocIdx} onSelect={setActiveDocIdx} sceneStep={sceneStep} />
@@ -341,8 +342,8 @@ export default function OriginationScene({ sceneStep, currentStepData }) {
                       style={{
                         display: 'grid',
                         gridTemplateColumns: '130px 1fr auto',
-                        gap: 6,
-                        padding: '6px 10px',
+                        gap: spacing[150],
+                        padding: `${spacing[150]}px 10px`,
                         borderBottom: i < Math.min(visibleFieldCount, activeDoc.fields.length) - 1 ? '1px solid var(--border-dim)' : 'none',
                         fontSize: 10,
                         alignItems: 'center',
@@ -355,7 +356,7 @@ export default function OriginationScene({ sceneStep, currentStepData }) {
                     </div>
                   ))}
                   {visibleFieldCount < activeDoc.fields.length && (
-                    <div style={{ padding: '6px 10px', fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', animation: 'pulse 1s infinite' }}>
+                    <div style={{ padding: `${spacing[150]}px 10px`, fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', animation: 'pulse 1s infinite' }}>
                       Extracting {activeDoc.type}... {visibleFieldCount}/{activeDoc.fields.length}
                     </div>
                   )}
@@ -365,12 +366,12 @@ export default function OriginationScene({ sceneStep, currentStepData }) {
 
                 {visibleFieldCount >= activeDoc.fields.length && (
                   <>
-                    <div style={{ marginTop: 14, marginBottom: 6, fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12 }}>
+                    <div style={{ marginTop: 14, marginBottom: spacing[150], fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12 }}>
                       Cross-Validation
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                       {VALIDATIONS.map((v) => (
-                        <div key={v.check} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '6px 8px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-dim)', fontSize: 10 }}>
+                        <div key={v.check} style={{ display: 'flex', alignItems: 'flex-start', gap: spacing[150], padding: `${spacing[150]}px ${spacing[200]}px`, background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-dim)', fontSize: 10 }}>
                           <span style={{ color: v.pass ? 'var(--success)' : 'var(--danger)', fontSize: 12, flexShrink: 0 }}>{v.pass ? '✓' : '✕'}</span>
                           <div>
                             <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{v.check}</div>
@@ -388,8 +389,8 @@ export default function OriginationScene({ sceneStep, currentStepData }) {
 
             {showProfile && (
               <div style={{ marginTop: 14, padding: 14, background: 'var(--mongo-dim)', borderRadius: 'var(--radius-md)', border: '1px solid var(--mongo)' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--mongo)', marginBottom: 8 }}>Profile Output — Ready for Decisioning</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 11 }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--mongo)', marginBottom: spacing[200] }}>Profile Output — Ready for Decisioning</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing[200], fontSize: 11 }}>
                   <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>APPLICANTS</div><div style={{ fontWeight: 600 }}>Marcus & Sofia Delgado</div></div>
                   <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>COMBINED INCOME</div><div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>$222,700</div></div>
                   <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>EQUIFAX</div><div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>784</div></div>
@@ -399,17 +400,17 @@ export default function OriginationScene({ sceneStep, currentStepData }) {
                   <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>OPEN BANKING</div><div style={{ fontWeight: 600 }}>Plaid verified</div></div>
                   <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>CHECKPOINT</div><div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>cp-1a2b3c</div></div>
                 </div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 8, display: 'flex', gap: 6 }}>
-                  <span style={{ padding: '2px 6px', background: 'var(--bg-raised)', borderRadius: 3 }}>Embedding stored</span>
-                  <span style={{ padding: '2px 6px', background: 'var(--bg-raised)', borderRadius: 3 }}>Checkpoint saved</span>
-                  <span style={{ padding: '2px 6px', background: 'var(--bg-raised)', borderRadius: 3 }}>Cash flow indexed</span>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: spacing[200], display: 'flex', gap: spacing[150] }}>
+                  <span style={{ padding: `${spacing[50]}px ${spacing[150]}px`, background: 'var(--bg-raised)', borderRadius: 3 }}>Embedding stored</span>
+                  <span style={{ padding: `${spacing[50]}px ${spacing[150]}px`, background: 'var(--bg-raised)', borderRadius: 3 }}>Checkpoint saved</span>
+                  <span style={{ padding: `${spacing[50]}px ${spacing[150]}px`, background: 'var(--bg-raised)', borderRadius: 3 }}>Cash flow indexed</span>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: 16 }}>
+        <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: spacing[400] }}>
           <PipelineTimeline
             steps={ORIGINATION_STEPS}
             stepIndex={sceneStep}

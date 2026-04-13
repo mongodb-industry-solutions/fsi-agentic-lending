@@ -195,6 +195,21 @@ export function useDemoEngine() {
     }
   }, [currentScene, sceneStep, hitlWaiting, pause, advanceToNextScene]);
 
+  const stepBackward = useCallback(() => {
+    pause();
+    setHitlWaiting(false);
+    setHitlApproved(false);
+    setHitlDeclined(false);
+
+    if (sceneStep > 0) {
+      setSceneStep(sceneStep - 1);
+    } else if (currentScene > 0) {
+      const prevSteps = SCENE_STEPS[currentScene - 1] || [];
+      setCurrentScene(currentScene - 1);
+      setSceneStep(prevSteps.length > 0 ? prevSteps.length - 1 : -1);
+    }
+  }, [currentScene, sceneStep, pause]);
+
   const goToScene = useCallback(
     (idx) => {
       pause();
@@ -260,6 +275,7 @@ export function useDemoEngine() {
     play,
     pause,
     stepForward,
+    stepBackward,
     reset,
     goToScene,
     nextScene,

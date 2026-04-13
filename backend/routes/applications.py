@@ -59,7 +59,7 @@ async def list_applications(skip: int = 0, limit: int = 50):
 
 @router.get("/portfolio/stats")
 async def portfolio_stats():
-    from agents.tools import get_portfolio_stats
+    from services.dashboard_service import get_portfolio_stats
     result = await asyncio.to_thread(get_portfolio_stats)
     return result
 
@@ -67,7 +67,7 @@ async def portfolio_stats():
 @router.get("/portfolio/ews")
 async def portfolio_ews(loan_id: str = None):
     """Early Warning System signals from payment time-series analysis."""
-    from agents.tools import get_ews_signals
+    from services.dashboard_service import get_ews_signals
     if not loan_id:
         db = get_db()
         sample = db["payments"].find_one({}, {"loan_id": 1})
@@ -81,7 +81,7 @@ async def portfolio_ews(loan_id: str = None):
 @router.get("/portfolio/events")
 async def portfolio_events(limit: int = 20):
     """Recent loan events (payments, agent actions)."""
-    from agents.tools import get_recent_events
+    from services.dashboard_service import get_recent_events
     limit = min(max(limit, 1), 100)
     result = await asyncio.to_thread(get_recent_events, limit)
     return result
@@ -89,7 +89,7 @@ async def portfolio_events(limit: int = 20):
 
 @router.get("/portfolio/payments")
 async def portfolio_payments(loan_id: str = None):
-    from agents.tools import get_payment_trends
+    from services.dashboard_service import get_payment_trends
     results = await asyncio.to_thread(get_payment_trends, loan_id)
     # Serialize timestamps
     for r in results:
@@ -217,7 +217,7 @@ async def stream_status(app_id: str):
 async def get_risk_pipeline(app_id: str):
     """Return the 7-stage aggregation pipeline stages and results."""
     _validate_app_id(app_id)
-    from agents.tools import run_risk_aggregation
+    from agents.pipeline.tools import run_risk_aggregation
     result = await asyncio.to_thread(run_risk_aggregation, app_id)
     if not result.get("application_id"):
         raise HTTPException(status_code=404, detail="Application not found or pipeline returned no results")

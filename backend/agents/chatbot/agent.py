@@ -12,9 +12,9 @@ import json
 import logging
 from typing import TypedDict, Optional
 
-from bedrock.anthropic_chat_completions import BedrockAnthropicChatCompletions
-from agents.app_agent_prompts import APPLICATION_AGENT_SYSTEM_PROMPT, SAFETY_PATTERNS
-from agents.app_agent_tools import (
+from agents.llm import get_llm
+from agents.chatbot.prompts import APPLICATION_AGENT_SYSTEM_PROMPT, SAFETY_PATTERNS
+from agents.chatbot.tools import (
     search_policies_borrower,
     get_document_requirements,
     get_application_status_filtered,
@@ -24,23 +24,13 @@ from agents.app_agent_tools import (
 
 logger = logging.getLogger(__name__)
 
-_llm = None
-
-
-def _get_llm():
-    """Get or create the singleton Bedrock LLM client."""
-    global _llm
-    if _llm is None:
-        _llm = BedrockAnthropicChatCompletions()
-    return _llm
-
 
 class AppAgentState(TypedDict):
     """State for a single application agent turn."""
-    messages: list                          # conversation history [{role, content}]
+    messages: list
     application_id: Optional[str]
-    user_message: str                       # current user input
-    response: Optional[str]                 # agent response
+    user_message: str
+    response: Optional[str]
 
 
 def _build_context(state: AppAgentState) -> tuple[str, list[dict]]:
@@ -175,7 +165,7 @@ def _build_context(state: AppAgentState) -> tuple[str, list[dict]]:
     return context_str, tool_metadata
 
 
-def _safety_filter(response: str) -> str:
+def safety_filter(response: str) -> str:
     """Check response against safety patterns. Returns filtered response.
 
     If any pattern matches, the entire response is replaced with a safe
@@ -245,14 +235,9 @@ def chat_stream(
     """Stream the agent response token-by-token.
 
     Yields dicts: first a list of tool_call events, then text chunks,
-    then a final done event. The caller (route) uses these to build
-    SSE events for the frontend.
-
-    Each yielded item is either:
-      - {"type": "tool_calls", "tools": [...]}  (emitted once, before tokens)
-      - str  (a text chunk)
+    then a final done event.
     """
-    llm = _get_llm()
+    llm = get_llm()
     messages, tool_metadata = _prepare_llm_messages(application_id, user_message, history)
 
     if tool_metadata:
@@ -284,7 +269,7 @@ def chat(
     Returns:
         The agent's response string, safety-filtered.
     """
-    llm = _get_llm()
+    llm = get_llm()
     messages, _tool_metadata = _prepare_llm_messages(application_id, user_message, history)
 
     try:
@@ -299,5 +284,5 @@ def chat(
             "Please try again in a moment."
         )
 
-    response = _safety_filter(response)
+    response = safety_filter(response)
     return response

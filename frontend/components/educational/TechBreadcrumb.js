@@ -1,14 +1,16 @@
 "use client";
 
+import Badge from '@leafygreen-ui/badge';
 import { CAPABILITIES } from '../../lib/data/capabilities';
 import { colorMap, dimMap } from '../../lib/data/colorMaps';
 
 export default function TechBreadcrumb({ activatedCapabilities = [] }) {
   const activeSet = new Set(activatedCapabilities);
   const activeCount = CAPABILITIES.filter((c) => activeSet.has(c.id)).length;
+  const allActive = activeCount === CAPABILITIES.length;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 12px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-dim)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4, padding: '4px 12px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-dim)' }}>
       <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', marginRight: 6 }}>
         MongoDB
       </span>
@@ -44,8 +46,10 @@ export default function TechBreadcrumb({ activatedCapabilities = [] }) {
           </span>
         );
       })}
-      <span style={{ marginLeft: 'auto', fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--mongo)', fontWeight: 700 }}>
-        {activeCount}/{CAPABILITIES.length}
+      <span style={{ marginLeft: 'auto' }}>
+        <Badge variant={allActive ? 'green' : 'lightgray'}>
+          {activeCount}/{CAPABILITIES.length}
+        </Badge>
       </span>
     </div>
   );

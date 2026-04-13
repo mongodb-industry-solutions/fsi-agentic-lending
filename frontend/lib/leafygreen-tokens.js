@@ -15,7 +15,7 @@ export const colors = {
   mongoBright: palette.green.base,  // #00ED64
   danger: palette.red.base,         // #DB3030
   success: palette.green.dark1,     // #00684A
-  headerBg: palette.green.dark2,    // #023430
+  headerBg: palette.green.dark3,    // #023430
 };
 
 export { palette, spacing };

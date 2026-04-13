@@ -48,7 +48,6 @@ When a user asks something out of scope, respond: "That's something your assigne
 If there are PENDING ACTION ITEMS in the context, proactively mention them early in your response — these are time-sensitive and the borrower needs to act on them."""
 
 
-# Regex patterns for output safety filter — catches accidental leaks
 SAFETY_PATTERNS = [
     r"risk.?score",
     r"risk.?tier",

@@ -117,6 +117,7 @@ export default function Demo() {
     >
       <SceneNavBar
         currentScene={engine.currentScene}
+        sceneStep={engine.sceneStep}
         isPlaying={engine.isPlaying}
         speed={engine.speed}
         setSpeed={engine.setSpeed}
@@ -125,6 +126,7 @@ export default function Demo() {
         onPlay={engine.play}
         onPause={engine.pause}
         onStep={engine.stepForward}
+        onStepBack={engine.stepBackward}
         onReset={engine.reset}
       />
 

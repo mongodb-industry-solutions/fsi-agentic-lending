@@ -1,6 +1,6 @@
 """Supervisor agent — routes work to specialized agents."""
 from agents.state import LendFlowState
-from agents.tools import log_agent_activity
+from agents.pipeline.tools import log_agent_activity
 
 
 def supervisor_node(state: LendFlowState, **kwargs) -> dict:
@@ -37,22 +37,18 @@ def supervisor_node(state: LendFlowState, **kwargs) -> dict:
 
     # Apply autonomy gates
     if autonomy == "observe":
-        # Every transition requires officer approval
         approved_nodes = state.get("hitl_approved_nodes", [])
         if natural_next not in ("hitl_gate", "complete") and natural_next not in approved_nodes:
             log_agent_activity(app_id, "supervisor", "autonomy_gate",
                 f"Observe mode: pausing before {natural_next} for officer review")
             return {"current_agent": "hitl_gate", "retry_count": 0, "pending_node": natural_next}
     elif autonomy == "suggest":
-        # Pause before final decision only
         if natural_next == "complete" and state.get("decision") not in ("error", "decline"):
             log_agent_activity(app_id, "supervisor", "autonomy_gate",
                 "Suggest mode: pausing for officer to review decision")
             natural_next = "hitl_gate"
     elif autonomy == "bounded":
-        # Only escalate based on policy (default — if decision is "escalate", hitl_gate is already set)
         pass
-    # "auto" — never pause, let natural_next flow
 
     log_agent_activity(app_id, "supervisor", "route",
         f"[{autonomy}] → {natural_next}")

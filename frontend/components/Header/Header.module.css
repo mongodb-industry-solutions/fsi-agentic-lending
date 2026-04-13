@@ -3,3 +3,7 @@
   outline: none;
   box-shadow: 0 0 0 2px #C3E7FE;
 }
+
+.navPill:hover:not([aria-current='page']) {
+  background: rgba(255, 255, 255, 0.1) !important;
+}

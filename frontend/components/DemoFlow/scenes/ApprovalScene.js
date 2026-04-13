@@ -96,21 +96,21 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
               stepIndex={sceneStep}
               totalSteps={APPROVAL_STEPS.length}
             />
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: spacing[3] }}>
-              <div style={{ textAlign: 'center', marginBottom: spacing[3] }}>
-                <div style={{ fontSize: 36, marginBottom: spacing[2] }}>✅</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 22, color: 'var(--mongo)', marginBottom: spacing[1] }}>LOAN APPROVED</div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: spacing[400] }}>
+              <div style={{ textAlign: 'center', marginBottom: spacing[400] }}>
+                <div style={{ fontSize: 36, marginBottom: spacing[200] }}>✅</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 22, color: 'var(--mongo)', marginBottom: spacing[100] }}>LOAN APPROVED</div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                   {LOAN_TERMS.type} @ {LOAN_TERMS.apr} · {LOAN_TERMS.monthlyPayment}/mo
                 </div>
               </div>
 
-              <div style={{ padding: spacing[3], background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', marginBottom: spacing[3] }}>
+              <div style={{ padding: spacing[400], background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', marginBottom: spacing[400] }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: 10 }}>Loan Terms</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   {Object.entries(LOAN_TERMS).map(([key, val]) => (
                     <div key={key}>
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>{key.replace(/([A-Z])/g, ' $1').trim()}</div>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[50] }}>{key.replace(/([A-Z])/g, ' $1').trim()}</div>
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: key === 'apr' || key === 'monthlyPayment' ? 'var(--mongo)' : 'var(--text-primary)' }}>{val}</div>
                     </div>
                   ))}
@@ -118,7 +118,7 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
               </div>
 
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: 10 }}>Repayment Schedule Preview</div>
-              <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', overflow: 'hidden', marginBottom: spacing[3] }}>
+              <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', overflow: 'hidden', marginBottom: spacing[400] }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', padding: '8px 10px', borderBottom: '1px solid var(--border-dim)', textTransform: 'uppercase' }}>
                   <span>Month</span><span>Payment</span><span>Principal</span><span>Interest</span><span>Balance</span>
                 </div>
@@ -132,7 +132,7 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
                   </div>
                 ))}
                 <button type="button" style={{
-                  width: '100%', padding: '6px 0', fontSize: 10,
+                  width: '100%', padding: `${spacing[150]}px 0`, fontSize: 10,
                   color: 'var(--mongo)', fontWeight: 600, fontFamily: 'var(--font-mono)',
                   background: 'none', border: 'none', borderTop: '1px solid var(--border-dim)',
                   cursor: 'pointer',
@@ -151,7 +151,7 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
             </div>
           </div>
 
-          <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: 16 }}>
+          <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: spacing[400] }}>
             <PipelineTimeline
               steps={APPROVAL_STEPS}
               stepIndex={sceneStep}
@@ -187,37 +187,37 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
               stepIndex={sceneStep}
               totalSteps={APPROVAL_STEPS.length}
             />
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: spacing[3] }}>
-              <div style={{ textAlign: 'center', marginBottom: spacing[3] }}>
-                <div style={{ fontSize: 36, marginBottom: spacing[2] }}>❌</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 22, color: 'var(--danger)', marginBottom: spacing[1] }}>LOAN DECLINED</div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: spacing[400] }}>
+              <div style={{ textAlign: 'center', marginBottom: spacing[400] }}>
+                <div style={{ fontSize: 36, marginBottom: spacing[200] }}>❌</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 22, color: 'var(--danger)', marginBottom: spacing[100] }}>LOAN DECLINED</div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                   Application {PAYLOAD.applicationId} — {PAYLOAD.applicant}
                 </div>
               </div>
-              <div style={{ padding: spacing[3], background: 'var(--danger-dim)', borderRadius: 'var(--radius-md)', border: '1px solid var(--danger)', marginBottom: spacing[3] }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--danger)', marginBottom: spacing[2] }}>Decision Summary</div>
+              <div style={{ padding: spacing[400], background: 'var(--danger-dim)', borderRadius: 'var(--radius-md)', border: '1px solid var(--danger)', marginBottom: spacing[400] }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--danger)', marginBottom: spacing[200] }}>Decision Summary</div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                   The loan officer has declined this application after manual review. The workflow state has been persisted to MongoDB via MongoDBSaver. An adverse action notice will be generated per Bank Act and FCAC requirements.
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: spacing[300] }}>
                 <div>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>Risk Score</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[50] }}>Risk Score</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700, color: 'var(--danger)' }}>{PAYLOAD.riskScore}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>Loan Amount</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[50] }}>Loan Amount</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700 }}>{PAYLOAD.loanAmount}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>Reason</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[50] }}>Reason</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>{PAYLOAD.triggerReason}</div>
                 </div>
               </div>
             </div>
           </div>
-          <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: 16 }}>
+          <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: spacing[400] }}>
             <PipelineTimeline
               steps={APPROVAL_STEPS}
               stepIndex={sceneStep}
@@ -252,11 +252,11 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
             stepIndex={sceneStep}
             totalSteps={APPROVAL_STEPS.length}
           />
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: spacing[3] }}>
-            <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', marginBottom: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[2] }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: spacing[400] }}>
+            <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[200] }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12 }}>Routing Decision</div>
-              <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'var(--mongo-dim)', color: 'var(--mongo)' }}>
+              <span style={{ fontSize: 9, fontWeight: 600, padding: `${spacing[50]}px ${spacing[200]}px`, borderRadius: 4, background: 'var(--mongo-dim)', color: 'var(--mongo)' }}>
                 Auto-decisioning rate: 70–83%
               </span>
             </div>
@@ -265,7 +265,7 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
               { tier: 2, label: 'Medium Risk (score 60–85)', action: 'Junior officer review', active: true },
               { tier: 3, label: 'High Risk (score < 60)', action: 'Senior underwriter escalation', active: false },
             ].map((t) => (
-              <div key={t.tier} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 'var(--radius-sm)', background: t.active ? 'var(--hitl-amber-dim)' : 'transparent', border: t.active ? '1px solid var(--hitl-amber)' : '1px solid transparent', marginBottom: 4 }}>
+              <div key={t.tier} style={{ display: 'flex', alignItems: 'center', gap: spacing[200], padding: `${spacing[150]}px ${spacing[200]}px`, borderRadius: 'var(--radius-sm)', background: t.active ? 'var(--hitl-amber-dim)' : 'transparent', border: t.active ? '1px solid var(--hitl-amber)' : '1px solid transparent', marginBottom: spacing[100] }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: t.active ? 'var(--hitl-amber)' : 'var(--text-dim)', flexShrink: 0 }}>
                   Tier {t.tier}
                 </span>
@@ -278,44 +278,44 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
           </div>
 
           <div style={{ padding: 28, background: 'var(--bg-surface)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border-base)', boxShadow: '0 12px 40px rgba(0,0,0,0.06)' }}>
-            <div style={{ padding: '10px 14px', background: 'var(--hitl-amber-dim)', borderRadius: 'var(--radius-md)', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ padding: '10px 14px', background: 'var(--hitl-amber-dim)', borderRadius: 'var(--radius-md)', marginBottom: spacing[500], display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 18 }}>💾</span>
               <div>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--hitl-amber)' }}>State saved to MongoDB — MongoDBSaver</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', marginTop: spacing[50] }}>
                   checkpoint({CHECKPOINT_DATA.checkpointId}) · thread: {CHECKPOINT_DATA.thread} · step: {CHECKPOINT_DATA.step}
                 </div>
               </div>
             </div>
 
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ padding: '6px 12px', background: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)', borderRadius: 20, fontSize: 12, fontWeight: 700, display: 'inline-block', marginBottom: 12 }}>
+            <div style={{ marginBottom: spacing[500] }}>
+              <div style={{ padding: `${spacing[150]}px ${spacing[300]}px`, background: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)', borderRadius: 20, fontSize: 12, fontWeight: 700, display: 'inline-block', marginBottom: spacing[300] }}>
                 ⏸ Human Review Required
               </div>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18 }}>LangGraph interrupt() triggered</div>
-              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>{PAYLOAD.triggerReason}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: spacing[100] }}>{PAYLOAD.triggerReason}</div>
             </div>
 
-            <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6, padding: 10, background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)', marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6, padding: 10, background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)', marginBottom: spacing[400] }}>
               The agent workflow is paused at this node. All state is persisted to MongoDB via MongoDBSaver. The loan officer reviews and decides.
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: spacing[3], marginBottom: spacing[3] }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: spacing[400], marginBottom: spacing[400] }}>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: spacing[1] }}>Risk Score</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: spacing[100] }}>Risk Score</div>
                 <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--hitl-amber)' }}>{PAYLOAD.riskScore} <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>/ 100</span></div>
               </div>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Loan Amount</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: spacing[100] }}>Loan Amount</div>
                 <div style={{ fontSize: 20, fontWeight: 700 }}>{PAYLOAD.loanAmount}</div>
               </div>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Proposed Rate</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: spacing[100] }}>Proposed Rate</div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--mongo)' }}>{PAYLOAD.proposedRate}</div>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: spacing[2], marginBottom: 20, padding: 12, background: 'var(--bg-raised)', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: spacing[200], marginBottom: spacing[500], padding: spacing[300], background: 'var(--bg-raised)', borderRadius: 'var(--radius-md)' }}>
               {[
                 { label: 'Applicant', value: PAYLOAD.applicant },
                 { label: 'Product', value: PAYLOAD.product },
@@ -323,15 +323,15 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
                 { label: 'LTV', value: `${PAYLOAD.ltv}%` },
               ].map((item) => (
                 <div key={item.label}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>{item.label}</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[50] }}>{item.label}</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600 }}>{item.value}</div>
                 </div>
               ))}
             </div>
 
-            <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', marginBottom: spacing[3] }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: spacing[2] }}>Generated Loan Terms</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: spacing[2], fontSize: 11 }}>
+            <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', marginBottom: spacing[400] }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: spacing[200] }}>Generated Loan Terms</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: spacing[200], fontSize: 11 }}>
                 <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>TYPE</div><div style={{ fontWeight: 600 }}>5yr Fixed (25yr)</div></div>
                 <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>APR</div><div style={{ fontWeight: 600, color: 'var(--mongo)' }}>4.89%</div></div>
                 <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>MONTHLY</div><div style={{ fontWeight: 600 }}>$4,047</div></div>
@@ -341,7 +341,7 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: spacing[3] }}>
+            <div style={{ display: 'flex', gap: spacing[400] }}>
               <button type="button" onClick={onApprove} style={{ flex: 1, padding: 14, borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--mongo)', color: '#ffffff', fontFamily: 'var(--font-display)', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
                 ✓ Approve Loan
               </button>
@@ -353,13 +353,13 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
               </button>
             </div>
             {modifyMsg && (
-              <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--hitl-amber-dim)', borderRadius: 'var(--radius-md)', border: '1px solid var(--hitl-amber)', fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ marginTop: spacing[300], padding: '10px 14px', background: 'var(--hitl-amber-dim)', borderRadius: 'var(--radius-md)', border: '1px solid var(--hitl-amber)', fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: spacing[200] }}>
                 <span style={{ fontSize: 14 }}>ℹ️</span>
                 <span>Terms modification is not available in this demo. Approve or decline to continue.</span>
                 <button
                   type="button"
                   onClick={() => setModifyMsg(false)}
-                  style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 14, padding: 4 }}
+                  style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 14, padding: spacing[100] }}
                   aria-label="Dismiss"
                 >
                   ×
@@ -367,14 +367,14 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
               </div>
             )}
 
-            <div style={{ marginTop: spacing[3], fontSize: 11, color: 'var(--text-dim)', textAlign: 'center' }}>
+            <div style={{ marginTop: spacing[400], fontSize: 11, color: 'var(--text-dim)', textAlign: 'center' }}>
               Workflow will resume from this checkpoint — no data lost
             </div>
           </div>
           </div>
         </div>
 
-        <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: 16 }}>
+        <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: spacing[400] }}>
           <PipelineTimeline
             steps={APPROVAL_STEPS}
             stepIndex={sceneStep}

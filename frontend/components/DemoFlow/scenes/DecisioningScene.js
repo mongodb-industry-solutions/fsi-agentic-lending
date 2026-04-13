@@ -13,6 +13,7 @@ import PipelineTimeline from '../PipelineTimeline';
 import StatCard from '../../visualizations/StatCard';
 import FicoRing from '../../visualizations/FicoRing';
 import { apiGet } from '../../../lib/api';
+import { spacing } from '@leafygreen-ui/tokens';
 
 const FACTORS = [
   { label: 'Income Stability', points: 42, color: 'var(--mongo)' },
@@ -62,7 +63,7 @@ function FactorBars({ factors, revealCount }) {
   const visible = factors.slice(0, revealCount);
   const maxAbs = Math.max(...factors.map((f) => Math.abs(f.points)));
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[200] }}>
       {visible.map((f) => {
         const width = (Math.abs(f.points) / maxAbs) * 100;
         const isNeg = f.points < 0;
@@ -85,14 +86,14 @@ function FactorBars({ factors, revealCount }) {
 function CashFlowCard() {
   const maxVal = Math.max(...CASH_FLOW_MONTHS.map((d) => d.income));
   return (
-    <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--agent-cyan)', marginBottom: 16, animation: 'slideDown 0.3s ease-out' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+    <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--agent-cyan)', marginBottom: spacing[400], animation: 'slideDown 0.3s ease-out' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[200] }}>
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--agent-cyan)' }}>
           Cash Flow Analysis
         </div>
         <Badge variant="blue">Open Banking + Aggregation</Badge>
       </div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 50, marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 50, marginBottom: spacing[150] }}>
         {CASH_FLOW_MONTHS.map((d, i) => {
           const incH = (d.income / maxVal) * 44;
           const expH = (d.expenses / maxVal) * 44;
@@ -107,7 +108,7 @@ function CashFlowCard() {
           );
         })}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: spacing[150], fontSize: 10 }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ color: 'var(--text-dim)', fontSize: 8, textTransform: 'uppercase' }}>Avg Surplus</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--success)' }}>$3,918/mo</div>
@@ -121,7 +122,7 @@ function CashFlowCard() {
           <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--agent-cyan)' }}>1.47x</div>
         </div>
       </div>
-      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 6 }}>
+      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: spacing[150] }}>
         74% of consumers comfortable sharing open banking data for better rates
       </div>
     </div>
@@ -130,11 +131,11 @@ function CashFlowCard() {
 
 function ChampionChallengerCard() {
   return (
-    <div style={{ padding: 10, background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-dim)', marginBottom: 12, animation: 'slideDown 0.3s ease-out' }}>
-      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, marginBottom: 6, color: 'var(--text-secondary)' }}>
+    <div style={{ padding: 10, background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-dim)', marginBottom: spacing[300], animation: 'slideDown 0.3s ease-out' }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, marginBottom: spacing[150], color: 'var(--text-secondary)' }}>
         Champion / Challenger Models
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: spacing[150], fontSize: 10 }}>
         <div>
           <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Champion</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--mongo)' }}>Score 72 (B+)</div>
@@ -155,7 +156,7 @@ function ChampionChallengerCard() {
 function AdverseActionPreview() {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div style={{ padding: 10, background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--hitl-amber)', marginBottom: 12, animation: 'slideDown 0.3s ease-out' }}>
+    <div style={{ padding: 10, background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--hitl-amber)', marginBottom: spacing[300], animation: 'slideDown 0.3s ease-out' }}>
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
@@ -167,14 +168,14 @@ function AdverseActionPreview() {
         <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{expanded ? '▾' : '▸'}</span>
       </button>
       {expanded && (
-        <div style={{ marginTop: 8 }}>
+        <div style={{ marginTop: spacing[200] }}>
           {ADVERSE_ACTION_REASONS.map((r) => (
-            <div key={r.code} style={{ display: 'flex', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border-dim)', fontSize: 10 }}>
+            <div key={r.code} style={{ display: 'flex', gap: spacing[200], padding: '5px 0', borderBottom: '1px solid var(--border-dim)', fontSize: 10 }}>
               <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--hitl-amber)', fontWeight: 700, flexShrink: 0 }}>{r.code}</span>
               <span style={{ color: 'var(--text-secondary)' }}>{r.reason}</span>
             </div>
           ))}
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: spacing[150] }}>
             FCAC-compliant reason codes auto-generated — addresses Canadian fair lending requirements
           </div>
         </div>
@@ -188,7 +189,7 @@ function RiskRing({ score, maxScore = 100, tier, fico }) {
   const circ = 2 * Math.PI * r;
   const offset = circ * (1 - score / maxScore);
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: spacing[400] }}>
       <svg width={110} height={110} viewBox="0 0 110 110">
         <circle cx={55} cy={55} r={r} fill="none" stroke="var(--border-dim)" strokeWidth={7} />
         <circle cx={55} cy={55} r={r} fill="none" stroke="var(--mongo)" strokeWidth={7} strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} transform="rotate(-90 55 55)" style={{ transition: 'stroke-dashoffset 1s ease-out' }} />
@@ -198,7 +199,7 @@ function RiskRing({ score, maxScore = 100, tier, fico }) {
       <div>
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14 }}>Risk Tier {tier}</div>
         <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Equifax {fico} · GDS 31.2% · LTV 80.0%</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing[200], marginTop: spacing[200] }}>
           <div>
             <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Rate</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800, color: 'var(--mongo)' }}>4.89%</div>
@@ -276,25 +277,25 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
             stepIndex={sceneStep}
             totalSteps={DECISIONING_STEPS.length}
           />
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: spacing[400] }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: spacing[200], marginBottom: spacing[300] }}>
               <StatCard label="Risk Score" value={sceneStep >= 1 ? displayRiskScore : 0} suffix="/100" color="var(--hitl-amber)" />
               <StatCard label="Risk Tier" value={sceneStep >= 2 ? 'B+' : '—'} color="var(--tool-blue)" animate={false} />
               <StatCard label="Fraud Scan" value={sceneStep >= 4 ? 'CLEAR' : 'Pending'} color={sceneStep >= 4 ? 'var(--success)' : 'var(--text-dim)'} animate={false} />
               <StatCard label="Factors" value={sceneStep >= 1 ? 7 : 0} color="var(--agent-cyan)" />
             </div>
             {sceneStep < 0 && (
-              <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>
+              <div style={{ padding: spacing[500], textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>
                 Awaiting underwriting agent...
               </div>
             )}
 
             {showFactors && (
-            <div style={{ marginBottom: 16, animation: 'slideDown 0.3s ease-out' }}>
+            <div style={{ marginBottom: spacing[400], animation: 'slideDown 0.3s ease-out' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Decision Factor Analysis</div>
               <FactorBars factors={FACTORS} revealCount={factorRevealCount} />
               {!showCashFlow && (
-                <div style={{ marginTop: 8, fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', animation: 'pulse 1.5s infinite' }}>
+                <div style={{ marginTop: spacing[200], fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', animation: 'pulse 1.5s infinite' }}>
                   Aggregation pipeline running...
                 </div>
               )}
@@ -305,20 +306,20 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
 
           {showCounterfactual && (
             <div style={{ animation: 'slideDown 0.3s ease-out' }}>
-              <div style={{ padding: 14, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--agent-cyan-dim)', marginBottom: 16 }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--agent-cyan)', marginBottom: 8 }}>Counterfactual Analysis</div>
+              <div style={{ padding: 14, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--agent-cyan-dim)', marginBottom: spacing[400] }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--agent-cyan)', marginBottom: spacing[200] }}>Counterfactual Analysis</div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                   If credit utilization were below <strong style={{ color: 'var(--text-primary)' }}>20%</strong>, the risk score would improve by <strong style={{ color: 'var(--mongo)' }}>18 points</strong> (72 → 90), moving from tier <strong>B+</strong> to <strong style={{ color: 'var(--mongo)' }}>A-</strong>, qualifying for <strong>4.29% APR</strong> (saving $239/mo).
                 </div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 8 }}>Powered by Atlas Vector Search — similar borrower profiling</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: spacing[200] }}>Powered by Atlas Vector Search — similar borrower profiling</div>
               </div>
               <WhatIfSliders />
             </div>
           )}
 
           {showFraudResult && (
-            <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--success)', marginBottom: 16, animation: 'slideDown 0.3s ease-out' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--success)', marginBottom: spacing[400], animation: 'slideDown 0.3s ease-out' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: spacing[200] }}>
                 <span style={{ fontSize: 18, color: 'var(--success)' }}>✓</span>
                 <div>
                   <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--success)' }}>Fraud Scan: CLEAR</div>
@@ -329,21 +330,21 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
           )}
 
           {showPaymentHistory && (
-            <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', marginBottom: 16, animation: 'slideDown 0.3s ease-out' }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: 6 }}>Payment History</div>
+            <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', marginBottom: spacing[400], animation: 'slideDown 0.3s ease-out' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: spacing[150] }}>Payment History</div>
               <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                 36-month analysis via Time Series Collection
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 8 }}>
-                <div style={{ textAlign: 'center', padding: 8, background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: spacing[200], marginTop: spacing[200] }}>
+                <div style={{ textAlign: 'center', padding: spacing[200], background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)' }}>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800, color: 'var(--success)' }}>100%</div>
                   <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>On-time</div>
                 </div>
-                <div style={{ textAlign: 'center', padding: 8, background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)' }}>
+                <div style={{ textAlign: 'center', padding: spacing[200], background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)' }}>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800 }}>36</div>
                   <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Months</div>
                 </div>
-                <div style={{ textAlign: 'center', padding: 8, background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)' }}>
+                <div style={{ textAlign: 'center', padding: spacing[200], background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)' }}>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800, color: 'var(--mongo)' }}>0</div>
                   <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Anomalies</div>
                 </div>
@@ -352,14 +353,14 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
           )}
 
           {showFinalScore && (
-            <div style={{ padding: 16, background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', border: '2px solid var(--mongo)', marginBottom: 16, animation: 'slideDown 0.3s ease-out' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div style={{ padding: spacing[400], background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', border: '2px solid var(--mongo)', marginBottom: spacing[400], animation: 'slideDown 0.3s ease-out' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: spacing[200], marginBottom: spacing[300] }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, color: 'var(--mongo)' }}>Risk Assessment Complete</div>
                 {pipelineData && (
                   <span style={{
                     fontSize: 9,
                     fontWeight: 700,
-                    padding: '2px 8px',
+                    padding: `${spacing[50]}px ${spacing[200]}px`,
                     borderRadius: 4,
                     background: 'rgba(0,200,100,0.1)',
                     color: 'var(--success, #00c864)',
@@ -368,11 +369,11 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
                   </span>
                 )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: spacing[400] }}>
                 <RiskRing score={displayRiskScore} tier="B+" fico={784} />
                 <FicoRing score={784} size={80} strokeWidth={6} />
               </div>
-              <div style={{ marginTop: 12 }}>
+              <div style={{ marginTop: spacing[300] }}>
                 <ChampionChallengerCard />
                 <AdverseActionPreview />
               </div>
@@ -381,13 +382,13 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
 
           {showValidation && (
             <>
-              <div style={{ marginBottom: 16, animation: 'slideDown 0.3s ease-out' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ marginBottom: spacing[400], animation: 'slideDown 0.3s ease-out' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, marginBottom: 10, display: 'flex', alignItems: 'center', gap: spacing[200] }}>
                   Similar Borrowers
                   <Badge variant="blue">Vector Search</Badge>
                 </div>
                 {SIMILAR_BORROWERS.map((b, i) => (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, padding: '10px 12px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-dim)', marginBottom: 6, fontSize: 11 }}>
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: spacing[150], padding: '10px 12px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-dim)', marginBottom: spacing[150], fontSize: 11 }}>
                     <div>
                       <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Equifax / GDS</div>
                       <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{b.equifax} / {b.gds}</div>
@@ -404,17 +405,17 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
                 ))}
               </div>
 
-              <div style={{ marginBottom: 16, animation: 'slideDown 0.3s ease-out' }}>
+              <div style={{ marginBottom: spacing[400], animation: 'slideDown 0.3s ease-out' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Fair Lending Analysis</div>
                 <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', overflow: 'hidden' }}>
                   {FAIR_LENDING.map((fl) => (
-                    <div key={fl.metric} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid var(--border-dim)', fontSize: 11 }}>
+                    <div key={fl.metric} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: `${spacing[200]}px ${spacing[300]}px`, borderBottom: '1px solid var(--border-dim)', fontSize: 11 }}>
                       <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>{fl.metric}</span>
                       <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: fl.color }}>{fl.result}</span>
                     </div>
                   ))}
                 </div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: spacing[100] }}>
                   Addresses fair lending compliance requirements — $2.5M+ settlement precedents
                 </div>
               </div>
@@ -422,7 +423,7 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
               <div style={{ animation: 'slideDown 0.3s ease-out' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Regulatory Compliance</div>
                 {COMPLIANCE.map((c) => (
-                  <div key={c.rule} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border-dim)', fontSize: 12 }}>
+                  <div key={c.rule} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: `${spacing[200]}px 0`, borderBottom: '1px solid var(--border-dim)', fontSize: 12 }}>
                     <Badge variant={c.met ? 'green' : 'red'}>{c.met ? 'Compliant' : 'Failed'}</Badge>
                     <span style={{ color: 'var(--text-secondary)' }}>{c.rule}</span>
                   </div>
@@ -433,7 +434,7 @@ export default function DecisioningScene({ sceneStep, currentStepData }) {
           </div>
         </div>
 
-        <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: 16 }}>
+        <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: spacing[400] }}>
           <PipelineTimeline
             steps={DECISIONING_STEPS}
             stepIndex={sceneStep}

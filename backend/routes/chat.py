@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from db.mdb import get_db
-from agents.application_agent import chat as agent_chat, chat_stream as agent_chat_stream, _safety_filter
+from agents.chatbot.agent import chat as agent_chat, chat_stream as agent_chat_stream, safety_filter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
@@ -147,7 +147,7 @@ async def send_message_stream(application_id: str, req: ChatMessageRequest):
         await task
 
         full_response = "".join(accumulated)
-        filtered = _safety_filter(full_response)
+        filtered = safety_filter(full_response)
 
         now = datetime.now(timezone.utc)
 
@@ -200,7 +200,7 @@ async def get_history(application_id: str):
 @router.get("/chat/{application_id}/interventions")
 async def get_interventions(application_id: str):
     """Get pending interventions for an application (borrower-safe fields only)."""
-    from agents.app_agent_tools import get_pending_interventions
+    from agents.chatbot.tools import get_pending_interventions
     interventions = await asyncio.to_thread(get_pending_interventions, application_id)
     return {"interventions": interventions}
 
@@ -208,7 +208,7 @@ async def get_interventions(application_id: str):
 @router.post("/chat/{application_id}/interventions/{intervention_id}/resolve")
 async def resolve_intervention(application_id: str, intervention_id: str):
     """Resolve/acknowledge a pending intervention."""
-    from agents.app_agent_tools import submit_intervention_response
+    from agents.chatbot.tools import submit_intervention_response
     result = await asyncio.to_thread(
         submit_intervention_response,
         intervention_id,

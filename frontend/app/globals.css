@@ -26,6 +26,10 @@
   --hitl-amber: #d97706;
   --hitl-amber-dim: rgba(217, 119, 6, 0.10);
   --hitl-amber-glow: rgba(217, 119, 6, 0.18);
+  --mongo-bright-dim: rgba(0, 237, 100, 0.08);
+  --mongo-bright-border: rgba(0, 237, 100, 0.20);
+  --tool-blue-border: rgba(59, 130, 246, 0.20);
+  --tool-blue-bg: rgba(59, 130, 246, 0.08);
   --danger: #DB3030;         /* palette.red.base */
   --danger-dim: rgba(219, 48, 48, 0.10);
   --success: #00684A;        /* palette.green.dark1 */

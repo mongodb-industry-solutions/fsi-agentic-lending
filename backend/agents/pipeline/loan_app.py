@@ -1,19 +1,18 @@
 """Loan Application Agent — processes documents, verifies identity, pulls credit."""
 import json
 import logging
-from datetime import datetime, timezone
 
 from agents.state import LendFlowState
-from agents.tools import (
+from agents.pipeline.tools import (
     get_application_documents,
     get_credit_reports,
     get_application_summary,
     log_agent_activity,
     update_application_status,
 )
-from agents.prompts import LOAN_APP_AGENT_PROMPT
-from bedrock.anthropic_chat_completions import BedrockAnthropicChatCompletions
-from db.mdb import get_db
+from agents.pipeline.prompts import LOAN_APP_AGENT_PROMPT
+from agents.llm import get_llm
+from agents.helpers.interventions import create_intervention
 
 logger = logging.getLogger(__name__)
 
@@ -24,14 +23,6 @@ except ImportError:
         def decorator(fn): return fn
         return decorator
 
-_llm = None
-
-def _get_llm():
-    global _llm
-    if _llm is None:
-        _llm = BedrockAnthropicChatCompletions()
-    return _llm
-
 
 @traceable(name="loan_app_node")
 def loan_app_node(state: LendFlowState, **kwargs) -> dict:
@@ -41,13 +32,11 @@ def loan_app_node(state: LendFlowState, **kwargs) -> dict:
     log_agent_activity(app_id, "loan_app_agent", "start", "Beginning document review and verification")
     update_application_status(app_id, "processing", "Document verification in progress")
 
-    # Fetch documents
     documents = get_application_documents(app_id)
     doc_count = len(documents)
 
     log_agent_activity(app_id, "loan_app_agent", "fetch_documents", f"Retrieved {doc_count} documents")
 
-    # Fetch credit reports
     credit_reports = get_credit_reports(app_id)
     credit_pulled = len(credit_reports) > 0
 
@@ -60,35 +49,21 @@ def loan_app_node(state: LendFlowState, **kwargs) -> dict:
 
     if not credit_pulled:
         log_agent_activity(app_id, "loan_app_agent", "credit_gap", "No credit reports found — creating intervention")
-        try:
-            db = get_db()
-            db["interventions"].insert_one({
-                "application_id": app_id,
-                "type": "credit_data_unavailable",
-                "status": "pending",
-                "internal_context": {
-                    "source_node": "loan_app_agent",
-                    "risk_flag": "no_credit_data",
-                    "severity": "advisory",
-                },
-                "borrower_context": {
-                    "summary": "We were unable to retrieve credit bureau data for your application.",
-                    "action_required": "This may delay processing. Please ensure your SIN and personal details are accurate, or contact your credit bureau to confirm your file is accessible.",
-                    "document_types_accepted": ["credit_report"],
-                },
-                "resolution": None,
-                "created_at": datetime.now(timezone.utc),
-                "resolved_at": None,
-            })
+        if create_intervention(
+            app_id,
+            intervention_type="credit_data_unavailable",
+            source_node="loan_app_agent",
+            risk_flag="no_credit_data",
+            severity="advisory",
+            borrower_summary="We were unable to retrieve credit bureau data for your application.",
+            action_required="This may delay processing. Please ensure your SIN and personal details are accurate, or contact your credit bureau to confirm your file is accessible.",
+            doc_types=["credit_report"],
+        ):
             log_agent_activity(app_id, "loan_app_agent", "intervention", "Created credit_data_unavailable intervention")
-        except Exception as e:
-            logger.warning(f"Failed to create credit data intervention: {e}")
 
-    # Get application summary
     app_summary = get_application_summary(app_id)
 
-    # Use Bedrock to analyze documents
-    llm = _get_llm()
+    llm = get_llm()
 
     doc_summary_text = "\n".join([
         f"- {d['doc_type']}: {d.get('extracted_text', 'No text')[:200]}..."
@@ -108,53 +83,36 @@ def loan_app_node(state: LendFlowState, **kwargs) -> dict:
     )
 
     log_agent_activity(app_id, "loan_app_agent", "analysis_complete", analysis[:500])
-
-    # Cross-reference identity across documents
     log_agent_activity(app_id, "loan_app_agent", "identity_check", f"Cross-referencing identity across {doc_count} documents...")
 
-    # Extract and log income information
     combined_income = app_summary.get("income_summary", {}).get("combined_gross", 0)
     if combined_income > 0:
         log_agent_activity(app_id, "loan_app_agent", "income_extraction", f"Combined gross income: ${combined_income:,.0f}/yr")
 
-    # Mark documents as verified
-    documents_verified = doc_count >= 10  # Expect at least 10 of 14 docs
+    documents_verified = doc_count >= 10
     if documents_verified:
         log_agent_activity(app_id, "loan_app_agent", "verification", "All required documents verified")
         update_application_status(app_id, "underwriting", "Documents verified — proceeding to underwriting")
     else:
         log_agent_activity(app_id, "loan_app_agent", "verification", f"Only {doc_count} documents found — minimum 10 required")
-        # Write intervention for missing documents
-        try:
-            db = get_db()
-            existing_types = {d.get("doc_type") for d in documents}
-            required_types = {"government_id", "employment_letter", "paystubs", "income_tax",
-                              "bank_statements", "purchase_agreement", "mortgage_application",
-                              "credit_report", "investment_statements", "utility_bills"}
-            missing = required_types - existing_types
-            if missing:
-                db["interventions"].insert_one({
-                    "application_id": app_id,
-                    "type": "missing_document",
-                    "status": "pending",
-                    "internal_context": {
-                        "source_node": "loan_app_agent",
-                        "risk_flag": "incomplete_documentation",
-                        "severity": "advisory",
-                        "missing_types": list(missing),
-                    },
-                    "borrower_context": {
-                        "summary": f"We noticed {len(missing)} document(s) may be missing from your application.",
-                        "action_required": "Please upload the missing documents to strengthen your application.",
-                        "document_types_accepted": list(missing),
-                    },
-                    "resolution": None,
-                    "created_at": datetime.now(timezone.utc),
-                    "resolved_at": None,
-                })
+        existing_types = {d.get("doc_type") for d in documents}
+        required_types = {"government_id", "employment_letter", "paystubs", "income_tax",
+                          "bank_statements", "purchase_agreement", "mortgage_application",
+                          "credit_report", "investment_statements", "utility_bills"}
+        missing = required_types - existing_types
+        if missing:
+            if create_intervention(
+                app_id,
+                intervention_type="missing_document",
+                source_node="loan_app_agent",
+                risk_flag="incomplete_documentation",
+                severity="advisory",
+                borrower_summary=f"We noticed {len(missing)} document(s) may be missing from your application.",
+                action_required="Please upload the missing documents to strengthen your application.",
+                doc_types=list(missing),
+                internal_extras={"missing_types": list(missing)},
+            ):
                 log_agent_activity(app_id, "loan_app_agent", "intervention", f"Created missing_document intervention for {len(missing)} types")
-        except Exception as e:
-            logger.warning(f"Failed to create intervention: {e}")
 
     return {
         "documents_verified": documents_verified,

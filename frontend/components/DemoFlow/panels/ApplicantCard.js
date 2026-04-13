@@ -1,5 +1,6 @@
 "use client";
 
+import { palette } from '@leafygreen-ui/palette';
 import { APPLICANT, DOCUMENTS } from '../../../lib/data/applicant';
 
 function docStatusForStep(stepIndex, docId) {
@@ -31,7 +32,7 @@ export default function ApplicantCard({ stepIndex }) {
             width: 44,
             height: 44,
             borderRadius: 12,
-            background: 'linear-gradient(135deg,#1a3a2a,#0d2818)',
+            background: `linear-gradient(135deg, ${palette.green.dark3}, ${palette.green.dark3}cc)`,
             border: '1px solid var(--mongo)',
             display: 'flex',
             alignItems: 'center',

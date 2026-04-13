@@ -1,4 +1,4 @@
-from agents.supervisor import supervisor_node
+from agents.pipeline.supervisor import supervisor_node
 from unittest.mock import patch
 
 
@@ -13,7 +13,7 @@ def test_supervisor_routes_to_loan_app():
         "last_error": None,
         "retry_count": 0,
     }
-    with patch('agents.supervisor.log_agent_activity'):
+    with patch('agents.pipeline.supervisor.log_agent_activity'):
         result = supervisor_node(state)
     assert result["current_agent"] == "loan_app"
 
@@ -29,7 +29,7 @@ def test_supervisor_routes_to_underwriter():
         "last_error": None,
         "retry_count": 0,
     }
-    with patch('agents.supervisor.log_agent_activity'):
+    with patch('agents.pipeline.supervisor.log_agent_activity'):
         result = supervisor_node(state)
     assert result["current_agent"] == "underwriter"
 
@@ -45,7 +45,7 @@ def test_supervisor_observe_mode_gates():
         "last_error": None,
         "retry_count": 0,
     }
-    with patch('agents.supervisor.log_agent_activity'):
+    with patch('agents.pipeline.supervisor.log_agent_activity'):
         result = supervisor_node(state)
     assert result["current_agent"] == "hitl_gate"
 
@@ -62,7 +62,7 @@ def test_supervisor_retries_on_error():
         "retry_count": 1,
         "current_agent": "loan_app",
     }
-    with patch('agents.supervisor.log_agent_activity'):
+    with patch('agents.pipeline.supervisor.log_agent_activity'):
         result = supervisor_node(state)
     assert result["current_agent"] == "loan_app"
     assert result["retry_count"] == 2
@@ -81,7 +81,7 @@ def test_supervisor_max_retries_completes():
         "retry_count": 3,
         "current_agent": "loan_app",
     }
-    with patch('agents.supervisor.log_agent_activity'):
+    with patch('agents.pipeline.supervisor.log_agent_activity'):
         result = supervisor_node(state)
     assert result["current_agent"] == "complete"
     assert result["decision"] == "error"

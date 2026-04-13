@@ -3,22 +3,37 @@
 import { useState, useEffect } from 'react';
 import { palette } from '@leafygreen-ui/palette';
 import { spacing } from '@leafygreen-ui/tokens';
+import Icon from '@leafygreen-ui/icon';
 import { apiPost } from '../../lib/api';
 import styles from './Header.module.css';
 
 const SCREENS = [
-  { id: "borrower", label: "Borrower Portal" },
-  { id: "officer", label: "Loan Officer" },
-  { id: "demo", label: "Demo Flow" },
+  { id: "borrower", label: "Borrower Portal", shortLabel: "Borrower" },
+  { id: "officer", label: "Loan Officer", shortLabel: "Officer" },
+  { id: "demo", label: "Demo Flow", shortLabel: "Demo" },
 ];
 
 export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [hasSession, setHasSession] = useState(false);
+  const [compact, setCompact] = useState(false);
+  const [narrow, setNarrow] = useState(false);
 
   useEffect(() => {
     setHasSession(!!sessionStorage.getItem('lendflow_demo_session'));
+    const mqCompact = window.matchMedia('(max-width: 768px)');
+    const mqNarrow = window.matchMedia('(max-width: 640px)');
+    setCompact(mqCompact.matches);
+    setNarrow(mqNarrow.matches);
+    const onCompact = (e) => setCompact(e.matches);
+    const onNarrow = (e) => setNarrow(e.matches);
+    mqCompact.addEventListener('change', onCompact);
+    mqNarrow.addEventListener('change', onNarrow);
+    return () => {
+      mqCompact.removeEventListener('change', onCompact);
+      mqNarrow.removeEventListener('change', onNarrow);
+    };
   }, []);
 
   const handleReset = async () => {
@@ -39,11 +54,11 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
         right: 0,
         zIndex: 200,
         height: 52,
-        padding: `0 ${spacing[6]}px`,
+        padding: `0 ${narrow ? spacing[3] : spacing[6]}px`,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        background: palette.green.dark2,
+        background: palette.green.dark3,
         borderBottom: `1px solid rgba(255,255,255,0.08)`,
         boxShadow: "var(--shadow-sm)",
       }}
@@ -115,7 +130,7 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
                 alignItems: "center",
                 gap: spacing[1],
                 padding: `${spacing[2]}px ${spacing[4]}px`,
-                minHeight: 34,
+                minHeight: narrow ? 44 : 34,
                 borderRadius: "var(--radius-xl)",
                 border: isActive
                   ? `1px solid ${palette.green.base}4d`
@@ -133,7 +148,7 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
                 transition: "all 150ms ease",
               }}
             >
-              {screen.label}
+              {compact ? screen.shortLabel : screen.label}
             </button>
           );
         })}
@@ -180,14 +195,13 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
                 border: '1px solid rgba(255,255,255,0.15)',
                 background: 'rgba(255,255,255,0.08)',
                 color: 'rgba(255,255,255,0.7)',
-                fontFamily: 'var(--font-display)',
-                fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: 'all 150ms ease',
               }}
               aria-label="Open technology reference panel"
             >
-              i
+              <Icon glyph="InfoWithCircle" size={14} />
             </button>
           </>
         )}

@@ -5,12 +5,13 @@
  * Color-coded: green (applicant), blue (hop 1), purple (hop 2), dim gray (hop 3).
  */
 import { useRef, useEffect, useState } from 'react';
+import { palette } from '@leafygreen-ui/palette';
 
-const APPLICANT = { id: 'applicant', label: 'Applicant', hop: 0, color: '#00ED64' };
+const APPLICANT = { id: 'applicant', label: 'Applicant', hop: 0, color: palette.green.base };
 const HOP_NODES = [
-  ...Array.from({ length: 8 }, (_, i) => ({ id: `h1-${i}`, label: `Entity ${i + 1}`, hop: 1, color: '#3b82f6' })),
+  ...Array.from({ length: 8 }, (_, i) => ({ id: `h1-${i}`, label: `Entity ${i + 1}`, hop: 1, color: palette.blue.base })),
   ...Array.from({ length: 12 }, (_, i) => ({ id: `h2-${i}`, label: `Entity ${i + 9}`, hop: 2, color: '#a855f7' })),
-  ...Array.from({ length: 20 }, (_, i) => ({ id: `h3-${i}`, label: `Entity ${i + 21}`, hop: 3, color: '#4f5b73' })),
+  ...Array.from({ length: 20 }, (_, i) => ({ id: `h3-${i}`, label: `Entity ${i + 21}`, hop: 3, color: palette.gray.dark1 })),
 ];
 
 export default function FraudGraph({ width: widthProp, height: heightProp, hopReveal = 3, fillContainer = false }) {
