@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import { apiGet } from '../../lib/api';
 import DocumentViewer from '../DocumentViewer';
@@ -39,7 +39,7 @@ const DOC_TYPE_ABBR = {
   property_inspection: 'INS',
 };
 
-function CompactDocCard({ doc, onView }) {
+function CompactDocCard({ doc, onView, justChanged }) {
   const [hovered, setHovered] = useState(false);
   const label = DOC_TYPE_LABELS[doc.doc_type] || doc.doc_type?.replace(/_/g, ' ') || 'Document';
   const abbr = DOC_TYPE_ABBR[doc.doc_type] || 'DOC';
@@ -49,14 +49,18 @@ function CompactDocCard({ doc, onView }) {
       type="button"
       style={{
         padding: `${spacing[2]}px ${spacing[3]}px`,
-        background: hovered ? 'var(--bg-raised, var(--bg-surface))' : 'var(--bg-surface)',
+        background: justChanged
+          ? 'var(--success-dim, rgba(0, 104, 74, 0.08))'
+          : hovered ? 'var(--bg-raised, var(--bg-surface))' : 'var(--bg-surface)',
         borderRadius: 8,
-        border: '1px solid var(--border-dim)',
+        border: justChanged ? '1px solid var(--success)' : '1px solid var(--border-dim)',
+        transition: justChanged
+          ? 'background 600ms ease, border-color 600ms ease'
+          : 'transform 220ms cubic-bezier(0.33, 1, 0.68, 1), box-shadow 220ms cubic-bezier(0.33, 1, 0.68, 1), background 150ms ease',
         display: 'flex',
         alignItems: 'center',
         gap: spacing[2],
         cursor: 'pointer',
-        transition: 'transform 220ms cubic-bezier(0.33, 1, 0.68, 1), box-shadow 220ms cubic-bezier(0.33, 1, 0.68, 1), background 150ms ease',
         transform: hovered ? 'translateY(-1px)' : 'none',
         boxShadow: hovered ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
         width: '100%',
@@ -130,18 +134,59 @@ export default function DocumentContext({ applicationId }) {
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
   const [viewingDocId, setViewingDocId] = useState(null);
+  const [changedIds, setChangedIds] = useState(new Set());
+  const prevStatusMap = useRef({});
+  const pollRef = useRef(null);
+  const flashTimeoutRef = useRef(null);
+  const allParsedRef = useRef(false);
 
-  useEffect(() => {
+  const fetchDocs = useCallback(() => {
     if (!applicationId) return;
-    setLoading(true);
     apiGet(`/applications/${applicationId}/documents`)
       .then((docs) => {
         if (docs && Array.isArray(docs)) {
+          const newChanged = new Set();
+          for (const doc of docs) {
+            const prevStatus = prevStatusMap.current[doc._id];
+            if (prevStatus && prevStatus !== doc.status) {
+              newChanged.add(doc._id);
+            }
+            prevStatusMap.current[doc._id] = doc.status;
+          }
+          if (newChanged.size > 0) {
+            setChangedIds(newChanged);
+            if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+            flashTimeoutRef.current = setTimeout(() => setChangedIds(new Set()), 2000);
+          }
+          const allDone = docs.length > 0 && docs.every(d => d.status === 'parsed' || d.status === 'error');
+          allParsedRef.current = allDone;
+          if (allDone && pollRef.current) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+          }
           setDocuments(docs);
         }
       })
       .finally(() => setLoading(false));
   }, [applicationId]);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchDocs();
+  }, [fetchDocs]);
+
+  useEffect(() => {
+    if (!applicationId) return;
+
+    pollRef.current = setInterval(() => {
+      if (!allParsedRef.current) fetchDocs();
+    }, 5000);
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+    };
+  }, [applicationId, fetchDocs]);
 
   return (
     <>
@@ -179,8 +224,35 @@ export default function DocumentContext({ applicationId }) {
                   fontSize: 10,
                   color: 'var(--text-dim)',
                   marginTop: 2,
+                  display: 'flex', alignItems: 'center', gap: 6,
                 }}>
-                  {documents.length} document{documents.length !== 1 ? 's' : ''}
+                  <span>{documents.length} document{documents.length !== 1 ? 's' : ''}</span>
+                  {documents.length > 0 && (() => {
+                    const parsed = documents.filter(d => d.status === 'parsed').length;
+                    if (parsed === documents.length) {
+                      return (
+                        <span style={{
+                          fontSize: 8, fontWeight: 700, fontFamily: 'var(--font-mono)',
+                          color: 'var(--success)', padding: '1px 4px', borderRadius: 3,
+                          background: 'var(--success-dim)',
+                        }}>
+                          All parsed
+                        </span>
+                      );
+                    }
+                    if (parsed > 0) {
+                      return (
+                        <span style={{
+                          fontSize: 8, fontWeight: 700, fontFamily: 'var(--font-mono)',
+                          color: 'var(--agent-cyan)', padding: '1px 4px', borderRadius: 3,
+                          background: 'var(--agent-cyan-dim)',
+                        }}>
+                          {parsed}/{documents.length}
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               )}
             </div>
@@ -245,7 +317,7 @@ export default function DocumentContext({ applicationId }) {
                 padding: spacing[4],
                 borderRadius: 8,
                 border: '1px dashed var(--border-dim)',
-                background: '#FAFBFA',
+                background: 'var(--bg-raised, var(--bg-surface))',
                 textAlign: 'center',
                 color: 'var(--text-dim)',
                 fontSize: 11,
@@ -258,6 +330,7 @@ export default function DocumentContext({ applicationId }) {
                   key={doc._id}
                   doc={doc}
                   onView={setViewingDocId}
+                  justChanged={changedIds.has(doc._id)}
                 />
               ))
             )}

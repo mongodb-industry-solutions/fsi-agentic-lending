@@ -1,14 +1,17 @@
 """Chat routes for the Application Agent."""
 import asyncio
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from db.mdb import get_db
-from agents.application_agent import chat as agent_chat
+from agents.application_agent import chat as agent_chat, chat_stream as agent_chat_stream
+from agents.app_agent_prompts import SAFETY_PATTERNS
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
@@ -89,6 +92,100 @@ async def send_message(application_id: str, req: ChatMessageRequest):
     )
 
 
+@router.post("/chat/{application_id}/message/stream")
+async def send_message_stream(application_id: str, req: ChatMessageRequest):
+    """Stream a response from the application agent token by token via SSE."""
+    import re
+    db = get_db()
+
+    from pymongo import ReturnDocument
+    conversation = await asyncio.to_thread(
+        db["conversations"].find_one_and_update,
+        {"application_id": application_id},
+        {"$setOnInsert": {
+            "application_id": application_id,
+            "messages": [],
+            "phase": "active",
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
+        }},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+
+    history = conversation.get("messages", [])
+
+    async def event_generator():
+        accumulated = []
+        queue = asyncio.Queue()
+        sentinel = object()
+
+        loop = asyncio.get_running_loop()
+
+        def run_stream():
+            try:
+                for chunk in agent_chat_stream(application_id, req.message, history):
+                    loop.call_soon_threadsafe(queue.put_nowait, chunk)
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, sentinel)
+
+        task = loop.run_in_executor(None, run_stream)
+
+        while True:
+            item = await queue.get()
+            if item is sentinel:
+                break
+            accumulated.append(item)
+            yield f"data: {json.dumps({'type': 'token', 'content': item})}\n\n"
+
+        await task
+
+        full_response = "".join(accumulated)
+
+        # Apply safety filter to the full assembled response
+        filtered = full_response
+        for pattern in SAFETY_PATTERNS:
+            if re.search(pattern, filtered, re.IGNORECASE):
+                filtered = (
+                    "I can help you with information about your application process, "
+                    "document requirements, and general lending policies. "
+                    "What would you like to know?"
+                )
+                break
+        if "internal_context" in filtered.lower():
+            filtered = "I can help you with your application. What would you like to know?"
+
+        now = datetime.now(timezone.utc)
+
+        await asyncio.to_thread(
+            db["conversations"].update_one,
+            {"application_id": application_id},
+            {
+                "$push": {
+                    "messages": {
+                        "$each": [
+                            {"role": "user", "content": req.message, "timestamp": now.isoformat()},
+                            {"role": "assistant", "content": filtered, "timestamp": now.isoformat()},
+                        ]
+                    }
+                },
+                "$set": {"updated_at": now},
+            },
+        )
+
+        yield f"data: {json.dumps({'type': 'done', 'content': filtered, 'timestamp': now.isoformat()})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.get("/chat/{application_id}/history")
 async def get_history(application_id: str):
     """Get conversation history for an application."""
@@ -101,6 +198,31 @@ async def get_history(application_id: str):
     if not conversation:
         return {"messages": []}
     return {"messages": conversation.get("messages", [])}
+
+
+@router.get("/chat/{application_id}/interventions")
+async def get_interventions(application_id: str):
+    """Get pending interventions for an application (borrower-safe fields only)."""
+    from agents.app_agent_tools import get_pending_interventions
+    interventions = await asyncio.to_thread(get_pending_interventions, application_id)
+    return {"interventions": interventions}
+
+
+@router.post("/chat/{application_id}/interventions/{intervention_id}/resolve")
+async def resolve_intervention(application_id: str, intervention_id: str):
+    """Resolve/acknowledge a pending intervention."""
+    from agents.app_agent_tools import submit_intervention_response
+    result = await asyncio.to_thread(
+        submit_intervention_response,
+        intervention_id,
+        "Acknowledged by borrower via portal",
+        application_id,
+    )
+    if result.get("error"):
+        if "Invalid" in result["error"]:
+            raise HTTPException(status_code=400, detail=result["error"])
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
 
 
 @router.post("/chat/general/message", response_model=ChatMessageResponse)

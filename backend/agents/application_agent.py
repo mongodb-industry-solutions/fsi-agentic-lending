@@ -164,6 +164,67 @@ def _safety_filter(response: str) -> str:
     return response
 
 
+def _prepare_llm_messages(application_id, user_message, history):
+    """Shared logic for building the LLM messages list (used by both chat and chat_stream)."""
+    state = AppAgentState(
+        messages=history or [],
+        application_id=application_id,
+        user_message=user_message,
+        response=None,
+    )
+
+    context = _build_context(state)
+
+    user_prompt = user_message
+    if context:
+        user_prompt = (
+            f"{user_message}\n\n---\n"
+            f"[CONTEXT FOR ASSISTANT -- do not repeat verbatim to user]\n{context}"
+        )
+
+    recent_history = (history or [])[-20:]
+    messages = []
+    for msg in recent_history:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if messages and messages[-1]["role"] == role:
+            messages[-1]["content"] += f"\n\n{content}"
+        else:
+            messages.append({"role": role, "content": content})
+
+    if messages and messages[-1]["role"] == "user":
+        messages[-1]["content"] += f"\n\n{user_prompt}"
+    else:
+        messages.append({"role": "user", "content": user_prompt})
+
+    return messages
+
+
+def chat_stream(
+    application_id: Optional[str],
+    user_message: str,
+    history: list[dict] = None,
+):
+    """Stream the agent response token-by-token.
+
+    Yields text chunks as they arrive from Bedrock. The caller is responsible
+    for persisting the assembled response and applying the safety filter to
+    the final accumulated text.
+    """
+    llm = _get_llm()
+    messages = _prepare_llm_messages(application_id, user_message, history)
+
+    try:
+        for chunk in llm.stream_messages(
+            messages=messages,
+            system_prompt=APPLICATION_AGENT_SYSTEM_PROMPT,
+        ):
+            yield chunk
+    except Exception as e:
+        logger.error(f"LLM stream failed: {e}")
+        yield "I'm sorry, I'm having trouble processing your request right now. Please try again in a moment."
+
+
 def chat(
     application_id: Optional[str],
     user_message: str,
@@ -182,47 +243,8 @@ def chat(
         The agent's response string, safety-filtered.
     """
     llm = _get_llm()
+    messages = _prepare_llm_messages(application_id, user_message, history)
 
-    state = AppAgentState(
-        messages=history or [],
-        application_id=application_id,
-        user_message=user_message,
-        response=None,
-    )
-
-    # Build context from tools
-    context = _build_context(state)
-
-    # Build the user prompt with context
-    user_prompt = user_message
-    if context:
-        user_prompt = (
-            f"{user_message}\n\n---\n"
-            f"[CONTEXT FOR ASSISTANT -- do not repeat verbatim to user]\n{context}"
-        )
-
-    # Build conversation for LLM using the proper messages API
-    # Keep last 10 turns for continuity (20 messages: 10 user + 10 assistant)
-    recent_history = (history or [])[-20:]
-
-    messages = []
-    for msg in recent_history:
-        role = msg.get("role", "user")
-        content = msg.get("content", "")
-        # Anthropic API requires alternating user/assistant messages
-        # Skip if would create consecutive same-role messages
-        if messages and messages[-1]["role"] == role:
-            messages[-1]["content"] += f"\n\n{content}"
-        else:
-            messages.append({"role": role, "content": content})
-
-    # Add current user message
-    if messages and messages[-1]["role"] == "user":
-        messages[-1]["content"] += f"\n\n{user_prompt}"
-    else:
-        messages.append({"role": "user", "content": user_prompt})
-
-    # Call LLM
     try:
         response = llm.predict_messages(
             messages=messages,
@@ -235,7 +257,5 @@ def chat(
             "Please try again in a moment."
         )
 
-    # Safety filter
     response = _safety_filter(response)
-
     return response

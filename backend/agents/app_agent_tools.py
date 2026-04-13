@@ -174,7 +174,7 @@ def get_pending_interventions(application_id: str) -> list[dict]:
 
 
 def submit_intervention_response(
-    intervention_id: str, response: str, documents_uploaded: list = None
+    intervention_id: str, response: str, application_id: str = None, documents_uploaded: list = None
 ) -> dict:
     """Resolve an intervention with the borrower's response.
 
@@ -182,10 +182,19 @@ def submit_intervention_response(
     Only resolves interventions that are currently 'pending' or 'active'.
     """
     from bson import ObjectId
+    from bson.errors import InvalidId
+
+    try:
+        oid = ObjectId(intervention_id)
+    except (InvalidId, TypeError):
+        return {"error": "Invalid intervention ID format"}
 
     db = get_db()
+    query = {"_id": oid, "status": {"$in": ["pending", "active"]}}
+    if application_id:
+        query["application_id"] = application_id
     result = db["interventions"].update_one(
-        {"_id": ObjectId(intervention_id), "status": {"$in": ["pending", "active"]}},
+        query,
         {
             "$set": {
                 "status": "resolved",

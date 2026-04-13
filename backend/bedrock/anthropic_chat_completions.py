@@ -168,6 +168,59 @@ class BedrockAnthropicChatCompletions(BedrockClient):
                 raise RuntimeError(f"Bedrock converse failed: {e}") from e
         raise RuntimeError("Bedrock converse failed after retries")
 
+    @traceable(name="bedrock_stream_messages")
+    def stream_messages(self, messages: list, system_prompt: str = None):
+        """Stream response tokens from a full message history.
+
+        Yields individual text chunks as they arrive from the model.
+        Uses invoke_model_with_response_stream for real-time token delivery.
+        """
+        native_request = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "messages": messages,
+        }
+        if system_prompt:
+            native_request["system"] = system_prompt
+
+        request = json.dumps(native_request)
+
+        for attempt in range(3):
+            try:
+                response = self.bedrock_client.invoke_model_with_response_stream(
+                    modelId=self.model_id, body=request)
+                break
+            except ClientError as e:
+                error_code = e.response.get('Error', {}).get('Code', '')
+                if error_code in ('ThrottlingException', 'ServiceUnavailableException', 'ModelTimeoutException') and attempt < 2:
+                    wait = 2 ** attempt
+                    self.log.warning(f"Bedrock stream throttled/timeout, retrying in {wait}s (attempt {attempt + 1})")
+                    time.sleep(wait)
+                    continue
+                raise RuntimeError(f"Bedrock stream failed after {attempt + 1} attempts: {e}") from e
+            except Exception as e:
+                raise RuntimeError(f"Bedrock stream failed: {e}") from e
+
+        stream = response.get("body")
+        if not stream:
+            self.log.warning("Bedrock stream returned no body")
+            return
+
+        yielded = False
+        for event in stream:
+            chunk = event.get("chunk")
+            if chunk:
+                payload = json.loads(chunk["bytes"].decode())
+                if payload.get("type") == "content_block_delta":
+                    delta = payload.get("delta", {})
+                    if delta.get("type") == "text_delta":
+                        yielded = True
+                        yield delta["text"]
+
+        if not yielded:
+            self.log.warning("Bedrock stream completed without yielding any text tokens")
+
     @traceable(name="bedrock_predict_messages")
     def predict_messages(self, messages: list, system_prompt: str = None) -> str:
         """Generate response from a full message history.
