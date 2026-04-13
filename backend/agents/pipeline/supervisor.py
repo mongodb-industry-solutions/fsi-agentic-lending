@@ -1,6 +1,10 @@
 """Supervisor agent — routes work to specialized agents."""
+from langgraph.types import Send
+
 from agents.state import LendFlowState
 from agents.pipeline.tools import log_agent_activity
+
+PARALLEL_GATHER_NODES = ("doc_verifier", "credit_puller")
 
 
 def supervisor_node(state: LendFlowState, **kwargs) -> dict:
@@ -8,7 +12,6 @@ def supervisor_node(state: LendFlowState, **kwargs) -> dict:
     app_id = state["application_id"]
     autonomy = state.get("autonomy_level", "bounded")
 
-    # Check for retry
     if state.get("last_error") and state.get("retry_count", 0) < 3:
         log_agent_activity(app_id, "supervisor", "retry",
             f"Retrying {state.get('current_agent')} (attempt {state.get('retry_count', 0) + 1})")
@@ -18,14 +21,12 @@ def supervisor_node(state: LendFlowState, **kwargs) -> dict:
             "last_error": None,
         }
 
-    # Max retries exceeded
     if state.get("last_error"):
         log_agent_activity(app_id, "supervisor", "error", "Max retries exceeded")
         return {"current_agent": "complete", "decision": "error"}
 
-    # Determine natural next agent
     if not state.get("documents_verified", False) or not state.get("credit_pulled", False):
-        natural_next = "loan_app"
+        natural_next = "parallel_gather"
     elif state.get("risk_score") is None:
         natural_next = "underwriter"
     elif state.get("decision") in ("approve", "decline", "error"):
@@ -35,7 +36,6 @@ def supervisor_node(state: LendFlowState, **kwargs) -> dict:
     else:
         natural_next = "complete"
 
-    # Apply autonomy gates
     if autonomy == "observe":
         approved_nodes = state.get("hitl_approved_nodes", [])
         if natural_next not in ("hitl_gate", "complete") and natural_next not in approved_nodes:
@@ -47,8 +47,6 @@ def supervisor_node(state: LendFlowState, **kwargs) -> dict:
             log_agent_activity(app_id, "supervisor", "autonomy_gate",
                 "Suggest mode: pausing for officer to review decision")
             natural_next = "hitl_gate"
-    elif autonomy == "bounded":
-        pass
 
     log_agent_activity(app_id, "supervisor", "route",
         f"[{autonomy}] → {natural_next}")
@@ -56,6 +54,13 @@ def supervisor_node(state: LendFlowState, **kwargs) -> dict:
     return {"current_agent": natural_next, "retry_count": 0}
 
 
-def route_from_supervisor(state: LendFlowState, **kwargs) -> str:
-    """Conditional edge function — returns the next node name."""
-    return state.get("current_agent", "loan_app")
+def route_from_supervisor(state: LendFlowState, **kwargs) -> list[str] | str:
+    """Conditional edge function — returns the next node(s).
+
+    When the supervisor decides ``parallel_gather``, fan out to both
+    ``doc_verifier`` and ``credit_puller`` via LangGraph ``Send``.
+    """
+    current = state.get("current_agent", "loan_app")
+    if current == "parallel_gather":
+        return [Send("doc_verifier", state), Send("credit_puller", state)]
+    return current

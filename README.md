@@ -1,4 +1,4 @@
-# LendFlow AI — Agentic Lending Platform
+# Agentic Lending Platform
 
 End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangGraph**, and **Voyage AI** work together to automate the full mortgage lifecycle — from application intake through portfolio management.
 
@@ -153,31 +153,33 @@ End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangG
 
 ## Where MongoDB Shines
 
-| Capability | How It's Used | Grade |
-|-----------|--------------|-------|
-| **Document Model** | Loan applications, interventions, and conversations grow through lifecycle stages — one document per entity, no schema migrations | A |
-| **Atlas Vector Search** | Policy RAG via Voyage AI multimodal embeddings (voyage-multimodal-3.5) — `queryVector` with pre-computed embeddings | A |
-| **Aggregation Framework** | 7-stage risk scoring pipeline ($match→$lookup×2→$addFields×3→$project) | A |
-| **Change Streams** | Real-time WebSocket queue + SSE status/activity feeds, labeled in UI | A |
-| **Time Series** | Payment history with $setWindowFields (rolling 90-day analysis), EWS signals | A- |
-| **MongoDBSaver** | LangGraph checkpoint persistence for HITL interrupt/resume across restarts | A |
-| **$graphLookup** | Fraud network visualization (visual demo, backend implementation planned) | B |
+| Capability                | How It's Used                                                                                                                     | Grade |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| **Document Model**        | Loan applications, interventions, and conversations grow through lifecycle stages — one document per entity, no schema migrations | A     |
+| **Atlas Vector Search**   | Policy RAG via Voyage AI multimodal embeddings (voyage-multimodal-3.5) — `queryVector` with pre-computed embeddings               | A     |
+| **Aggregation Framework** | 7-stage risk scoring pipeline ($match→$lookup×2→$addFields×3→$project)                                                            | A     |
+| **Change Streams**        | Real-time WebSocket queue + SSE status/activity feeds, labeled in UI                                                              | A     |
+| **Time Series**           | Payment history with $setWindowFields (rolling 90-day analysis), EWS signals                                                      | A-    |
+| **MongoDBSaver**          | LangGraph checkpoint persistence for HITL interrupt/resume across restarts                                                        | A     |
+| **$graphLookup**          | Fraud network visualization (visual demo, backend implementation planned)                                                         | B     |
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 15 (App Router), LeafyGreen UI, Euclid Circular A |
-| Backend | FastAPI, LangGraph, Python 3.13 |
-| Database | MongoDB Atlas (7 collections + 3 LangGraph infra) |
-| AI/ML | AWS Bedrock Claude Haiku 4 (tool_use for structured output), Voyage AI multimodal embeddings (voyage-multimodal-3.5) |
-| Observability | LangSmith (@traceable on all LLM calls + agent nodes) |
-| Deployment | Docker Compose (local), Kanopy/K8s (staging/prod) |
+| Layer         | Technology                                                                                                           |
+| ------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Frontend      | Next.js 15 (App Router), LeafyGreen UI, Euclid Circular A                                                            |
+| Backend       | FastAPI, LangGraph, Python 3.13                                                                                      |
+| Database      | MongoDB Atlas (7 collections + 3 LangGraph infra)                                                                    |
+| AI/ML         | AWS Bedrock Claude Haiku 4 (tool_use for structured output), Voyage AI multimodal embeddings (voyage-multimodal-3.5) |
+| Observability | LangSmith (@traceable on all LLM calls + agent nodes)                                                                |
+| Deployment    | Docker Compose (local), Kanopy/K8s (staging/prod)                                                                    |
 
 ## Agent Features
 
 ### Structured Output via Tool Use
+
 The underwriter agent uses **Bedrock Converse API with tool definitions** to produce structured JSON analysis:
+
 - Risk factors (array)
 - Mitigating factors (array)
 - Recommended conditions (array)
@@ -186,10 +188,13 @@ The underwriter agent uses **Bedrock Converse API with tool definitions** to pro
 - Narrative summary
 
 ### OSFI B-20 Stress Test
+
 Every application is stress-tested at `max(contract_rate + 2%, 5.25%)`. Explicit pass/fail with GDS/TDS at the stress rate. Failure → automatic decline with regulatory reason.
 
 ### Intervention Pipeline
+
 Pipeline agents create typed interventions that surface as borrower-facing action cards in the AI chat:
+
 - `stress_test_failure` — OSFI B-20 stress test failed (blocking)
 - `income_data_required` — combined income is zero/missing (blocking)
 - `credit_score_required` — primary credit score unavailable (blocking)
@@ -199,7 +204,9 @@ Pipeline agents create typed interventions that surface as borrower-facing actio
 Interventions include separate `internal_context` (for officer/pipeline use) and `borrower_context` (safe to display in chat). Resolution flows through the chat endpoint.
 
 ### Application Agent (AI Chat)
+
 Context-aware conversational assistant for borrowers:
+
 - Streaming markdown responses via SSE with tool transparency (tool_call events during context gathering)
 - Intervention awareness — surfaces pending action items as in-chat cards with urgency escalation (pulse animation + elapsed timer after 30s)
 - Contextual suggested questions that adapt to application status phase
@@ -209,7 +216,9 @@ Context-aware conversational assistant for borrowers:
 - Safety-filtered responses (PII, loan-specific guardrails)
 
 ### Officer Overrides (HITL)
+
 Officers can:
+
 - **Approve** with optional conditions
 - **Decline** with reason (surfaces policy violations in Decision Summary)
 - **Modify and continue** — override loan amount, risk tier, or add conditions. Sends `modify_and_continue` action with `overrides` and `conditions` to the backend, persists to MongoDB, resets HITL state, and reconnects to the SSE activity stream to resume the pipeline with re-underwriting.
@@ -217,6 +226,7 @@ Officers can:
 - HITL context is auto-fetched when an application enters review (no manual "Request Context" step)
 
 ### Error Recovery
+
 - `safe_node` wrapper catches agent errors → writes to state → supervisor retries (up to 3x)
 - Bedrock calls retry with exponential backoff (throttle/timeout)
 - Transient vs permanent error classification
@@ -225,7 +235,9 @@ Officers can:
 ## Demo Screens
 
 ### 1. Borrower Portal
+
 Phase-based flow: **profile selection → application form → real-time tracking**.
+
 - **Borrower Selection** — seeded demo profiles with key stat badges (combined income, LTV ratio, credit score), a "How AI Helps" before/after comparison strip, and an interactive demo-flow explainer with expandable technology details per step.
 - **Application Form** — co-applicant fields, amortization calculator, hybrid read-only / editable sections, client-side validation with inline error states via LeafyGreen `TextInput`.
 - **Status Tracker** — 9-stage timeline driven by SSE (`/applications/{id}/status`) with live `ThinkingStrip` showing agent activity in real-time, confidence badges on completed stages (e.g., "N resolved by AI", "Document verified"), staggered before/after metric reveals, `completionBurst` animations, and a post-approval `SavingsSummary` card with animated count-up metrics.
@@ -236,6 +248,7 @@ Phase-based flow: **profile selection → application form → real-time trackin
 - **Demo Reset** — header button (visible when a session exists) resets the demo with confirmation modal.
 
 ### 2. Loan Officer Dashboard
+
 Full-featured officer workspace with real-time data flows and human-in-the-loop decisioning.
 
 - **Application Queue** — real-time via WebSocket + MongoDB Change Stream. Filterable by status (All / Pending Review / Processing / Completed), sortable (Newest First / Needs Attention), with amber accent on applications awaiting review and a review-count badge.
@@ -253,6 +266,7 @@ Full-featured officer workspace with real-time data flows and human-in-the-loop 
 - **Status-Aware Phase Initialization** — selecting an application reads its queue status to initialize the correct UI phase (preview, executing, HITL review, or decision summary) without race conditions. Uses refs to avoid spurious re-renders from unrelated queue updates.
 
 ### 3. Demo Flow
+
 5-scene scripted walkthrough with WorkflowCanvas, capability popovers, educational InfoWizard, collapsible TechRecap. Split-pane document viewer (PDF + extracted JSON). Risk score gauge + FICO ring visualizations.
 
 ## Prerequisites
@@ -309,88 +323,91 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 
 ### Backend (`backend/.env`)
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `MONGODB_URI` | Yes | MongoDB Atlas connection string |
-| `DATABASE_NAME` | Yes | Database name (default: `lendflow`) |
-| `CHATCOMPLETIONS_MODEL_ID` | Yes | Bedrock inference profile ARN or model ID |
-| `VOYAGE_API_KEY` | Yes | Voyage AI API key for multimodal embeddings |
-| `AWS_REGION` | No | AWS region (default: `us-east-1`) |
-| `ORIGINS` | No | CORS origins (default: `http://localhost:3000`) |
-| `CURRENT_5YR_FIXED_RATE` | No | Mortgage rate (default: `0.0489`) |
-| `DECLINE_RISK_SCORE` | No | Auto-decline threshold (default: `80`) |
-| `ESCALATE_PURCHASE_PRICE` | No | HITL escalation threshold (default: `500000`) |
-| `ESCALATE_GDS` | No | GDS ratio escalation threshold (default: `0.36`) |
-| `ESCALATE_TDS` | No | TDS ratio escalation threshold (default: `0.41`) |
-| `LANGCHAIN_TRACING_V2` | No | Enable LangSmith tracing (`true`) |
-| `LANGCHAIN_API_KEY` | No | LangSmith API key |
-| `LANGCHAIN_PROJECT` | No | LangSmith project name |
+| Variable                   | Required | Description                                      |
+| -------------------------- | -------- | ------------------------------------------------ |
+| `MONGODB_URI`              | Yes      | MongoDB Atlas connection string                  |
+| `DATABASE_NAME`            | Yes      | Database name (default: `lendflow`)              |
+| `CHATCOMPLETIONS_MODEL_ID` | Yes      | Bedrock inference profile ARN or model ID        |
+| `VOYAGE_API_KEY`           | Yes      | Voyage AI API key for multimodal embeddings      |
+| `AWS_REGION`               | No       | AWS region (default: `us-east-1`)                |
+| `ORIGINS`                  | No       | CORS origins (default: `http://localhost:3000`)  |
+| `CURRENT_5YR_FIXED_RATE`   | No       | Mortgage rate (default: `0.0489`)                |
+| `DECLINE_RISK_SCORE`       | No       | Auto-decline threshold (default: `80`)           |
+| `ESCALATE_PURCHASE_PRICE`  | No       | HITL escalation threshold (default: `500000`)    |
+| `ESCALATE_GDS`             | No       | GDS ratio escalation threshold (default: `0.36`) |
+| `ESCALATE_TDS`             | No       | TDS ratio escalation threshold (default: `0.41`) |
+| `LANGCHAIN_TRACING_V2`     | No       | Enable LangSmith tracing (`true`)                |
+| `LANGCHAIN_API_KEY`        | No       | LangSmith API key                                |
+| `LANGCHAIN_PROJECT`        | No       | LangSmith project name                           |
 
 ### Frontend (`frontend/.env`)
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `NEXT_PUBLIC_BACKEND_URL` | No | Backend URL for API proxy (default: `http://localhost:8000`) |
-| `NEXT_PUBLIC_WS_BASE` | No | WebSocket URL (default: auto-detected) |
+| Variable                  | Required | Description                                                  |
+| ------------------------- | -------- | ------------------------------------------------------------ |
+| `NEXT_PUBLIC_BACKEND_URL` | No       | Backend URL for API proxy (default: `http://localhost:8000`) |
+| `NEXT_PUBLIC_WS_BASE`     | No       | WebSocket URL (default: auto-detected)                       |
 
 ## API Endpoints
 
 ### REST (24 endpoints)
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/applications` | Create loan application |
-| GET | `/api/applications` | List applications (paginated: `?skip=0&limit=50`) |
-| GET | `/api/applications/{id}` | Full application with documents + credit reports |
-| GET | `/api/applications/{id}/documents` | List documents |
-| GET | `/api/applications/{id}/risk-pipeline` | 7-stage aggregation results + stage descriptions |
-| GET | `/api/documents/{id}/pdf` | Serve original PDF |
-| GET | `/api/documents/{id}/json` | Full MongoDB document JSON |
-| POST | `/api/applications/{id}/documents/upload` | Upload + extract document via Bedrock |
-| POST | `/api/documents/search` | Atlas Vector Search across documents (supports `application_id` filter) |
-| POST | `/api/policies/search` | Atlas Vector Search across policies |
-| POST | `/api/agent/{id}/run` | Trigger agent pipeline |
-| POST | `/api/hitl/{id}/decision` | Officer decision (approve/decline/modify + overrides + officer_id) |
-| GET | `/api/hitl/{id}/context` | HITL review context (application + activity trail) |
-| POST | `/api/chat/{id}/message` | Send chat message to Application Agent |
-| POST | `/api/chat/{id}/message/stream` | Streaming chat (SSE with tool_call events + citations in done event) |
-| GET | `/api/chat/{id}/history` | Chat conversation history |
-| GET | `/api/chat/{id}/interventions` | Pending interventions (borrower-safe fields) |
-| POST | `/api/chat/{id}/interventions/{iid}/resolve` | Acknowledge/resolve an intervention |
-| POST | `/api/chat/general/message` | General chat (pre-application, used by FloatingChatDrawer) |
-| GET | `/api/portfolio/stats` | Portfolio-level aggregation (active loans, delinquency) |
-| GET | `/api/portfolio/payments` | Payment trends with $setWindowFields |
-| GET | `/api/portfolio/ews` | Early Warning System signals from time-series (auto-samples a loan_id if none provided) |
-| GET | `/api/portfolio/events` | Recent events (payments + agent actions) |
-| POST | `/api/demo/reset` | Reset demo state (requires `X-Demo-Reset: confirm` header) |
+
+| Method | Path                                         | Description                                                                             |
+| ------ | -------------------------------------------- | --------------------------------------------------------------------------------------- |
+| POST   | `/api/applications`                          | Create loan application                                                                 |
+| GET    | `/api/applications`                          | List applications (paginated: `?skip=0&limit=50`)                                       |
+| GET    | `/api/applications/{id}`                     | Full application with documents + credit reports                                        |
+| GET    | `/api/applications/{id}/documents`           | List documents                                                                          |
+| GET    | `/api/applications/{id}/risk-pipeline`       | 7-stage aggregation results + stage descriptions                                        |
+| GET    | `/api/documents/{id}/pdf`                    | Serve original PDF                                                                      |
+| GET    | `/api/documents/{id}/json`                   | Full MongoDB document JSON                                                              |
+| POST   | `/api/applications/{id}/documents/upload`    | Upload + extract document via Bedrock                                                   |
+| POST   | `/api/documents/search`                      | Atlas Vector Search across documents (supports `application_id` filter)                 |
+| POST   | `/api/policies/search`                       | Atlas Vector Search across policies                                                     |
+| POST   | `/api/agent/{id}/run`                        | Trigger agent pipeline                                                                  |
+| POST   | `/api/hitl/{id}/decision`                    | Officer decision (approve/decline/modify + overrides + officer_id)                      |
+| GET    | `/api/hitl/{id}/context`                     | HITL review context (application + activity trail)                                      |
+| POST   | `/api/chat/{id}/message`                     | Send chat message to Application Agent                                                  |
+| POST   | `/api/chat/{id}/message/stream`              | Streaming chat (SSE with tool_call events + citations in done event)                    |
+| GET    | `/api/chat/{id}/history`                     | Chat conversation history                                                               |
+| GET    | `/api/chat/{id}/interventions`               | Pending interventions (borrower-safe fields)                                            |
+| POST   | `/api/chat/{id}/interventions/{iid}/resolve` | Acknowledge/resolve an intervention                                                     |
+| POST   | `/api/chat/general/message`                  | General chat (pre-application, used by FloatingChatDrawer)                              |
+| GET    | `/api/portfolio/stats`                       | Portfolio-level aggregation (active loans, delinquency)                                 |
+| GET    | `/api/portfolio/payments`                    | Payment trends with $setWindowFields                                                    |
+| GET    | `/api/portfolio/ews`                         | Early Warning System signals from time-series (auto-samples a loan_id if none provided) |
+| GET    | `/api/portfolio/events`                      | Recent events (payments + agent actions)                                                |
+| POST   | `/api/demo/reset`                            | Reset demo state (requires `X-Demo-Reset: confirm` header)                              |
 
 ### SSE (4 endpoints)
-| Path | Description |
-|------|-------------|
-| GET `/api/applications/{id}/activity` | Stream agent activity (Change Stream) |
-| GET `/api/applications/{id}/status` | Stream status changes (Change Stream) |
-| GET `/api/agent/{id}/run-stream` | Combined run + stream (LangGraph astream_events) — used by officer dashboard for workflow progression + HITL detection |
-| GET `/api/agent/{id}/stream` | Activity-only stream — used by AgentActivityLog for reconnection after HITL resume |
+
+| Path                                  | Description                                                                                                            |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| GET `/api/applications/{id}/activity` | Stream agent activity (Change Stream)                                                                                  |
+| GET `/api/applications/{id}/status`   | Stream status changes (Change Stream)                                                                                  |
+| GET `/api/agent/{id}/run-stream`      | Combined run + stream (LangGraph astream_events) — used by officer dashboard for workflow progression + HITL detection |
+| GET `/api/agent/{id}/stream`          | Activity-only stream — used by AgentActivityLog for reconnection after HITL resume                                     |
 
 ### WebSocket (1 endpoint)
-| Path | Description |
-|------|-------------|
+
+| Path                      | Description                                                                   |
+| ------------------------- | ----------------------------------------------------------------------------- |
 | WS `/api/applications/ws` | Real-time application queue (Change Stream, heartbeat, dead-client detection) |
 
 ## MongoDB Collections (9 + 3 infra)
 
-| Collection | Type | Purpose | Key Feature |
-|-----------|------|---------|-------------|
-| `borrowers` | Standard | Applicant profiles | Polymorphic income sources |
-| `applications` | Standard | Loan state machine | Status history with audit trail |
-| `documents` | Standard | Extracted PDF data | Voyage AI embeddings for vector search |
-| `credit_reports` | Standard | Credit bureau data | Per-borrower scoring, sorted by borrower order |
-| `underwriting_policies` | Standard | Policy text for RAG | Voyage AI embeddings, 15 Canadian mortgage rules |
-| `conversations` | Standard | Application Agent chat history | Per-application message persistence (borrower PII — separate retention policy) |
-| `interventions` | Standard | Pipeline-to-borrower action items | Typed interventions created by pipeline agents, surfaced in chat |
-| `payments` | **Time Series** | Payment history | $setWindowFields rolling 90-day analysis |
-| `agent_activity` | **Time Series** | Agent action log | Real-time SSE streaming via Change Stream |
-| `checkpoints` | LangGraph | Graph state snapshots | MongoDBSaver interrupt/resume |
-| `checkpoint_writes` | LangGraph | Write-ahead log | Checkpoint durability |
+| Collection              | Type            | Purpose                           | Key Feature                                                                    |
+| ----------------------- | --------------- | --------------------------------- | ------------------------------------------------------------------------------ |
+| `borrowers`             | Standard        | Applicant profiles                | Polymorphic income sources                                                     |
+| `applications`          | Standard        | Loan state machine                | Status history with audit trail                                                |
+| `documents`             | Standard        | Extracted PDF data                | Voyage AI embeddings for vector search                                         |
+| `credit_reports`        | Standard        | Credit bureau data                | Per-borrower scoring, sorted by borrower order                                 |
+| `underwriting_policies` | Standard        | Policy text for RAG               | Voyage AI embeddings, 15 Canadian mortgage rules                               |
+| `conversations`         | Standard        | Application Agent chat history    | Per-application message persistence (borrower PII — separate retention policy) |
+| `interventions`         | Standard        | Pipeline-to-borrower action items | Typed interventions created by pipeline agents, surfaced in chat               |
+| `payments`              | **Time Series** | Payment history                   | $setWindowFields rolling 90-day analysis                                       |
+| `agent_activity`        | **Time Series** | Agent action log                  | Real-time SSE streaming via Change Stream                                      |
+| `checkpoints`           | LangGraph       | Graph state snapshots             | MongoDBSaver interrupt/resume                                                  |
+| `checkpoint_writes`     | LangGraph       | Write-ahead log                   | Checkpoint durability                                                          |
 
 ## Security
 
@@ -404,11 +421,13 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 ## Deployment
 
 ### Local Development
+
 ```bash
 docker compose up    # Frontend :3000, Backend :8000
 ```
 
 ### Kubernetes (Kanopy)
+
 Multi-container pod pattern (frontend + backend sidecar). See [KANOPY_DEPLOYMENT_README.md](KANOPY_DEPLOYMENT_README.md).
 
 Environment configs: `environment/staging.yaml`, `environment/production.yaml`

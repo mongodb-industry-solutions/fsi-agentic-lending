@@ -1,5 +1,5 @@
 """
-MongoDB collection definitions for LendFlow AI.
+MongoDB collection definitions for Agentic Lending Platform.
 6 core collections for the lending lifecycle.
 """
 
@@ -68,6 +68,19 @@ COLLECTIONS = {
         "indexes": [
             {"keys": [("application_id", 1), ("status", 1)]},
             {"keys": [("created_at", -1)]},
+        ],
+    },
+    "hitl_audit": {
+        "description": "Immutable audit log of officer HITL decisions (no update/delete operations)",
+        "indexes": [
+            {"keys": [("application_id", 1), ("timestamp", -1)]},
+            {"keys": [("officer_id", 1)]},
+        ],
+    },
+    "pipeline_locks": {
+        "description": "Distributed pipeline concurrency locks (TTL-based)",
+        "indexes": [
+            {"keys": [("locked_at", 1)], "expireAfterSeconds": 600},
         ],
     },
 }

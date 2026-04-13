@@ -146,24 +146,54 @@ export function apiWebSocket(path, { onMessage, onError, onClose, reconnect = tr
   };
 }
 
-export function apiSSE(path, onEvent, onError) {
+export function apiSSE(path, onEvent, onError, { maxRetries = 5 } = {}) {
   const url = `${API_BASE}${path}`;
-  const source = new EventSource(url);
+  let source = null;
+  let lastEventId = null;
+  let retries = 0;
+  let closed = false;
 
-  source.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      onEvent(data);
-    } catch (err) {
-      console.warn('[LendFlow SSE] Parse error:', err);
-    }
+  function connect() {
+    if (closed) return;
+    const connectUrl = lastEventId ? `${url}${url.includes('?') ? '&' : '?'}after=${encodeURIComponent(lastEventId)}` : url;
+    source = new EventSource(connectUrl);
+
+    source.onmessage = (event) => {
+      retries = 0;
+      if (event.lastEventId) lastEventId = event.lastEventId;
+      try {
+        const data = JSON.parse(event.data);
+        onEvent(data);
+        if (data.type === 'complete' || data.type === 'error') {
+          source.close();
+          closed = true;
+        }
+      } catch (err) {
+        console.warn('[LendFlow SSE] Parse error:', err);
+      }
+    };
+
+    source.onerror = (err) => {
+      console.warn('[LendFlow SSE] Connection error:', err);
+      source.close();
+      if (closed) return;
+      if (retries < maxRetries) {
+        retries++;
+        const delay = Math.min(1000 * Math.pow(2, retries - 1), 15000);
+        console.info(`[LendFlow SSE] Reconnecting in ${delay}ms (attempt ${retries}/${maxRetries})`);
+        setTimeout(connect, delay);
+      } else {
+        if (onError) onError(err);
+      }
+    };
+  }
+
+  connect();
+
+  return {
+    close() {
+      closed = true;
+      if (source) source.close();
+    },
   };
-
-  source.onerror = (err) => {
-    console.warn('[LendFlow SSE] Connection error:', err);
-    if (onError) onError(err);
-    source.close();
-  };
-
-  return source; // Caller can call source.close() to disconnect
 }

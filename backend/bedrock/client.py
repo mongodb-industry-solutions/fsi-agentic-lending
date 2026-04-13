@@ -1,18 +1,16 @@
-import boto3
-from botocore.config import Config
 import os
-
 from typing import Optional
 
-import os
+import boto3
+from botocore.config import Config
 from dotenv import load_dotenv
 
 load_dotenv()
 
 
 class BedrockClient:
-    """Implementation of BedrockClient class."""
-     
+    """Base AWS Bedrock client — manages boto3 session and connection lifecycle."""
+
     def __init__(self, aws_access_key: Optional[str] = None, aws_secret_key: Optional[str] = None,
                  assumed_role: Optional[str] = None, region_name: Optional[str] = "us-east-1") -> None:
         self.region_name = region_name
@@ -43,6 +41,8 @@ class BedrockClient:
                 "max_attempts": 10,
                 "mode": "standard",
             },
+            connect_timeout=10,
+            read_timeout=120,
         )
         session = boto3.Session(**session_kwargs)
         
@@ -72,9 +72,14 @@ class BedrockClient:
     
     def _close_bedrock(self):
         """Close Bedrock client."""
-        if hasattr(self, 'bedrock') and self.bedrock:
-            self.bedrock.close()
-    
+        if hasattr(self, 'bedrock_client') and self.bedrock_client:
+            self.bedrock_client.close()
+            self.bedrock_client = None
+
+    def close(self):
+        """Public shutdown method."""
+        self._close_bedrock()
+
     def __del__(self):
         """Destructor."""
         self._close_bedrock()

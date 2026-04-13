@@ -116,6 +116,7 @@ async def send_message_stream(application_id: str, req: ChatMessageRequest):
     async def event_generator():
         accumulated = []
         citations = []
+        safety_tripped = False
         queue = asyncio.Queue()
         sentinel = object()
 
@@ -142,12 +143,23 @@ async def send_message_stream(application_id: str, req: ChatMessageRequest):
                 continue
             if isinstance(item, str):
                 accumulated.append(item)
-                yield f"data: {json.dumps({'type': 'token', 'content': item})}\n\n"
+                if not safety_tripped:
+                    running_text = "".join(accumulated)
+                    filtered_check = safety_filter(running_text)
+                    if filtered_check != running_text:
+                        safety_tripped = True
+                        logger.warning(f"Safety filter tripped during stream for {application_id}")
+                    else:
+                        yield f"data: {json.dumps({'type': 'token', 'content': item})}\n\n"
 
         await task
 
         full_response = "".join(accumulated)
-        filtered = safety_filter(full_response)
+        if safety_tripped:
+            filtered = safety_filter(full_response)
+            yield f"data: {json.dumps({'type': 'replace', 'content': filtered})}\n\n"
+        else:
+            filtered = full_response
 
         now = datetime.now(timezone.utc)
 

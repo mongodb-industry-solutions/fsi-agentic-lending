@@ -35,7 +35,6 @@ def hitl_gate(state: LendFlowState, **kwargs) -> dict:
         action = decision.get("action", "decline")
 
     notes = decision.get("notes", "")
-    conditions = decision.get("conditions", [])
     overrides = decision.get("overrides", {})
 
     state_updates = {

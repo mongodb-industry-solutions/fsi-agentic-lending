@@ -1,10 +1,14 @@
 """MongoDB tools available to LangGraph pipeline agents."""
 import logging
-import os
 import time as _time
 from datetime import datetime, timezone
 from db.mdb import get_db as _get_db
-from services.embedding_service import embed_query as _embed_query
+from services.vector_search import (
+    search_policies,
+    search_documents,
+    OFFICER_PROJECTION,
+    BORROWER_SAFE_PROJECTION,
+)
 
 
 def get_application_documents(application_id: str) -> list[dict]:
@@ -46,62 +50,6 @@ def get_application_summary(application_id: str) -> dict:
         {"_id": 0, "application_id": 1, "borrower_names": 1, "loan_amount": 1, "purchase_price": 1, "down_payment": 1, "product": 1, "property": 1, "income_summary": 1, "status": 1}
     )
     return app or {}
-
-
-BORROWER_SAFE_PROJECTION = {
-    "_id": 0,
-    "policy_id": 1,
-    "title": 1,
-    "section": 1,
-    "content": 1,
-    "category": 1,
-    "score": {"$meta": "vectorSearchScore"},
-}
-
-OFFICER_PROJECTION = {
-    "_id": 0,
-    "policy_id": 1,
-    "title": 1,
-    "content": 1,
-    "score": {"$meta": "vectorSearchScore"},
-}
-
-
-def search_policies(query: str, limit: int = 5, projection: dict | None = None) -> list[dict]:
-    """Search underwriting policies via Atlas Vector Search with Voyage AI embeddings.
-
-    Args:
-        query: The search query text.
-        limit: Max results to return.
-        projection: MongoDB $project stage. Defaults to officer-level fields.
-    """
-    db = _get_db()
-    if projection is None:
-        projection = OFFICER_PROJECTION
-    try:
-        query_vector = _embed_query(query)
-        pipeline = [
-            {
-                "$vectorSearch": {
-                    "index": "policies_vector_idx",
-                    "path": "embedding",
-                    "queryVector": query_vector,
-                    "numCandidates": 50,
-                    "limit": limit,
-                }
-            },
-            {"$project": projection},
-        ]
-        results = list(db["underwriting_policies"].aggregate(pipeline))
-        return results
-    except Exception as e:
-        logging.getLogger(__name__).error(f"Vector search failed: {e}")
-        return [{
-            "policy_id": "SEARCH_UNAVAILABLE",
-            "title": "Policy Search Unavailable",
-            "content": f"Vector search failed: {str(e)[:200]}. Manual policy review required.",
-            "score": 0,
-        }]
 
 
 def log_agent_activity(application_id: str, agent: str, action: str, detail: str, checkpoint_id: str = None):

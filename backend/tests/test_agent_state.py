@@ -1,8 +1,8 @@
-from agents.pipeline.supervisor import supervisor_node
+from agents.pipeline.supervisor import supervisor_node, route_from_supervisor
 from unittest.mock import patch
 
 
-def test_supervisor_routes_to_loan_app():
+def test_supervisor_routes_to_parallel_gather():
     state = {
         "application_id": "APP-TEST-0001",
         "autonomy_level": "bounded",
@@ -15,7 +15,7 @@ def test_supervisor_routes_to_loan_app():
     }
     with patch('agents.pipeline.supervisor.log_agent_activity'):
         result = supervisor_node(state)
-    assert result["current_agent"] == "loan_app"
+    assert result["current_agent"] == "parallel_gather"
 
 
 def test_supervisor_routes_to_underwriter():
@@ -85,3 +85,18 @@ def test_supervisor_max_retries_completes():
         result = supervisor_node(state)
     assert result["current_agent"] == "complete"
     assert result["decision"] == "error"
+
+
+def test_route_from_supervisor_parallel():
+    """parallel_gather should produce two Send objects."""
+    from langgraph.types import Send
+    state = {"current_agent": "parallel_gather", "application_id": "APP-TEST"}
+    result = route_from_supervisor(state)
+    assert isinstance(result, list) and len(result) == 2
+    assert all(isinstance(r, Send) for r in result)
+
+
+def test_route_from_supervisor_single():
+    state = {"current_agent": "underwriter"}
+    result = route_from_supervisor(state)
+    assert result == "underwriter"

@@ -16,7 +16,7 @@ from models.schemas import VectorSearchRequest
 from services import document_service, vector_search_service
 from services.extraction_service import extract_from_pdf, EXTRACTION_PROMPTS
 from services.application_service import serialize_doc
-from services.embedding_service import embed_text as _embed_text
+from services.embedding_service import embed_document as _embed_document
 from db.mdb import get_db
 
 logger = logging.getLogger(__name__)
@@ -189,22 +189,25 @@ async def upload_document(
     except Exception as e:
         extraction = {"text_summary": f"Extraction failed: {str(e)}", "error": str(e)}
 
-    # Generate embedding
-    text_for_embedding = extraction.get("text_summary", json.dumps(extraction, indent=2))
+    # Generate multimodal embedding from PDF page images
+    text_for_display = extraction.get("text_summary", json.dumps(extraction, indent=2))
+    embedding = None
+    embedding_pages = 0
     try:
-        embedding = await asyncio.to_thread(_embed_text, text_for_embedding, "document")
+        embedding, embedding_pages = await asyncio.to_thread(_embed_document, file_path)
     except Exception as e:
-        logger.warning(f"Embedding generation failed: {e}")
-        embedding = None
+        logger.warning(f"Multimodal embedding generation failed: {e}")
 
     # Store in MongoDB
     doc_record = {
         "application_id": app_id,
         "doc_type": doc_type,
         "filename": safe_name,
-        "extracted_text": text_for_embedding,
+        "extracted_text": text_for_display,
         "structured_data": extraction,
         "embedding": embedding,
+        "embedding_type": "multimodal" if embedding else None,
+        "embedding_pages": embedding_pages if embedding else 0,
         "status": "parsed" if "error" not in extraction else "error",
         "created_at": datetime.now(timezone.utc),
     }

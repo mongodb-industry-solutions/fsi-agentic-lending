@@ -59,8 +59,6 @@ export default function AnnotationOverlay({
   }
 
   const features = currentStep.features || [];
-  const ops = currentStep.ops || [];
-  const hasMemory = !!currentStep.memory;
   const reasoning = currentStep.reasoning;
   const timing = reasoning?.timing;
 
@@ -95,7 +93,7 @@ export default function AnnotationOverlay({
                     height: 4,
                     borderRadius: 2,
                     background: i <= stepIndex ? 'var(--mongo)' : 'var(--border-dim)',
-                    transition: 'all 0.3s',
+                    transition: '220ms cubic-bezier(0.33, 1, 0.68, 1)',
                   }}
                 />
               ))}
@@ -158,25 +156,6 @@ export default function AnnotationOverlay({
           />,
           document.body,
         )}
-        {ops.length > 0 && (
-          <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
-            padding: '2px 6px', borderRadius: 4,
-            background: 'var(--mongo-dim)', color: 'var(--mongo)',
-          }}>
-            {ops.length} {ops.length === 1 ? 'op' : 'ops'}
-          </span>
-        )}
-        {hasMemory && (
-          <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
-            padding: '2px 6px', borderRadius: 4,
-            background: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)',
-          }}>
-            {currentStep.memory.type === 'checkpoint' ? '💾 checkpoint' : '🧠 state'}
-          </span>
-        )}
-
         {reasoning?.text && (
           <button
             type="button"
@@ -187,8 +166,10 @@ export default function AnnotationOverlay({
               padding: '2px 8px', borderRadius: 4,
               border: '1px solid var(--border-dim)', background: 'var(--bg-raised)',
               color: 'var(--text-dim)', cursor: 'pointer',
-              transition: 'all 0.15s',
+              transition: '150ms cubic-bezier(0.33, 1, 0.68, 1)',
             }}
+            onFocus={(e) => { e.currentTarget.style.boxShadow = '0 0 0 2px #C3E7FE'; }}
+            onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
           >
             {reasoningExpanded ? '▾ Hide reasoning' : '▸ Show reasoning'}
           </button>

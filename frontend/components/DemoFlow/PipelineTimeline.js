@@ -111,10 +111,10 @@ export default function PipelineTimeline({
                   borderLeft: `3px solid ${e.color}`,
                   background: isHighlighted ? e.color + '14' : isLatest ? 'var(--bg-surface)' : 'var(--bg-surface)',
                   fontSize: 11,
-                  transition: 'background 0.2s, box-shadow 0.2s',
+                  transition: 'background 150ms cubic-bezier(0.33, 1, 0.68, 1), box-shadow 150ms cubic-bezier(0.33, 1, 0.68, 1)',
                   boxShadow: isHighlighted ? `0 0 0 1px ${e.color}33` : 'none',
                   cursor: 'default',
-                  animation: isLatest ? 'slideDown 0.25s ease-out' : undefined,
+                  animation: isLatest ? 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' : undefined,
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontWeight: 700, fontSize: 12 }}>
@@ -141,8 +141,8 @@ export default function PipelineTimeline({
                   borderLeft: `3px solid ${e.color}33`,
                   borderRadius: 'var(--radius-sm)',
                   background: isHighlighted ? e.color + '0a' : 'transparent',
-                  transition: 'background 0.2s',
-                  animation: isLatest ? 'slideDown 0.2s ease-out' : undefined,
+                  transition: 'background 150ms cubic-bezier(0.33, 1, 0.68, 1)',
+                  animation: isLatest ? 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' : undefined,
                 }}
               >
                 <span style={{ fontSize: 9, marginTop: 1 }}>🗄</span>
@@ -165,8 +165,8 @@ export default function PipelineTimeline({
                   borderLeft: `3px solid ${e.color}`,
                   borderRadius: 'var(--radius-sm)',
                   background: isHighlighted ? e.color + '14' : e.color + '08',
-                  transition: 'background 0.2s',
-                  animation: isLatest ? 'slideDown 0.25s ease-out' : undefined,
+                  transition: 'background 150ms cubic-bezier(0.33, 1, 0.68, 1)',
+                  animation: isLatest ? 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' : undefined,
                 }}
               >
                 <span style={{ fontSize: 11 }}>{e.memType === 'checkpoint' ? '💾' : '🧠'}</span>

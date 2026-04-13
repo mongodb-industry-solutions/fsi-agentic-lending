@@ -1,15 +1,14 @@
 import json
+import logging
+import os
 import time
-
-from bedrock.client import BedrockClient
-from botocore.exceptions import ClientError
-
 from typing import Optional
 
-import logging
-
-import os
+from botocore.exceptions import ClientError
 from dotenv import load_dotenv
+
+from bedrock.client import BedrockClient
+from services.circuit_breaker import bedrock_breaker
 
 load_dotenv()
 
@@ -21,36 +20,89 @@ except ImportError:
             return fn
         return decorator
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+class ToolResponseError(RuntimeError):
+    """Raised when converse_with_tools returns an unexpected response shape."""
+
+
+def parse_tool_response(response: dict, expected_tool_name: str | None = None) -> dict | None:
+    """Extract and validate a tool-use block from a Bedrock Converse response.
+
+    Returns the parsed ``input`` dict if a valid tool use block is found, or
+    ``None`` if the model responded with plain text instead of calling a tool.
+    Raises ``ToolResponseError`` on malformed responses or truncation.
+    """
+    stop_reason = response.get("stopReason", "")
+    if stop_reason == "max_tokens":
+        raise ToolResponseError("Response truncated (max_tokens) — retry with a shorter prompt or higher maxTokens")
+
+    content = response.get("output", {}).get("message", {}).get("content", [])
+    tool_block = next((block for block in content if "toolUse" in block), None)
+
+    if tool_block is None:
+        if stop_reason == "end_turn":
+            return None
+        raise ToolResponseError(f"No tool use block and unexpected stopReason: {stop_reason}")
+
+    tool_use = tool_block["toolUse"]
+    actual_name = tool_use.get("name", "")
+    if expected_tool_name and actual_name != expected_tool_name:
+        raise ToolResponseError(f"Expected tool '{expected_tool_name}', got '{actual_name}'")
+
+    tool_input = tool_use.get("input")
+    if tool_input is None:
+        raise ToolResponseError(f"Tool '{actual_name}' returned no input schema")
+
+    return tool_input
+
+
 class BedrockAnthropicChatCompletions(BedrockClient):
-    """ A class to generate chat completions using Bedrock's Anthropic text models"""
+    """Generate chat completions using Bedrock's Anthropic text models."""
     # Reference: https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-runtime_example_bedrock-runtime_InvokeModel_AnthropicClaude_section.html
 
     log: logging.Logger = logging.getLogger("BedrockAnthropicChatCompletions")
 
-    def __init__(self, aws_access_key: Optional[str] = None, aws_secret_key: Optional[str] = None, region_name: Optional[str] = "us-east-1",
-                model_id: Optional[str] = None) -> None:
-        super().__init__(aws_access_key=aws_access_key, aws_secret_key=aws_secret_key, region_name=region_name)
-        """
-        Initialize the BedrockAnthropicChatCompletions class.
+    def __init__(
+        self,
+        aws_access_key: Optional[str] = None,
+        aws_secret_key: Optional[str] = None,
+        region_name: Optional[str] = "us-east-1",
+        model_id: Optional[str] = None,
+    ) -> None:
+        """Initialise with optional AWS credentials and model ID.
 
         Args:
-            aws_access_key (str): The AWS access key.
-            aws_secret_key (str): The AWS secret key.
-            region_name (str): The AWS region name. Default is os.getenv("AWS_REGION").
-            model_id (str): The model ID or inference profile ARN to use.
-                            Reads from CHATCOMPLETIONS_MODEL_ID env var, falls back to Claude Haiku 4.5.
-            bedrock_client (BedrockClient): The BedrockClient instance.
+            aws_access_key: AWS access key (or from env/profile).
+            aws_secret_key: AWS secret key (or from env/profile).
+            region_name: AWS region. Defaults to us-east-1.
+            model_id: Bedrock model ID. Falls back to CHATCOMPLETIONS_MODEL_ID
+                      env var, then Claude Haiku 4.5.
         """
+        super().__init__(aws_access_key=aws_access_key, aws_secret_key=aws_secret_key, region_name=region_name)
         self.model_id = model_id or os.environ.get("CHATCOMPLETIONS_MODEL_ID", "anthropic.claude-haiku-4-5-20251001-v1:0")
         self.max_tokens = 4096
         self.temperature = 0.00001
         self.bedrock_client = self._get_bedrock_client()
+        self._total_input_tokens = 0
+        self._total_output_tokens = 0
 
+    def _log_usage(self, response_body: dict, method: str):
+        """Extract and log token usage from a Bedrock response."""
+        usage = response_body.get("usage", {})
+        input_tokens = usage.get("input_tokens", usage.get("inputTokens", 0))
+        output_tokens = usage.get("output_tokens", usage.get("outputTokens", 0))
+        if input_tokens or output_tokens:
+            self._total_input_tokens += input_tokens
+            self._total_output_tokens += output_tokens
+            self.log.info(
+                "LLM usage [%s]: input=%d output=%d (cumulative: in=%d out=%d)",
+                method, input_tokens, output_tokens,
+                self._total_input_tokens, self._total_output_tokens,
+            )
+
+    @bedrock_breaker
     @traceable(name="bedrock_predict")
     def predict(self, text: str):
         """ Predict a chat completion based on the input text.
@@ -95,14 +147,12 @@ class BedrockAnthropicChatCompletions(BedrockClient):
             except Exception as e:
                 raise RuntimeError(f"Bedrock failed: {e}") from e
 
-        # Decode the response body.
         model_response = json.loads(response["body"].read())
-
-        # Extract the response text.
+        self._log_usage(model_response, "predict")
         response_text = model_response["content"][0]["text"]
-
         return response_text
 
+    @bedrock_breaker
     @traceable(name="bedrock_predict_with_system")
     def predict_with_system(self, text: str, system_prompt: str) -> str:
         """Generate response with a system prompt.
@@ -141,8 +191,10 @@ class BedrockAnthropicChatCompletions(BedrockClient):
                 raise RuntimeError(f"Bedrock failed: {e}") from e
 
         model_response = json.loads(response["body"].read())
+        self._log_usage(model_response, "predict_with_system")
         return model_response["content"][0]["text"]
 
+    @bedrock_breaker
     @traceable(name="bedrock_converse_with_tools")
     def converse_with_tools(self, messages, system_prompt, tools, max_retries=3):
         """Bedrock Converse API with tool definitions for structured output."""
@@ -155,6 +207,7 @@ class BedrockAnthropicChatCompletions(BedrockClient):
                     toolConfig={"tools": tools},
                     inferenceConfig={"maxTokens": self.max_tokens, "temperature": self.temperature},
                 )
+                self._log_usage(response, "converse_with_tools")
                 return response
             except ClientError as e:
                 error_code = e.response.get('Error', {}).get('Code', '')
@@ -168,6 +221,7 @@ class BedrockAnthropicChatCompletions(BedrockClient):
                 raise RuntimeError(f"Bedrock converse failed: {e}") from e
         raise RuntimeError("Bedrock converse failed after retries")
 
+    @bedrock_breaker
     @traceable(name="bedrock_stream_messages")
     def stream_messages(self, messages: list, system_prompt: str = None):
         """Stream response tokens from a full message history.
@@ -221,6 +275,7 @@ class BedrockAnthropicChatCompletions(BedrockClient):
         if not yielded:
             self.log.warning("Bedrock stream completed without yielding any text tokens")
 
+    @bedrock_breaker
     @traceable(name="bedrock_predict_messages")
     def predict_messages(self, messages: list, system_prompt: str = None) -> str:
         """Generate response from a full message history.
@@ -260,4 +315,6 @@ class BedrockAnthropicChatCompletions(BedrockClient):
                 raise RuntimeError(f"Bedrock failed: {e}") from e
 
         model_response = json.loads(response["body"].read())
-        return model_response["content"][0]["text"]
+        self._log_usage(model_response, "predict_messages")
+        blocks = model_response.get("content", [])
+        return " ".join(b["text"] for b in blocks if b.get("type") == "text" and "text" in b)

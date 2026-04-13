@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
+import Badge from '@leafygreen-ui/badge';
+import ExpandableCard from '@leafygreen-ui/expandable-card';
 import { FUNDING_STEPS } from '../engine/demoScenes';
 import { mergeCanvasState } from '../engine/canvasUtils';
 import WorkflowCanvas from '../WorkflowCanvas';
 import AnnotationOverlay from '../AnnotationOverlay';
-import DataSourceStrip from '../DataSourceStrip';
-import PipelineTimeline from '../PipelineTimeline';
+import PipelineDrawer from '../PipelineDrawer';
 import { spacing } from '@leafygreen-ui/tokens';
 
 const TIMELINE_EVENTS = [
@@ -114,17 +115,8 @@ function SyntaxTokens({ text }) {
 }
 
 function StatusBadge({ status }) {
-  const colors = {
-    approved: { bg: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)' },
-    funded: { bg: 'var(--success-dim)', color: 'var(--success)' },
-    active: { bg: 'var(--mongo-dim)', color: 'var(--mongo)' },
-  };
-  const c = colors[status] || colors.approved;
-  return (
-    <span style={{ padding: '4px 10px', borderRadius: 12, background: c.bg, color: c.color, fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>
-      {status}
-    </span>
-  );
+  const variantMap = { approved: 'yellow', funded: 'green', active: 'green' };
+  return <Badge variant={variantMap[status] || 'lightgray'}>{status.toUpperCase()}</Badge>;
 }
 
 export default function FundingScene({ sceneStep, currentStepData }) {
@@ -155,11 +147,9 @@ export default function FundingScene({ sceneStep, currentStepData }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <DataSourceStrip sceneKey="funding" sceneStep={sceneStep} totalSteps={FUNDING_STEPS.length} />
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: '1fr' }}>
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ position: 'relative', flex: '1.4 1 0%', minHeight: 240, overflow: 'hidden' }}>
             <WorkflowCanvas
               activeNodes={canvasState.activeNodes}
               activeEdges={canvasState.activeEdges}
@@ -177,19 +167,6 @@ export default function FundingScene({ sceneStep, currentStepData }) {
             totalSteps={FUNDING_STEPS.length}
           />
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: spacing[400] }}>
-            <div style={{ display: 'flex', gap: spacing[200], marginBottom: 14 }}>
-            <div style={{ flex: 1, padding: '8px 10px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--danger)', borderLeftWidth: 3 }}>
-              <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[50] }}>Traditional</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 800, color: 'var(--danger)' }}>T+3 to T+5</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Batch settlement</div>
-            </div>
-            <div style={{ flex: 1, padding: '8px 10px', background: 'var(--mongo-dim)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--mongo)', borderLeftWidth: 3 }}>
-              <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[50] }}>Agentic</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 800, color: 'var(--mongo)' }}>Event-driven</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Instant settlement</div>
-            </div>
-          </div>
-
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: spacing[400] }}>
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13 }}>Funding Timeline</div>
             <StatusBadge status={currentStatus} />
@@ -200,7 +177,7 @@ export default function FundingScene({ sceneStep, currentStepData }) {
             {TIMELINE_EVENTS.map((event, i) => {
               const reached = sceneStep >= i;
               return (
-                <div key={i} style={{ position: 'relative', paddingLeft: spacing[500], paddingBottom: spacing[400], opacity: reached ? 1 : 0.4, transition: 'opacity 0.4s' }}>
+                <div key={i} style={{ position: 'relative', paddingLeft: spacing[500], paddingBottom: spacing[400], opacity: reached ? 1 : 0.4, transition: 'opacity 220ms cubic-bezier(0.33, 1, 0.68, 1)' }}>
                   <div style={{ position: 'absolute', left: 0, top: 4, width: 16, height: 16, borderRadius: '50%', background: reached ? 'var(--bg-surface)' : 'var(--bg-raised)', border: `2px solid ${reached ? 'var(--mongo)' : 'var(--border-dim)'}`, zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8 }}>
                     {reached ? '✓' : ''}
                   </div>
@@ -215,7 +192,7 @@ export default function FundingScene({ sceneStep, currentStepData }) {
           {sceneStep >= 1 && (
             <>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, marginBottom: spacing[200] }}>Accounting Entries</div>
-              <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', overflow: 'hidden', marginBottom: spacing[400] }}>
+              <div style={{ background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border-dim)', overflow: 'hidden', marginBottom: spacing[400] }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', padding: '8px 10px', borderBottom: '1px solid var(--border-dim)', textTransform: 'uppercase' }}>
                   <span>Entry</span><span>Debit</span><span>Credit</span><span>Balance</span>
                 </div>
@@ -231,61 +208,43 @@ export default function FundingScene({ sceneStep, currentStepData }) {
             </>
           )}
 
-          {sceneStep >= 1 && (
-            <div style={{ padding: 10, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', marginBottom: 14, animation: 'slideDown 0.3s ease-out' }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, marginBottom: spacing[150] }}>Funding Rails</div>
-              <div style={{ display: 'flex', gap: spacing[150] }}>
-                {[
-                  { label: 'EFT (Payments Canada)', active: true },
-                  { label: 'Wire', active: false },
-                  { label: 'Real-Time Payments (RTP)', active: false },
-                ].map((r) => (
-                  <span key={r.label} style={{
-                    fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 10,
-                    background: r.active ? 'var(--mongo-dim)' : 'var(--bg-raised)',
-                    color: r.active ? 'var(--mongo)' : 'var(--text-dim)',
-                    border: r.active ? '1px solid var(--mongo)' : '1px solid var(--border-dim)',
-                  }}>
-                    {r.active && '✓ '}{r.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, marginBottom: spacing[100] }}>MongoDB Document Evolution</div>
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: spacing[300], lineHeight: 1.6 }}>
-            One document grows through each lifecycle stage. No ETL — just <strong style={{ color: 'var(--mongo)' }}>MongoDB&apos;s flexible document model</strong>.
+            One document grows through each lifecycle stage — <strong style={{ color: 'var(--mongo)' }}>12 → 47 fields</strong>.
           </div>
 
-          {visibleDocStages.map((stage, i) => (
-            <div key={stage.label} style={{ marginBottom: 10, animation: i === visibleDocStages.length - 1 && sceneStep >= 2 ? 'sceneEnter 0.4s ease-out' : undefined }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: spacing[200], marginBottom: spacing[100] }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: stage.color }} />
-                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, color: stage.color }}>{stage.label}</span>
-                {i < visibleDocStages.length - 1 && (
-                  <span style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>✓</span>
-                )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: spacing[200], marginBottom: spacing[300] }}>
+            {visibleDocStages.map((stage, i) => (
+              <div key={stage.label} style={{ display: 'flex', alignItems: 'center', gap: spacing[100] }}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: stage.color }} />
+                <span style={{ fontSize: 11, fontWeight: 600, color: stage.color }}>{stage.label}</span>
+                {i < visibleDocStages.length - 1 && <span style={{ color: 'var(--text-dim)', margin: `0 ${spacing[50]}px` }}>→</span>}
               </div>
-              <pre
-                style={{
+            ))}
+          </div>
+
+          <ExpandableCard title={`Document Evolution (${visibleDocStages.length} stages)`} defaultOpen={false}>
+            {visibleDocStages.map((stage, i) => (
+              <div key={stage.label} style={{ marginBottom: i < visibleDocStages.length - 1 ? spacing[300] : 0 }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, color: stage.color, marginBottom: spacing[100] }}>{stage.label}</div>
+                <pre style={{
                   padding: spacing[200],
                   background: 'var(--bg-surface)',
-                  borderRadius: 'var(--radius-sm)',
-                  border: `1px solid ${i === visibleDocStages.length - 1 ? stage.color + '44' : 'var(--border-dim)'}`,
+                  borderRadius: 8,
+                  border: '1px solid var(--border-dim)',
                   fontFamily: 'var(--font-mono)',
-                  fontSize: 9,
+                  fontSize: 11,
                   lineHeight: 1.5,
                   overflowX: 'auto',
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-all',
-                  opacity: i === visibleDocStages.length - 1 ? 1 : 0.7,
-                }}
-              >
-                <SyntaxTokens text={stage.fields} />
-              </pre>
-            </div>
-          ))}
+                  margin: 0,
+                }}>
+                  <SyntaxTokens text={stage.fields} />
+                </pre>
+              </div>
+            ))}
+          </ExpandableCard>
 
           {sceneStep >= 3 && (
             <div style={{ marginTop: spacing[300], padding: 14, background: 'var(--mongo-dim)', borderRadius: 'var(--radius-md)', border: '1px solid var(--mongo)', textAlign: 'center' }}>
@@ -302,14 +261,12 @@ export default function FundingScene({ sceneStep, currentStepData }) {
           </div>
         </div>
 
-        <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: spacing[400] }}>
-          <PipelineTimeline
-            steps={FUNDING_STEPS}
-            stepIndex={sceneStep}
-            onEntryHover={handleTimelineHover}
-            highlightNodeId={hoveredNode}
-          />
-        </div>
+        <PipelineDrawer
+          steps={FUNDING_STEPS}
+          stepIndex={sceneStep}
+          onEntryHover={handleTimelineHover}
+          highlightNodeId={hoveredNode}
+        />
       </div>
     </div>
   );

@@ -1,9 +1,14 @@
 "use client";
 
+import { useCallback } from 'react';
+import Badge from '@leafygreen-ui/badge';
 import { spacing } from '@leafygreen-ui/tokens';
 import { SCENE_META } from '../../lib/data/demoScenes';
+import { CAPABILITIES } from '../../lib/data/capabilities';
+import { uiTokens } from '../../lib/uiTokens';
 
 const SPEEDS = [0.25, 0.5, 1, 2];
+const TOTAL_CAPABILITIES = CAPABILITIES.length;
 
 export default function SceneNavBar({
   currentScene,
@@ -18,7 +23,15 @@ export default function SceneNavBar({
   onStep,
   onStepBack,
   onReset,
+  activeFeatures = [],
 }) {
+  const activeCount = new Set(activeFeatures).size;
+  const allActive = activeCount >= TOTAL_CAPABILITIES;
+
+  const cycleSpeed = useCallback(() => {
+    const idx = SPEEDS.indexOf(speed);
+    setSpeed(SPEEDS[(idx + 1) % SPEEDS.length]);
+  }, [speed, setSpeed]);
   const atStart = currentScene === 0 && sceneStep <= 0;
   return (
     <div
@@ -46,7 +59,7 @@ export default function SceneNavBar({
                   alignItems: 'center',
                   gap: spacing[100],
                   padding: `${spacing[2]}px ${spacing[300]}px`,
-                  borderRadius: 'var(--radius-sm)',
+                  borderRadius: 8,
                   border: active ? '1px solid var(--mongo)' : '1px solid transparent',
                   background: active ? 'var(--mongo-dim)' : visited ? 'var(--bg-raised)' : 'transparent',
                   color: active ? 'var(--mongo)' : visited ? 'var(--text-secondary)' : 'var(--text-dim)',
@@ -54,7 +67,7 @@ export default function SceneNavBar({
                   fontWeight: active ? 700 : 500,
                   fontSize: 12,
                   cursor: 'pointer',
-                  transition: 'all 0.2s',
+                  transition: `background ${uiTokens.transitionFast}, color ${uiTokens.transitionFast}, border-color ${uiTokens.transitionFast}`,
                   whiteSpace: 'nowrap',
                 }}
               >
@@ -77,41 +90,30 @@ export default function SceneNavBar({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: spacing[2] }}>
-        <span
+        <Badge variant={allActive ? 'green' : 'lightgray'}>
+          {activeCount}/{TOTAL_CAPABILITIES} capabilities
+        </Badge>
+
+        <button
+          type="button"
+          onClick={cycleSpeed}
+          title="Cycle playback speed"
           style={{
-            fontSize: 18,
-            fontWeight: 700,
+            padding: `${spacing[50]}px ${spacing[2]}px`,
+            borderRadius: 8,
+            border: '1px solid var(--border-dim)',
+            background: 'var(--mongo-dim)',
             color: 'var(--mongo)',
-            minWidth: 140,
-            textAlign: 'right',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            fontWeight: 700,
+            cursor: 'pointer',
+            minWidth: 44,
+            textAlign: 'center',
           }}
         >
-          <span style={{ fontFamily: 'var(--font-display)' }}>{SCENE_META[currentScene]?.title}</span>
-          {' · '}
-          <span style={{ fontFamily: 'var(--font-mono)' }}>{(elapsedMs / 1000).toFixed(2)}s</span>
-        </span>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: spacing[50], marginLeft: spacing[2] }}>
-          {SPEEDS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSpeed(s)}
-              style={{
-                padding: `${spacing[50]}px ${spacing[2]}px`,
-                borderRadius: 'var(--radius-sm)',
-                border: speed === s ? '1px solid var(--mongo)' : '1px solid var(--border-dim)',
-                background: speed === s ? 'var(--mongo-dim)' : 'transparent',
-                color: speed === s ? 'var(--mongo)' : 'var(--text-dim)',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10,
-                cursor: 'pointer',
-              }}
-            >
-              {s}x
-            </button>
-          ))}
-        </div>
+          {speed}x
+        </button>
 
         <button
           type="button"
@@ -119,7 +121,7 @@ export default function SceneNavBar({
           disabled={atStart}
           style={{
             padding: `${spacing[150]}px ${spacing[300]}px`,
-            borderRadius: 'var(--radius-sm)',
+            borderRadius: 8,
             border: '1px solid var(--border-base)',
             background: 'var(--bg-surface)',
             color: 'var(--text-primary)',
@@ -128,7 +130,7 @@ export default function SceneNavBar({
             fontSize: 11,
             cursor: atStart ? 'default' : 'pointer',
             opacity: atStart ? 0.4 : 1,
-            transition: 'opacity 0.15s ease',
+            transition: `opacity ${uiTokens.transitionFast}`,
           }}
         >
           ← Back
@@ -139,7 +141,7 @@ export default function SceneNavBar({
           onClick={isPlaying ? onPause : onPlay}
           style={{
             padding: `${spacing[150]}px ${spacing[300]}px`,
-            borderRadius: 'var(--radius-sm)',
+            borderRadius: 8,
             border: 'none',
             background: 'var(--mongo)',
             color: '#ffffff',
@@ -157,7 +159,7 @@ export default function SceneNavBar({
           onClick={onStep}
           style={{
             padding: `${spacing[150]}px ${spacing[300]}px`,
-            borderRadius: 'var(--radius-sm)',
+            borderRadius: 8,
             border: '1px solid var(--border-base)',
             background: 'var(--bg-surface)',
             color: 'var(--text-primary)',
@@ -175,12 +177,12 @@ export default function SceneNavBar({
           onClick={onReset}
           style={{
             padding: `${spacing[150]}px ${spacing[200]}px`,
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border-dim)',
+            borderRadius: 8,
+            border: 'none',
             background: 'transparent',
             color: 'var(--text-dim)',
             fontFamily: 'var(--font-mono)',
-            fontSize: 10,
+            fontSize: 11,
             cursor: 'pointer',
           }}
         >

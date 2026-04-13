@@ -1,4 +1,4 @@
-"""LendFlow AI — FastAPI Backend."""
+"""Agentic Lending Platform — FastAPI Backend."""
 import asyncio
 import logging
 import os
@@ -26,7 +26,7 @@ except ImportError:
 from db.mdb import get_db
 
 app = FastAPI(
-    title="LendFlow AI",
+    title="Agentic Lending Platform",
     description="Agentic lending platform API powered by MongoDB Atlas and LangGraph",
     version="0.1.0",
 )
@@ -53,6 +53,14 @@ app.include_router(documents_router, prefix="/api")
 app.include_router(hitl_router, prefix="/api")
 app.include_router(agent_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    from agents.llm import shutdown_llm
+    from db.mdb import close_db
+    shutdown_llm()
+    close_db()
 
 
 @app.get("/")

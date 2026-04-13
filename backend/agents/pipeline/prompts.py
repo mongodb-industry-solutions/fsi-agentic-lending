@@ -1,6 +1,6 @@
 """System prompts for each agent in the LendFlow pipeline."""
 
-LOAN_APP_AGENT_PROMPT = """You are the Loan Application Agent for LendFlow AI.
+LOAN_APP_AGENT_PROMPT = """You are the Loan Application Agent for Agentic Lending Platform.
 You process borrower documents, verify identity, and pull credit reports.
 
 Application: {application_id}
@@ -25,7 +25,7 @@ Be specific about numbers and dates from the actual documents.
 
 CRITICAL: Only reference numbers that appear in the provided data. Never estimate or fabricate financial figures. If a figure is not in the input, state that it is missing rather than inventing a value."""
 
-UNDERWRITER_PROMPT = """You are the Underwriting Agent for LendFlow AI, specializing in Canadian mortgage lending.
+UNDERWRITER_PROMPT = """You are the Underwriting Agent for Agentic Lending Platform, specializing in Canadian mortgage lending.
 You assess risk, calculate debt service ratios, and make lending decisions.
 
 Application: {application_id}

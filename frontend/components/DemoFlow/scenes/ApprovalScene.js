@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
+import Badge from '@leafygreen-ui/badge';
+import ExpandableCard from '@leafygreen-ui/expandable-card';
 import { spacing } from '@leafygreen-ui/tokens';
 import { APPROVAL_STEPS } from '../engine/demoScenes';
 import { mergeCanvasState } from '../engine/canvasUtils';
 import WorkflowCanvas from '../WorkflowCanvas';
 import AnnotationOverlay from '../AnnotationOverlay';
-import DataSourceStrip from '../DataSourceStrip';
-import PipelineTimeline from '../PipelineTimeline';
+import PipelineDrawer from '../PipelineDrawer';
 
 const CHECKPOINT_DATA = {
   checkpointId: 'cp-7g8h9i',
@@ -76,10 +77,9 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
   if (hitlApproved) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-        <DataSourceStrip sceneKey="approval" sceneStep={sceneStep} totalSteps={APPROVAL_STEPS.length} />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', flex: 1, minHeight: 0 }}>
+        <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: '1fr' }}>
           <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <div style={{ position: 'relative', flex: '1.4 1 0%', minHeight: 240, overflow: 'hidden' }}>
               <WorkflowCanvas
                 activeNodes={canvasState.activeNodes}
                 activeEdges={canvasState.activeEdges}
@@ -105,60 +105,54 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
                 </div>
               </div>
 
-              <div style={{ padding: spacing[400], background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', marginBottom: spacing[400] }}>
+              <div style={{ padding: spacing[400], background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border-dim)', marginBottom: spacing[400] }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: 10 }}>Loan Terms</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   {Object.entries(LOAN_TERMS).map(([key, val]) => (
                     <div key={key}>
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[50] }}>{key.replace(/([A-Z])/g, ' $1').trim()}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: spacing[50] }}>{key.replace(/([A-Z])/g, ' $1').trim()}</div>
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: key === 'apr' || key === 'monthlyPayment' ? 'var(--mongo)' : 'var(--text-primary)' }}>{val}</div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: 10 }}>Repayment Schedule Preview</div>
-              <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', overflow: 'hidden', marginBottom: spacing[400] }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', padding: '8px 10px', borderBottom: '1px solid var(--border-dim)', textTransform: 'uppercase' }}>
-                  <span>Month</span><span>Payment</span><span>Principal</span><span>Interest</span><span>Balance</span>
-                </div>
-                {AMORTIZATION.map((row) => (
-                  <div key={row.month} style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', fontSize: 10, padding: '7px 10px', borderBottom: '1px solid var(--border-dim)', fontFamily: 'var(--font-mono)' }}>
-                    <span>{row.month}</span>
-                    <span>{row.payment}</span>
-                    <span style={{ color: 'var(--mongo)' }}>{row.principal}</span>
-                    <span style={{ color: 'var(--text-dim)' }}>{row.interest}</span>
-                    <span>{row.balance}</span>
+              <ExpandableCard title="Repayment Schedule (300 months)" defaultOpen={false}>
+                <div style={{ background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border-dim)', overflow: 'hidden' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', padding: '8px 10px', borderBottom: '1px solid var(--border-dim)', textTransform: 'uppercase' }}>
+                    <span>Month</span><span>Payment</span><span>Principal</span><span>Interest</span><span>Balance</span>
                   </div>
-                ))}
-                <button type="button" style={{
-                  width: '100%', padding: `${spacing[150]}px 0`, fontSize: 10,
-                  color: 'var(--mongo)', fontWeight: 600, fontFamily: 'var(--font-mono)',
-                  background: 'none', border: 'none', borderTop: '1px solid var(--border-dim)',
-                  cursor: 'pointer',
-                }}>
-                  View full 300-month schedule →
-                </button>
-              </div>
-
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: 10 }}>Regulatory Disclosures</div>
-              {DISCLOSURES.map((d) => (
-                <div key={d.rule} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--border-dim)', fontSize: 12 }}>
-                  <span style={{ color: 'var(--success)', fontSize: 14 }}>✓</span>
-                  <span style={{ color: 'var(--text-secondary)' }}>{d.rule}</span>
+                  {AMORTIZATION.map((row) => (
+                    <div key={row.month} style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', fontSize: 11, padding: '7px 10px', borderBottom: '1px solid var(--border-dim)', fontFamily: 'var(--font-mono)' }}>
+                      <span>{row.month}</span>
+                      <span>{row.payment}</span>
+                      <span style={{ color: 'var(--mongo)' }}>{row.principal}</span>
+                      <span style={{ color: 'var(--text-dim)' }}>{row.interest}</span>
+                      <span>{row.balance}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </ExpandableCard>
+
+              <div style={{ marginTop: spacing[300] }}>
+                <ExpandableCard title="Regulatory Disclosures (4/4 compliant)" defaultOpen={false}>
+                  {DISCLOSURES.map((d) => (
+                    <div key={d.rule} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--border-dim)', fontSize: 12 }}>
+                      <span style={{ color: 'var(--success)', fontSize: 14 }}>✓</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{d.rule}</span>
+                    </div>
+                  ))}
+                </ExpandableCard>
+              </div>
             </div>
           </div>
 
-          <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: spacing[400] }}>
-            <PipelineTimeline
-              steps={APPROVAL_STEPS}
-              stepIndex={sceneStep}
-              onEntryHover={handleTimelineHover}
-              highlightNodeId={hoveredNode}
-            />
-          </div>
+          <PipelineDrawer
+            steps={APPROVAL_STEPS}
+            stepIndex={sceneStep}
+            onEntryHover={handleTimelineHover}
+            highlightNodeId={hoveredNode}
+          />
         </div>
       </div>
     );
@@ -167,10 +161,9 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
   if (hitlDeclined) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-        <DataSourceStrip sceneKey="approval" sceneStep={sceneStep} totalSteps={APPROVAL_STEPS.length} />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', flex: 1, minHeight: 0 }}>
+        <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: '1fr' }}>
           <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <div style={{ position: 'relative', flex: '1.4 1 0%', minHeight: 240, overflow: 'hidden' }}>
               <WorkflowCanvas
                 activeNodes={canvasState.activeNodes}
                 activeEdges={canvasState.activeEdges}
@@ -217,14 +210,12 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
               </div>
             </div>
           </div>
-          <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: spacing[400] }}>
-            <PipelineTimeline
-              steps={APPROVAL_STEPS}
-              stepIndex={sceneStep}
-              onEntryHover={handleTimelineHover}
-              highlightNodeId={hoveredNode}
-            />
-          </div>
+          <PipelineDrawer
+            steps={APPROVAL_STEPS}
+            stepIndex={sceneStep}
+            onEntryHover={handleTimelineHover}
+            highlightNodeId={hoveredNode}
+          />
         </div>
       </div>
     );
@@ -232,10 +223,9 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <DataSourceStrip sceneKey="approval" sceneStep={sceneStep} totalSteps={APPROVAL_STEPS.length} />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', flex: 1, minHeight: 0 }}>
+      <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: '1fr' }}>
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ position: 'relative', flex: '1.4 1 0%', minHeight: 240, overflow: 'hidden' }}>
             <WorkflowCanvas
               activeNodes={canvasState.activeNodes}
               activeEdges={canvasState.activeEdges}
@@ -253,31 +243,7 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
             totalSteps={APPROVAL_STEPS.length}
           />
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: spacing[400] }}>
-            <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', marginBottom: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[200] }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12 }}>Routing Decision</div>
-              <span style={{ fontSize: 9, fontWeight: 600, padding: `${spacing[50]}px ${spacing[200]}px`, borderRadius: 4, background: 'var(--mongo-dim)', color: 'var(--mongo)' }}>
-                Auto-decisioning rate: 70–83%
-              </span>
-            </div>
-            {[
-              { tier: 1, label: 'Low Risk (score > 85)', action: 'Auto-approve — no human review', active: false },
-              { tier: 2, label: 'Medium Risk (score 60–85)', action: 'Junior officer review', active: true },
-              { tier: 3, label: 'High Risk (score < 60)', action: 'Senior underwriter escalation', active: false },
-            ].map((t) => (
-              <div key={t.tier} style={{ display: 'flex', alignItems: 'center', gap: spacing[200], padding: `${spacing[150]}px ${spacing[200]}px`, borderRadius: 'var(--radius-sm)', background: t.active ? 'var(--hitl-amber-dim)' : 'transparent', border: t.active ? '1px solid var(--hitl-amber)' : '1px solid transparent', marginBottom: spacing[100] }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: t.active ? 'var(--hitl-amber)' : 'var(--text-dim)', flexShrink: 0 }}>
-                  Tier {t.tier}
-                </span>
-                <span style={{ fontSize: 10, color: 'var(--text-secondary)', flex: 1 }}>{t.label}</span>
-                <span style={{ fontSize: 10, fontWeight: 600, color: t.active ? 'var(--hitl-amber)' : 'var(--text-dim)' }}>
-                  {t.action} {t.active && '← THIS APPLICATION'}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ padding: 28, background: 'var(--bg-surface)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border-base)', boxShadow: '0 12px 40px rgba(0,0,0,0.06)' }}>
+          <div style={{ padding: spacing[4], background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border-base)', boxShadow: '0 4px 12px rgba(20, 23, 26, 0.06)' }}>
             <div style={{ padding: '10px 14px', background: 'var(--hitl-amber-dim)', borderRadius: 'var(--radius-md)', marginBottom: spacing[500], display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 18 }}>💾</span>
               <div>
@@ -288,16 +254,15 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
               </div>
             </div>
 
-            <div style={{ marginBottom: spacing[500] }}>
-              <div style={{ padding: `${spacing[150]}px ${spacing[300]}px`, background: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)', borderRadius: 20, fontSize: 12, fontWeight: 700, display: 'inline-block', marginBottom: spacing[300] }}>
-                ⏸ Human Review Required
+            <div style={{ marginBottom: spacing[400] }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: spacing[200], marginBottom: spacing[200] }}>
+                <div style={{ padding: `${spacing[150]}px ${spacing[300]}px`, background: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)', borderRadius: 20, fontSize: 12, fontWeight: 700, display: 'inline-block' }}>
+                  ⏸ Human Review Required
+                </div>
+                <Badge variant="yellow">Tier 2 — Officer Review</Badge>
               </div>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18 }}>LangGraph interrupt() triggered</div>
               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: spacing[100] }}>{PAYLOAD.triggerReason}</div>
-            </div>
-
-            <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6, padding: 10, background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)', marginBottom: spacing[400] }}>
-              The agent workflow is paused at this node. All state is persisted to MongoDB via MongoDBSaver. The loan officer reviews and decides.
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: spacing[400], marginBottom: spacing[400] }}>
@@ -329,19 +294,7 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
               ))}
             </div>
 
-            <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', marginBottom: spacing[400] }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: spacing[200] }}>Generated Loan Terms</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: spacing[200], fontSize: 11 }}>
-                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>TYPE</div><div style={{ fontWeight: 600 }}>5yr Fixed (25yr)</div></div>
-                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>APR</div><div style={{ fontWeight: 600, color: 'var(--mongo)' }}>4.89%</div></div>
-                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>MONTHLY</div><div style={{ fontWeight: 600 }}>$4,047</div></div>
-                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>TOTAL INTEREST</div><div style={{ fontWeight: 600 }}>$514,100</div></div>
-                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>FIRST PAYMENT</div><div style={{ fontWeight: 600 }}>May 1, 2026</div></div>
-                <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>MATURITY</div><div style={{ fontWeight: 600 }}>Apr 2051</div></div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: spacing[400] }}>
+            <div style={{ display: 'flex', gap: spacing[300] }}>
               <button type="button" onClick={onApprove} style={{ flex: 1, padding: 14, borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--mongo)', color: '#ffffff', fontFamily: 'var(--font-display)', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
                 ✓ Approve Loan
               </button>
@@ -374,14 +327,12 @@ export default function ApprovalScene({ sceneStep, hitlApproved, hitlDeclined, o
           </div>
         </div>
 
-        <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: spacing[400] }}>
-          <PipelineTimeline
-            steps={APPROVAL_STEPS}
-            stepIndex={sceneStep}
-            onEntryHover={handleTimelineHover}
-            highlightNodeId={hoveredNode}
-          />
-        </div>
+        <PipelineDrawer
+          steps={APPROVAL_STEPS}
+          stepIndex={sceneStep}
+          onEntryHover={handleTimelineHover}
+          highlightNodeId={hoveredNode}
+        />
       </div>
     </div>
   );

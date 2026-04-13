@@ -19,7 +19,7 @@ load_dotenv()
 
 from db.mdb import MongoDBConnector
 from services.extraction_service import extract_from_pdf, EXTRACTION_PROMPTS
-from services.embedding_service import embed_text, embed_texts
+from services.embedding_service import embed_texts, embed_document
 
 # PDF directory
 PDF_DIR = Path(__file__).resolve().parent.parent.parent / "docs" / "synthetic data"
@@ -274,20 +274,24 @@ def main():
             extraction_data[doc_type] = extracted
 
             # Store in documents collection
-            text_for_embedding = extracted.get("text_summary", json.dumps(extracted, indent=2))
+            text_for_display = extracted.get("text_summary", json.dumps(extracted, indent=2))
+            embedding = None
+            embedding_pages = 0
             try:
-                embedding = embed_text(text_for_embedding, input_type="document")
+                embedding, embedding_pages = embed_document(pdf_path)
+                print(f"  Multimodal embedding: {embedding_pages} pages")
             except Exception as e:
-                print(f"  Warning: embedding failed: {e}")
-                embedding = None
+                print(f"  Warning: multimodal embedding failed: {e}")
 
             doc_record = {
                 "application_id": APPLICATION_ID,
                 "doc_type": doc_type,
                 "filename": pdf_path.name,
-                "extracted_text": text_for_embedding,
+                "extracted_text": text_for_display,
                 "structured_data": extracted,
                 "embedding": embedding,
+                "embedding_type": "multimodal" if embedding else None,
+                "embedding_pages": embedding_pages if embedding else 0,
                 "status": "parsed",
                 "created_at": datetime.now(timezone.utc),
             }

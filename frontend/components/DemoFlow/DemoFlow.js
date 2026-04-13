@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useDemoEngine } from '../../lib/hooks/useDemoEngine';
 import SceneNavBar from './SceneNavBar';
 import TechRecap from './TechRecap';
-import TechBreadcrumb from '../educational/TechBreadcrumb';
 
 import OriginationScene from './scenes/OriginationScene';
 import DecisioningScene from './scenes/DecisioningScene';
@@ -128,9 +127,8 @@ export default function Demo() {
         onStep={engine.stepForward}
         onStepBack={engine.stepBackward}
         onReset={engine.reset}
+        activeFeatures={engine.activeFeatures}
       />
-
-      <TechBreadcrumb activatedCapabilities={engine.activeFeatures} />
 
       <div
         className="scene-content"

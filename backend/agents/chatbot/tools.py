@@ -8,7 +8,7 @@ import logging
 from datetime import datetime, timezone
 
 from db.mdb import get_db
-from agents.pipeline.tools import search_policies, BORROWER_SAFE_PROJECTION
+from services.vector_search import search_policies, BORROWER_SAFE_PROJECTION
 
 logger = logging.getLogger(__name__)
 

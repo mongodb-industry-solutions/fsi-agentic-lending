@@ -320,18 +320,6 @@ export default function WorkflowCanvas({
         ctx.fillRect(0, 0, W, H);
       }
 
-      // Subtle grid
-      ctx.strokeStyle = theme.grid;
-      ctx.lineWidth = 0.3;
-      ctx.globalAlpha = 0.35;
-      for (let x = 0; x < W; x += 40) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-      }
-      for (let y = 0; y < H; y += 40) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-      }
-      ctx.globalAlpha = 1;
-
       // Stage column labels
       STAGE_COLUMNS.forEach((col) => {
         const cx = col.px * W;
@@ -438,9 +426,9 @@ export default function WorkflowCanvas({
 
         // Flow particles on active non-completed edges
         if (isActive && !bothCompleted && ctx.globalAlpha > 0.3) {
-          const particleCount = (key.includes('aggregation') || key.includes('vectorSearch')) ? 2 : 1;
+          const particleCount = 1;
           for (let p = 0; p < particleCount; p++) {
-            const offset = p * (1 / particleCount);
+            const offset = 0;
             const t = ((now % 1400) / 1400 + offset) % 1;
             const pt = quadPoint(pa.x, pa.y, mx, my, pb.x, pb.y, t);
             ctx.beginPath();
@@ -504,7 +492,7 @@ export default function WorkflowCanvas({
         if ((isActive || isPulsing || isHovered || isHighlighted) && !isCompleted) {
           ctx.shadowColor = n.color + (isPulsing ? '66' : '33');
           ctx.shadowBlur = isPulsing
-            ? 16 + Math.sin(now / 180) * 6
+            ? 16 + Math.sin(now / 300) * 2
             : isHovered || isHighlighted ? 12 : 8;
         }
 

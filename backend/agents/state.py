@@ -1,4 +1,5 @@
 """LendFlow agent state definition for LangGraph."""
+from datetime import datetime, timezone
 from typing import TypedDict, Annotated, Literal, Optional
 from langgraph.graph.message import add_messages
 
@@ -26,6 +27,9 @@ class LendFlowState(TypedDict):
     risk_tier: Optional[str]
     policy_citations: list[str]
 
+    # Underwriting — LLM structured output
+    structured_analysis: Optional[dict]
+
     # Decision
     decision: Optional[str]  # approve / decline / escalate
     decision_reasoning: str
@@ -50,3 +54,49 @@ class LendFlowState(TypedDict):
     # HITL observe mode tracking
     hitl_approved_nodes: list[str]
     pending_node: Optional[str]
+
+
+_STATE_DEFAULTS: dict = {
+    "messages": list,
+    "application_id": str,
+    "current_agent": lambda: "supervisor",
+    "documents_verified": lambda: False,
+    "document_count": lambda: 0,
+    "extraction_summary": lambda: "",
+    "credit_pulled": lambda: False,
+    "primary_credit_score": lambda: None,
+    "co_applicant_credit_score": lambda: None,
+    "gds_ratio": lambda: None,
+    "tds_ratio": lambda: None,
+    "risk_score": lambda: None,
+    "risk_tier": lambda: None,
+    "policy_citations": list,
+    "structured_analysis": lambda: None,
+    "decision": lambda: None,
+    "decision_reasoning": lambda: "",
+    "officer_notes": lambda: None,
+    "autonomy_level": str,
+    "last_error": lambda: None,
+    "retry_count": lambda: 0,
+    "started_at": lambda: datetime.now(timezone.utc).isoformat(),
+    "completed_at": lambda: None,
+    "stress_gds": lambda: None,
+    "stress_tds": lambda: None,
+    "stress_rate": lambda: None,
+    "hitl_approved_nodes": list,
+    "pending_node": lambda: None,
+}
+
+
+def make_initial_state(application_id: str, autonomy_level: str = "bounded") -> dict:
+    """Build a complete initial state dict for a new pipeline run.
+
+    Derives keys from LendFlowState so new fields only need to be added in
+    ``_STATE_DEFAULTS`` — callers never go out of sync.
+    """
+    state: dict = {}
+    for key, factory in _STATE_DEFAULTS.items():
+        state[key] = factory()
+    state["application_id"] = application_id
+    state["autonomy_level"] = autonomy_level
+    return state

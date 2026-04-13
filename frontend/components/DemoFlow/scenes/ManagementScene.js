@@ -5,8 +5,7 @@ import { MANAGEMENT_STEPS } from '../engine/demoScenes';
 import { mergeCanvasState } from '../engine/canvasUtils';
 import WorkflowCanvas from '../WorkflowCanvas';
 import AnnotationOverlay from '../AnnotationOverlay';
-import DataSourceStrip from '../DataSourceStrip';
-import PipelineTimeline from '../PipelineTimeline';
+import PipelineDrawer from '../PipelineDrawer';
 import { apiGet } from '../../../lib/api';
 import { spacing } from '@leafygreen-ui/tokens';
 
@@ -18,18 +17,9 @@ const DEFAULT_STATS = [
 ];
 
 const EWS_SIGNALS = [
+  { signal: 'Credit utilization trend', status: 'red', detail: 'Rising 3 consecutive months', icon: '⚠️' },
   { signal: 'Payment pattern change', status: 'amber', detail: '2 late in 90 days', icon: '⚠️' },
   { signal: 'Income stability', status: 'green', detail: 'Stable — verified monthly', icon: '✓' },
-  { signal: 'Credit utilization trend', status: 'red', detail: 'Rising 3 consecutive months', icon: '⚠️' },
-  { signal: 'Behavioral score drift', status: 'amber', detail: 'PSI 0.18 (threshold: 0.20)', icon: '⚠️' },
-  { signal: 'External event', status: 'green', detail: 'No adverse events detected', icon: '✓' },
-];
-
-const DEFAULT_MONTHLY_DATA = [
-  { month: 'Jan', value: 42 }, { month: 'Feb', value: 38 }, { month: 'Mar', value: 45 },
-  { month: 'Apr', value: 52 }, { month: 'May', value: 48 }, { month: 'Jun', value: 55 },
-  { month: 'Jul', value: 61 }, { month: 'Aug', value: 58 }, { month: 'Sep', value: 63 },
-  { month: 'Oct', value: 59 }, { month: 'Nov', value: 67 }, { month: 'Dec', value: 72 },
 ];
 
 const EVENT_TEMPLATES = [
@@ -45,12 +35,10 @@ const EVENT_TEMPLATES = [
 ];
 
 const INTERVENTION_STEPS = [
-  { label: 'EWS Alert', detail: 'Payment anomaly detected (Day 47 late, 2nd occurrence in 90 days)', icon: '🚨', color: 'var(--danger)' },
-  { label: 'Propensity-to-Pay', detail: 'Score: 0.73 (moderate risk) — Atlas Vector Search on 500M+ payment patterns', icon: '🎯', color: 'var(--voyage)' },
-  { label: 'Similar Borrowers', detail: '82% resolved with modification, 12% self-cured, 6% escalated', icon: '👥', color: 'var(--agent-cyan)' },
-  { label: 'Recommended Action', detail: 'Proactive restructuring offer', icon: '💡', color: 'var(--mongo)' },
-  { label: 'Multi-Channel Outreach', detail: 'SMS sent, email queued, portal notification active', icon: '📱', color: 'var(--success)' },
-  { label: 'Offer Generated', detail: 'Rate reduction 4.89% → 4.29% for 6 months, payment $4,047 → $3,840', icon: '📝', color: 'var(--mongo)' },
+  { label: 'EWS Alert', detail: 'Payment anomaly detected (Day 47 late, 2nd occurrence)', icon: '🚨', color: 'var(--danger)' },
+  { label: 'Propensity-to-Pay', detail: 'Score: 0.73 — Atlas Vector Search on 500M+ patterns', icon: '🎯', color: 'var(--voyage)' },
+  { label: 'Similar Borrowers', detail: '82% resolved with modification, 12% self-cured', icon: '👥', color: 'var(--agent-cyan)' },
+  { label: 'Offer Generated', detail: 'Rate 4.89% → 4.29% for 6 months, payment $4,047 → $3,840', icon: '📝', color: 'var(--mongo)' },
 ];
 
 function AnimatedStat({ stat }) {
@@ -78,32 +66,6 @@ function AnimatedStat({ stat }) {
   );
 }
 
-const BAR_HEIGHT_PX = 70;
-
-function BarChart({ data, label, badge }) {
-  const maxVal = Math.max(...data.map((d) => d.value));
-  return (
-    <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11 }}>{label}</div>
-        {badge && <span style={{ fontSize: 8, fontWeight: 600, padding: `${spacing[50]}px ${spacing[150]}px`, borderRadius: 4, background: 'var(--voyage-dim)', color: 'var(--voyage)' }}>{badge}</span>}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: spacing[50], height: BAR_HEIGHT_PX }}>
-        {data.map((d, i) => {
-          const h = (d.value / maxVal) * BAR_HEIGHT_PX;
-          return (
-            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
-              <div style={{ fontSize: 7, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--mongo)', marginBottom: 1 }}>{d.value}</div>
-              <div style={{ width: '100%', height: h, background: 'var(--mongo)', borderRadius: '2px 2px 0 0', opacity: 0.6, transition: 'height 0.6s ease-out', minHeight: 3 }} />
-              <div style={{ fontSize: 7, color: 'var(--text-dim)', whiteSpace: 'nowrap', marginTop: 3 }}>{d.month}</div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function StatusDot({ status }) {
   const colors = { green: 'var(--success)', amber: 'var(--hitl-amber)', red: 'var(--danger)' };
   return (
@@ -118,7 +80,7 @@ function StatusDot({ status }) {
 function EWSPanel({ highlightAlert, signals }) {
   const data = signals || EWS_SIGNALS;
   return (
-    <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', animation: 'slideDown 0.3s ease-out' }}>
+    <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', animation: 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[200] }}>
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12 }}>Early Warning System</div>
         <div style={{ display: 'flex', gap: spacing[100], alignItems: 'center' }}>
@@ -138,7 +100,7 @@ function EWSPanel({ highlightAlert, signals }) {
               display: 'flex', alignItems: 'center', gap: spacing[200], padding: `${spacing[150]}px ${spacing[200]}px`,
               borderBottom: '1px solid var(--border-dim)',
               background: isHighlighted ? (s.status === 'red' ? 'rgba(239,68,68,0.06)' : 'rgba(245,158,11,0.06)') : 'transparent',
-              transition: 'background 0.3s',
+              transition: 'background 220ms cubic-bezier(0.33, 1, 0.68, 1)',
             }}>
               <StatusDot status={s.status} />
               <div style={{ flex: 1 }}>
@@ -157,31 +119,12 @@ function EWSPanel({ highlightAlert, signals }) {
   );
 }
 
-function PSIHealthIndicator() {
-  return (
-    <div style={{ padding: 10, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', animation: 'slideDown 0.3s ease-out' }}>
-      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, marginBottom: spacing[150] }}>Model Health — PSI Monitor</div>
-      <div style={{ display: 'flex', gap: spacing[200], alignItems: 'center' }}>
-        <div style={{ flex: 1, height: 8, background: 'var(--bg-raised)', borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
-          <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: '90%', background: 'linear-gradient(90deg, var(--success), var(--hitl-amber))', borderRadius: 4 }} />
-          <div style={{ position: 'absolute', left: '90%', top: -2, width: 2, height: 12, background: 'var(--danger)' }} title="Threshold" />
-        </div>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: 'var(--hitl-amber)' }}>PSI: 0.18</span>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'var(--text-dim)', marginTop: 3 }}>
-        <span>Stable (0.0)</span>
-        <span style={{ color: 'var(--danger)' }}>Retrain (0.20)</span>
-      </div>
-    </div>
-  );
-}
-
 function RenewalInterventionCard({ sceneStep }) {
-  const visibleSteps = Math.min(sceneStep >= 4 ? 6 : sceneStep >= 3 ? 4 : sceneStep >= 2 ? 2 : 0, INTERVENTION_STEPS.length);
+  const visibleSteps = Math.min(sceneStep >= 3 ? 4 : sceneStep >= 2 ? 2 : 0, INTERVENTION_STEPS.length);
   if (visibleSteps === 0) return null;
 
   return (
-    <div style={{ padding: 14, background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', border: '2px solid var(--voyage)', animation: 'sceneEnter 0.4s ease-out' }}>
+    <div style={{ padding: 14, background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', border: '2px solid var(--voyage)', animation: 'sceneEnter 220ms cubic-bezier(0.33, 1, 0.68, 1)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: spacing[200], marginBottom: spacing[300] }}>
         <span style={{ fontSize: 18 }}>🔄</span>
         <div>
@@ -193,7 +136,7 @@ function RenewalInterventionCard({ sceneStep }) {
       <div style={{ position: 'relative', paddingLeft: spacing[500] }}>
         <div style={{ position: 'absolute', left: 8, top: 0, bottom: 0, width: 2, background: 'var(--border-dim)' }} />
         {INTERVENTION_STEPS.slice(0, visibleSteps).map((step, i) => (
-          <div key={step.label} style={{ position: 'relative', paddingLeft: spacing[500], paddingBottom: 10, animation: 'slideDown 0.3s ease-out' }}>
+          <div key={step.label} style={{ position: 'relative', paddingLeft: spacing[500], paddingBottom: 10, animation: 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' }}>
             <div style={{
               position: 'absolute', left: 0, top: 4, width: 16, height: 16, borderRadius: '50%',
               background: 'var(--bg-surface)', border: `2px solid ${step.color}`, zIndex: 1,
@@ -207,43 +150,10 @@ function RenewalInterventionCard({ sceneStep }) {
         ))}
       </div>
 
-      {visibleSteps >= 6 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: spacing[150], marginTop: spacing[150] }}>
-          <div style={{ padding: `${spacing[150]}px ${spacing[200]}px`, background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
-            <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: spacing[50] }}>ORIGINAL</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--text-dim)', textDecoration: 'line-through' }}>4.89%</div>
-          </div>
-          <div style={{ padding: `${spacing[150]}px ${spacing[200]}px`, background: 'var(--mongo-dim)', borderRadius: 'var(--radius-sm)', textAlign: 'center', border: '1px solid var(--mongo)' }}>
-            <div style={{ fontSize: 8, color: 'var(--mongo)', marginBottom: spacing[50] }}>NEW RATE</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 800, color: 'var(--mongo)' }}>4.29%</div>
-          </div>
-          <div style={{ padding: `${spacing[150]}px ${spacing[200]}px`, background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
-            <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: spacing[50] }}>PAYMENT</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--success)' }}>$3,840</div>
-          </div>
-        </div>
-      )}
-
-      <div style={{ marginTop: spacing[200], fontSize: 9, color: 'var(--text-dim)', display: 'flex', gap: spacing[150] }}>
+      <div style={{ marginTop: spacing[200], fontSize: 11, color: 'var(--text-dim)', display: 'flex', gap: spacing[150] }}>
         <span style={{ padding: `${spacing[50]}px ${spacing[150]}px`, background: 'var(--voyage-dim)', color: 'var(--voyage)', borderRadius: 3 }}>Vector Search</span>
         <span style={{ padding: `${spacing[50]}px ${spacing[150]}px`, background: 'var(--bg-raised)', color: 'var(--agent-cyan)', borderRadius: 3 }}>Time Series</span>
         <span style={{ padding: `${spacing[50]}px ${spacing[150]}px`, background: 'var(--bg-raised)', color: 'var(--success)', borderRadius: 3 }}>Change Streams</span>
-      </div>
-    </div>
-  );
-}
-
-function CrossLifecycleFeedback() {
-  return (
-    <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--mongo)', animation: 'slideDown 0.3s ease-out' }}>
-      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, color: 'var(--mongo)', marginBottom: spacing[150] }}>
-        Cross-Lifecycle Feedback Loop
-      </div>
-      <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: spacing[150] }}>
-        This borrower&apos;s payment pattern data will refine the Underwriting Agent&apos;s risk model for future applicants with similar profiles.
-      </div>
-      <div style={{ fontSize: 9, color: 'var(--text-dim)', fontStyle: 'italic' }}>
-        Collections data → Underwriting model improvement: the gap no vendor has filled.
       </div>
     </div>
   );
@@ -278,7 +188,7 @@ function LiveEventFeed({ sceneStep, backendEvents }) {
       setEvents((prev) => [{ id, ...tmpl, text: msg, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 20));
     };
     addEvent(); addEvent(); addEvent();
-    const interval = setInterval(addEvent, 1800);
+    const interval = setInterval(addEvent, 3500);
     return () => clearInterval(interval);
   }, [sceneStep, backendEvents]);
 
@@ -291,9 +201,9 @@ function LiveEventFeed({ sceneStep, backendEvents }) {
           Streaming
         </span>
       </div>
-      <div style={{ maxHeight: 120, overflowY: 'auto' }}>
+      <div style={{ maxHeight: 80, overflowY: 'auto' }}>
         {events.map((e) => (
-          <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: spacing[150], padding: `${spacing[100]}px 0`, borderBottom: '1px solid var(--border-dim)', fontSize: 10, animation: 'slideDown 0.3s ease-out' }}>
+          <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: spacing[150], padding: `${spacing[100]}px 0`, borderBottom: '1px solid var(--border-dim)', fontSize: 10, animation: 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' }}>
             <span style={{ fontSize: 11, flexShrink: 0 }}>{e.icon}</span>
             <span style={{ flex: 1, color: e.type === 'agent' ? 'var(--voyage)' : 'var(--text-secondary)', fontWeight: e.type === 'agent' ? 600 : 400 }}>{e.text}</span>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)', flexShrink: 0 }}>{e.time}</span>
@@ -307,16 +217,13 @@ function LiveEventFeed({ sceneStep, backendEvents }) {
 export default function ManagementScene({ sceneStep, currentStepData }) {
   const started = sceneStep >= 0;
   const showEWS = sceneStep >= 0;
-  const showPSI = sceneStep >= 1;
   const showAlertHighlight = sceneStep >= 2;
   const showRenewalAgent = sceneStep >= 2;
-  const showCrossLifecycle = sceneStep >= 4;
 
   const [hoveredNode, setHoveredNode] = useState(null);
   const [timelineHighlight, setTimelineHighlight] = useState(null);
 
   const [liveStats, setLiveStats] = useState(null);
-  const [liveMonthly, setLiveMonthly] = useState(null);
   const [ewsSignals, setEwsSignals] = useState(EWS_SIGNALS);
   const [liveEvents, setLiveEvents] = useState(null);
 
@@ -326,25 +233,13 @@ export default function ManagementScene({ sceneStep, currentStepData }) {
 
     async function fetchPortfolioData() {
       try {
-        const [statsRes, paymentsRes] = await Promise.all([
+        const [statsRes] = await Promise.all([
           apiGet('/portfolio/stats'),
-          apiGet('/portfolio/payments?loan_id=L-00001'),
         ]);
         if (cancelled) return;
 
         if (statsRes && statsRes.active_loans !== undefined) {
           setLiveStats(statsRes);
-        }
-        if (Array.isArray(paymentsRes) && paymentsRes.length > 0) {
-          const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-          const mapped = paymentsRes
-            .slice()
-            .reverse()
-            .map((p) => {
-              const d = new Date(p.timestamp);
-              return { month: MONTH_NAMES[d.getMonth()], value: Math.round(p.amount / 100) };
-            });
-          setLiveMonthly(mapped);
         }
       } catch {
         // Keep fallback data on error
@@ -385,11 +280,9 @@ export default function ManagementScene({ sceneStep, currentStepData }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-      <DataSourceStrip sceneKey="management" sceneStep={sceneStep} totalSteps={MANAGEMENT_STEPS.length} />
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: '1fr' }}>
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ position: 'relative', flex: '1.4 1 0%', minHeight: 240, overflow: 'hidden' }}>
             {started && (
               <WorkflowCanvas
                 activeNodes={canvasState.activeNodes}
@@ -409,7 +302,7 @@ export default function ManagementScene({ sceneStep, currentStepData }) {
             totalSteps={MANAGEMENT_STEPS.length}
           />
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: spacing[300], display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: spacing[200] }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: spacing[200] }}>
               {(liveStats
                 ? [
                     { label: 'Active Loans', value: liveStats.active_loans, format: (v) => v.toLocaleString('en-US'), color: 'var(--mongo)' },
@@ -422,24 +315,19 @@ export default function ManagementScene({ sceneStep, currentStepData }) {
             </div>
 
             {showEWS && <EWSPanel highlightAlert={showAlertHighlight} signals={ewsSignals} />}
-            {showPSI && <PSIHealthIndicator />}
 
-            <BarChart data={liveMonthly || DEFAULT_MONTHLY_DATA} label="Monthly Payment Volume ($M)" badge="Time Series &middot; $setWindowFields" />
             <LiveEventFeed sceneStep={sceneStep} backendEvents={liveEvents} />
 
             {showRenewalAgent && <RenewalInterventionCard sceneStep={sceneStep} />}
-            {showCrossLifecycle && <CrossLifecycleFeedback />}
           </div>
         </div>
 
-        <div style={{ borderLeft: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-base)', padding: spacing[400] }}>
-          <PipelineTimeline
-            steps={MANAGEMENT_STEPS}
-            stepIndex={sceneStep}
-            onEntryHover={handleTimelineHover}
-            highlightNodeId={hoveredNode}
-          />
-        </div>
+        <PipelineDrawer
+          steps={MANAGEMENT_STEPS}
+          stepIndex={sceneStep}
+          onEntryHover={handleTimelineHover}
+          highlightNodeId={hoveredNode}
+        />
       </div>
     </div>
   );

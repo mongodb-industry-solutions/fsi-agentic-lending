@@ -281,6 +281,8 @@ Risk Score: {risk_score}/100
 Risk Tier: {risk_tier}
 """
 
+    from bedrock.anthropic_chat_completions import parse_tool_response, ToolResponseError
+
     try:
         response = llm.converse_with_tools(
             messages=[{"role": "user", "content": [{"text": analysis_input}]}],
@@ -288,20 +290,22 @@ Risk Tier: {risk_tier}
             tools=[UNDERWRITING_ANALYSIS_TOOL],
         )
 
-        content = response.get("output", {}).get("message", {}).get("content", [])
-        tool_use = next((block for block in content if "toolUse" in block), None)
+        try:
+            structured_analysis = parse_tool_response(response, expected_tool_name="underwriting_analysis")
+        except ToolResponseError as te:
+            log_agent_activity(app_id, "underwriter", "tool_parse_warning", str(te)[:300])
+            structured_analysis = None
 
-        if tool_use:
-            structured_analysis = tool_use["toolUse"]["input"]
+        if structured_analysis:
             analysis = structured_analysis.get("narrative_summary", "")
             log_agent_activity(app_id, "underwriter", "structured_analysis",
                 f"Confidence: {structured_analysis.get('confidence', 'N/A')}, "
                 f"Risk factors: {len(structured_analysis.get('risk_factors', []))}, "
                 f"Mitigating: {len(structured_analysis.get('mitigating_factors', []))}")
         else:
+            content = response.get("output", {}).get("message", {}).get("content", [])
             text_block = next((block for block in content if "text" in block), None)
             analysis = text_block.get("text", "") if text_block else ""
-            structured_analysis = None
 
     except RuntimeError as e:
         log_agent_activity(app_id, "underwriter", "llm_error", str(e)[:500])

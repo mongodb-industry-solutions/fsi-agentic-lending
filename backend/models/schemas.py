@@ -50,11 +50,16 @@ class ApplicationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class HITLOverrides(BaseModel):
+    risk_tier: Optional[str] = Field(None, pattern=r"^(A|B\+|B|C|D)$")
+    loan_amount: Optional[float] = Field(None, gt=0)
+
+
 class HITLDecisionRequest(BaseModel):
     action: str = Field(..., pattern="^(approve|decline|modify_and_continue)$")
     officer_notes: str = ""
     conditions: list[str] = []
-    overrides: dict = {}
+    overrides: HITLOverrides = HITLOverrides()
     officer_id: str = ""
 
 
