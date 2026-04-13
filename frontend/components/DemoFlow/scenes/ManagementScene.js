@@ -326,8 +326,8 @@ export default function ManagementScene({ sceneStep, currentStepData }) {
     async function fetchPortfolioData() {
       try {
         const [statsRes, paymentsRes] = await Promise.all([
-          apiGet('/api/backend/portfolio/stats'),
-          apiGet('/api/backend/portfolio/payments?loan_id=L-00001'),
+          apiGet('/portfolio/stats'),
+          apiGet('/portfolio/payments?loan_id=L-00001'),
         ]);
         if (cancelled) return;
 
@@ -351,7 +351,7 @@ export default function ManagementScene({ sceneStep, currentStepData }) {
 
       // Fetch EWS signals
       try {
-        const ewsRes = await apiGet('/api/backend/portfolio/ews?loan_id=L-00001');
+        const ewsRes = await apiGet('/portfolio/ews?loan_id=L-00001');
         if (!cancelled && ewsRes && Array.isArray(ewsRes) && ewsRes.length > 0) {
           setEwsSignals(ewsRes);
         }
@@ -361,7 +361,7 @@ export default function ManagementScene({ sceneStep, currentStepData }) {
 
       // Fetch recent events
       try {
-        const eventsRes = await apiGet('/api/backend/portfolio/events?limit=20');
+        const eventsRes = await apiGet('/portfolio/events?limit=20');
         if (!cancelled && eventsRes && Array.isArray(eventsRes) && eventsRes.length > 0) {
           setLiveEvents(eventsRes);
         }

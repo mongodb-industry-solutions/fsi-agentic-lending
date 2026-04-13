@@ -27,7 +27,6 @@ const NODES = {
   checkpoint:    { label: 'Checkpointer',         icon: '💾', color: '#d97706', w: 110, h: 34, type: NODE_TYPES.storage },
   memory:        { label: 'Memory Store',         icon: '🧠', color: '#00684A', w: 110, h: 34, type: NODE_TYPES.storage },
   mongoAtlas:    { label: 'MongoDB Atlas',        icon: '🍃', color: '#00684A', w: 140, h: 46, type: NODE_TYPES.storage },
-  langsmith:     { label: 'LangSmith',            icon: '🔗', color: '#64748b', w: 96,  h: 30, type: NODE_TYPES.output },
   decision:      { label: 'DECISION',             icon: '✅', color: '#00684A', w: 100, h: 42, type: NODE_TYPES.gate },
   fundingEngine: { label: 'Funding Engine',       icon: '💰', color: '#059669', w: 114, h: 38, type: NODE_TYPES.output },
   ledger:        { label: 'Loan Ledger',          icon: '📒', color: '#059669', w: 100, h: 34, type: NODE_TYPES.storage },
@@ -53,8 +52,6 @@ const EDGES = [
   ['timeSeries', 'mongoAtlas'],
   ['checkpoint', 'mongoAtlas'],
   ['memory', 'mongoAtlas'],
-  ['supervisor', 'langsmith'],
-  ['underwriter', 'langsmith'],
   ['hitlGate', 'checkpoint'],
   ['decision', 'fundingEngine'],
   ['fundingEngine', 'ledger'],
@@ -123,7 +120,6 @@ const PIPELINE_LAYOUT = {
 
   mongoAtlas:    { px: 0.50, py: 0.92 },
   memory:        { px: 0.44, py: 0.50 },
-  langsmith:     { px: 0.19, py: 0.08 },
 };
 
 if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {

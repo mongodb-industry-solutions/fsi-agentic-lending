@@ -69,7 +69,11 @@ async def portfolio_ews(loan_id: str = None):
     """Early Warning System signals from payment time-series analysis."""
     from agents.tools import get_ews_signals
     if not loan_id:
-        return []
+        db = get_db()
+        sample = db["payments"].find_one({}, {"loan_id": 1})
+        if not sample:
+            return []
+        loan_id = sample["loan_id"]
     result = await asyncio.to_thread(get_ews_signals, loan_id)
     return result
 

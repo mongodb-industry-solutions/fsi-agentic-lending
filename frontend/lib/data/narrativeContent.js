@@ -1,6 +1,6 @@
 /**
  * Structured narrative copy from Challenge, MongoDB Platform, and Architecture tabs
- * (lendflow-app). Used by Next.js pages/components.
+ * (agentic-lending). Used by Next.js pages/components.
  */
 
 export const challengeContent = {
@@ -159,7 +159,7 @@ export const mongoContent = {
 export const architectureContent = {
   pageTitle: 'The AI Layer',
   pageIntro:
-    'LangGraph orchestrates agents that use LangChain tools backed by MongoDB. LangSmith provides full observability.',
+    'LangGraph orchestrates agents that use LangChain tools backed by MongoDB.',
 
   agentDescriptions: {
     supervisor: {
@@ -261,20 +261,4 @@ export const architectureContent = {
     return Command(goto="reject", update={"rejection_reason": decision["reason"]})`,
   },
 
-  langsmithDescription: {
-    title: 'LangSmith — regulatory audit trail',
-    body:
-      'Tagged with loan_id and applicant_id metadata for traceability. Annotation queues let reviewers flag questionable agent decisions. Evaluation datasets benchmark agent accuracy against human underwriters.',
-    traceSteps: [
-      { label: 'Supervisor route', ms: 45 },
-      { label: 'creditBureau() tool call', ms: 312 },
-      { label: 'mongodb_aggregation() 7-stage', ms: 18 },
-      { label: 'voyage_multimodal_embed()', ms: 42 },
-      { label: 'atlas_vector_search()', ms: 24 },
-      { label: 'graphLookup_fraud()', ms: 31 },
-      { label: 'interrupt() HITL', ms: '—' },
-      { label: 'MongoDBSaver.checkpoint()', ms: 8 },
-      { label: 'generate_decision()', ms: 380 },
-    ],
-  },
 };

@@ -38,7 +38,6 @@ export default function TechRecap({ elapsedMs, activeFeatures }) {
     { category: 'Data Platform', items: 'MongoDB Atlas — Document Model, Aggregation Framework, $graphLookup, Change Streams, Time Series, Vector Search' },
     { category: 'Orchestration', items: 'LangGraph — Orchestrator-worker pattern, interrupt(), MongoDBSaver checkpoints, MongoDBStore memory' },
     { category: 'Integration', items: 'LangChain — MongoDBAtlasVectorSearch, tool bindings, structured output' },
-    { category: 'Observability', items: 'LangSmith — Full trace capture, latency profiling, agent step replay' },
     { category: 'AI Models', items: 'Claude 3.5 Sonnet (reasoning) + voyage-multimodal-3.5 (multimodal embeddings with Matryoshka dimensionality)' },
   ];
 

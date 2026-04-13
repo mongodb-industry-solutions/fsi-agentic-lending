@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import Badge from '@leafygreen-ui/badge';
-import { apiGet } from '../../lib/api';
+import { apiGet, apiPost } from '../../lib/api';
 
 function formatCurrency(amount) {
   if (amount == null) return 'N/A';
@@ -127,6 +127,113 @@ function RiskPipelineViz({ applicationId }) {
               Pipeline data not available for this application.
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DocumentSearch({ applicationId }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState(null);
+  const [searching, setSearching] = useState(false);
+
+  const handleSearch = useCallback(async () => {
+    if (!query.trim()) return;
+    setSearching(true);
+    const data = await apiPost('/documents/search', {
+      query: query.trim(),
+      application_id: applicationId,
+      limit: 5,
+    });
+    setSearching(false);
+    if (data?.results) setResults(data.results);
+    else if (Array.isArray(data)) setResults(data);
+    else setResults([]);
+  }, [query, applicationId]);
+
+  return (
+    <div style={{
+      padding: spacing[3], background: 'var(--bg-surface)', borderRadius: 8,
+      border: '1px solid var(--border-dim)',
+    }}>
+      <div style={{
+        fontSize: 9, fontWeight: 700, color: 'var(--voyage)',
+        textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: spacing[2],
+      }}>
+        Document Search
+        <span style={{
+          marginLeft: 6, fontSize: 8, fontFamily: 'var(--font-mono)',
+          padding: '1px 4px', borderRadius: 4,
+          background: 'var(--voyage-dim)', color: 'var(--voyage)', fontWeight: 600,
+        }}>
+          Atlas Vector Search
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: spacing[2] }}>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          placeholder="Search documents by meaning..."
+          aria-label="Semantic document search"
+          style={{
+            flex: 1, padding: '6px 10px', fontSize: 11,
+            fontFamily: 'inherit',
+            background: 'var(--bg-raised)', border: '1px solid var(--border-dim)',
+            borderRadius: 6, color: 'var(--text-primary)', outline: 'none',
+          }}
+        />
+        <button
+          type="button"
+          onClick={handleSearch}
+          disabled={searching || !query.trim()}
+          style={{
+            padding: '6px 12px', borderRadius: 6, border: 'none',
+            background: query.trim() ? 'var(--voyage)' : 'var(--border-dim)',
+            color: '#fff', fontSize: 10, fontWeight: 600,
+            fontFamily: 'var(--font-display)', cursor: query.trim() ? 'pointer' : 'default',
+          }}
+        >
+          {searching ? '...' : 'Search'}
+        </button>
+      </div>
+      {results && results.length === 0 && (
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', padding: 4 }}>
+          No matching documents found.
+        </div>
+      )}
+      {results && results.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {results.map((r, i) => (
+            <div key={i} style={{
+              padding: '6px 8px', background: 'var(--bg-raised)', borderRadius: 6,
+              border: '1px solid var(--border-dim)',
+              animation: `thinkingFade 200ms cubic-bezier(0.33, 1, 0.68, 1) ${i * 60}ms both`,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {r.doc_type?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || r.filename || 'Document'}
+                </span>
+                {r.score != null && (
+                  <span style={{
+                    fontSize: 8, fontFamily: 'var(--font-mono)', fontWeight: 700,
+                    padding: '1px 4px', borderRadius: 4,
+                    background: r.score > 0.7 ? 'var(--success-dim)' : 'var(--hitl-amber-dim)',
+                    color: r.score > 0.7 ? 'var(--success)' : 'var(--hitl-amber)',
+                  }}>
+                    {(r.score * 100).toFixed(0)}%
+                  </span>
+                )}
+              </div>
+              {r.content && (
+                <div style={{ fontSize: 9, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                  {r.content.slice(0, 150)}{r.content.length > 150 ? '...' : ''}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -267,6 +374,9 @@ export default function ApplicationDetail({ appDetail, compact = false }) {
           </div>
         </div>
       )}
+
+      {/* Semantic Document Search */}
+      {application_id && <DocumentSearch applicationId={application_id} />}
     </div>
   );
 }

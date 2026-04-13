@@ -200,9 +200,11 @@ Interventions include separate `internal_context` (for officer/pipeline use) and
 
 ### Application Agent (AI Chat)
 Context-aware conversational assistant for borrowers:
-- Streaming markdown responses via SSE
-- Intervention awareness — surfaces pending action items as in-chat cards
+- Streaming markdown responses via SSE with tool transparency (tool_call events during context gathering)
+- Intervention awareness — surfaces pending action items as in-chat cards with urgency escalation (pulse animation + elapsed timer after 30s)
 - Contextual suggested questions that adapt to application status phase
+- Policy RAG citations surfaced as expandable reference cards below assistant messages
+- Floating pre-application chat drawer available during profile selection and form phases
 - Conversation persistence in MongoDB `conversations` collection
 - Safety-filtered responses (PII, loan-specific guardrails)
 
@@ -224,22 +226,29 @@ Officers can:
 
 ### 1. Borrower Portal
 Phase-based flow: **profile selection → application form → real-time tracking**.
-- **Borrower Selection** — seeded demo profiles with key stat badges (combined income, LTV ratio, credit score) and a demo-flow explainer card describing the 4-stage pipeline.
+- **Borrower Selection** — seeded demo profiles with key stat badges (combined income, LTV ratio, credit score), a "How AI Helps" before/after comparison strip, and an interactive demo-flow explainer with expandable technology details per step.
 - **Application Form** — co-applicant fields, amortization calculator, hybrid read-only / editable sections, client-side validation with inline error states via LeafyGreen `TextInput`.
-- **Status Tracker** — 5-stage timeline driven by SSE (`/applications/{id}/status`), with live agent activity feeds per-stage (color-coded by agent) via SSE (`/applications/{id}/activity`), dynamic summary card populated from application data.
-- **Document Context** — document checklist with status polling, PDF + extracted JSON split-pane viewer.
-- **Application Agent (AI Chat)** — streaming markdown responses, contextual suggested questions that adapt to application status (submitted / processing / underwriting / review / approved / declined), intervention action cards surfaced in-chat, conversation history persistence.
+- **Status Tracker** — 9-stage timeline driven by SSE (`/applications/{id}/status`) with live `ThinkingStrip` showing agent activity in real-time, confidence badges on completed stages (e.g., "N resolved by AI", "Document verified"), staggered before/after metric reveals, `completionBurst` animations, and a post-approval `SavingsSummary` card with animated count-up metrics.
+- **Document Context** — document checklist with status polling, shimmer animation on processing documents, PDF + extracted JSON split-pane viewer.
+- **Application Agent (AI Chat)** — streaming markdown responses with tool transparency (`ContextGathering` component shows each tool being invoked during context build), policy RAG citations as expandable reference cards, contextual suggested questions adapting to application status, intervention action cards with urgency escalation (pulse + elapsed timer after 30s), conversation history persistence.
+- **Floating Chat Drawer** — pre-application chat bubble available during profile selection and form phases for general questions.
 - **Intervention Pipeline** — backend agents create typed interventions (stress test failure, income data required, credit score required, credit data unavailable) that surface as borrower-facing action cards in the chat.
+- **Demo Reset** — header button (visible when a session exists) resets the demo with confirmation modal.
 
 ### 2. Loan Officer Dashboard
 Full-featured officer workspace with real-time data flows and human-in-the-loop decisioning.
 
 - **Application Queue** — real-time via WebSocket + MongoDB Change Stream. Filterable by status (All / Pending Review / Processing / Completed), sortable (Newest First / Needs Attention), with amber accent on applications awaiting review and a review-count badge.
-- **Application Detail** — comprehensive view of selected application: borrower info, income summary, loan terms, property details, risk assessment (score, tier, GDS/TDS), credit reports, and document list with status badges. Compact mode for inline display during processing. Includes expandable **Risk Pipeline Visualization** showing the 7-stage MongoDB aggregation pipeline with per-stage operator and description.
-- **Agent Activity Log** — real-time SSE feed of agent actions with search filtering, color-coded by agent, auto-scroll with manual override.
-- **Intent Preview** — agent's planned execution steps with status overlay (complete/in-progress/pending) derived from live application state, and a proceed button to launch the pipeline.
-- **HITL Review** — auto-fetched review context, approve/decline/modify actions with officer overrides (loan amount, risk tier, conditions). Modified terms trigger `modify_and_continue` with re-underwriting via SSE reconnection.
-- **Decision Summary** — rich post-decision view replacing the minimal approved/declined card. Shows decision type (Auto-Approved / Officer Reviewed / Manual), officer modifications, key metrics, policy violations for declines, stage timeline with per-agent action counts and durations, and a full expandable audit trail.
+- **Application Detail** — comprehensive view of selected application: borrower info, income summary, loan terms, property details, risk assessment (score, tier, GDS/TDS), credit reports, and document list with status badges. Compact mode for inline display during processing. Includes expandable **Risk Pipeline Visualization** showing the 7-stage MongoDB aggregation pipeline with per-stage operator and description. **Document Search** panel for semantic search across application documents via Atlas Vector Search.
+- **Live Underwriting Results** — real-time metrics overlay during processing, powered by captured `node_complete` SSE output. Shows document count, credit score, risk score with tier badge, GDS/TDS ratios, and stress test pass/fail as each pipeline stage completes.
+- **Stage Progress Bar** — 3-stage progress indicator (Origination → Decisioning → HITL) with animated transitions, elapsed durations per stage, and stage-start timestamps. Sits between the compact detail bar and the workflow canvas.
+- **Agent Activity Log** — real-time SSE feed of agent actions with search filtering, color-coded by agent, auto-scroll with manual override. Compact/detailed view mode toggle, action-type badges (DATA, COMPUTE, SEARCH, DECIDE, ALERT), pause/resume stream with buffer count badge, and entry count cap display.
+- **Policy Explorer** — collapsible panel for Atlas Vector Search across lending policies (underwriting guidelines, OSFI B-20, etc.). Officers can query policy text and see relevant matches with relevance scores.
+- **Portfolio Intelligence** — collapsible panel with lazy-loaded payment trends, Early Warning System (EWS) signals, and recent portfolio events. Auto-fetches a sample loan if no specific loan is selected, with retry-on-failure.
+- **Intent Preview** — agent's planned execution steps with per-step expand/collapse editing, dependency connectors via CSS Module pseudo-selectors, data availability indicators ("3/3 inputs"), dynamically computed total estimate, visual hierarchy (green border for complete steps, strikethrough for disabled), and a proceed button to launch the pipeline.
+- **HITL Review** — auto-fetched review context, structured risk factor rows with pass/fail badges, GDS/TDS ThresholdBar visualizations, restructured 3-part agent reasoning card. Approve/decline/modify actions with officer overrides (loan amount, risk tier, conditions). Modified terms trigger `modify_and_continue` with re-underwriting via SSE reconnection.
+- **Decision Summary** — rich post-decision view with decision provenance chain (horizontal Agent → Officer → Final flow with timestamps), "Copy Audit Trail" button (serializes to JSON with inline "Copied!" feedback), before/after comparison for modified decisions highlighting changes in rate, amount, and conditions. Shows decision type, key metrics, policy violations for declines, stage timeline, and full expandable audit trail.
+- **Dashboard Stats & Layout** — stats bar with trend arrows (↑/↓ computed from previous counts), average processing time metric, elapsed timer during execution. Improved idle state with mini pipeline sketch, dynamic pending application count, and contextual prompts.
 - **Portfolio Stats** — fetched from `GET /portfolio/stats` on mount, merged into the dashboard stats bar (total portfolio value, active loans, delinquency rate).
 - **Status-Aware Phase Initialization** — selecting an application reads its queue status to initialize the correct UI phase (preview, executing, HITL review, or decision summary) without race conditions. Uses refs to avoid spurious re-renders from unrelated queue updates.
 
@@ -326,7 +335,7 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 
 ## API Endpoints
 
-### REST (22 endpoints)
+### REST (24 endpoints)
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/api/applications` | Create loan application |
@@ -337,21 +346,22 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | GET | `/api/documents/{id}/pdf` | Serve original PDF |
 | GET | `/api/documents/{id}/json` | Full MongoDB document JSON |
 | POST | `/api/applications/{id}/documents/upload` | Upload + extract document via Bedrock |
-| POST | `/api/documents/search` | Atlas Vector Search across documents |
+| POST | `/api/documents/search` | Atlas Vector Search across documents (supports `application_id` filter) |
 | POST | `/api/policies/search` | Atlas Vector Search across policies |
 | POST | `/api/agent/{id}/run` | Trigger agent pipeline |
 | POST | `/api/hitl/{id}/decision` | Officer decision (approve/decline/modify + overrides + officer_id) |
 | GET | `/api/hitl/{id}/context` | HITL review context (application + activity trail) |
 | POST | `/api/chat/{id}/message` | Send chat message to Application Agent |
-| POST | `/api/chat/{id}/message/stream` | Streaming chat (SSE token stream) |
+| POST | `/api/chat/{id}/message/stream` | Streaming chat (SSE with tool_call events + citations in done event) |
 | GET | `/api/chat/{id}/history` | Chat conversation history |
 | GET | `/api/chat/{id}/interventions` | Pending interventions (borrower-safe fields) |
 | POST | `/api/chat/{id}/interventions/{iid}/resolve` | Acknowledge/resolve an intervention |
-| POST | `/api/chat/general/message` | General chat (pre-application) |
+| POST | `/api/chat/general/message` | General chat (pre-application, used by FloatingChatDrawer) |
 | GET | `/api/portfolio/stats` | Portfolio-level aggregation (active loans, delinquency) |
 | GET | `/api/portfolio/payments` | Payment trends with $setWindowFields |
-| GET | `/api/portfolio/ews` | Early Warning System signals from time-series |
+| GET | `/api/portfolio/ews` | Early Warning System signals from time-series (auto-samples a loan_id if none provided) |
 | GET | `/api/portfolio/events` | Recent events (payments + agent actions) |
+| POST | `/api/demo/reset` | Reset demo state (requires `X-Demo-Reset: confirm` header) |
 
 ### SSE (4 endpoints)
 | Path | Description |

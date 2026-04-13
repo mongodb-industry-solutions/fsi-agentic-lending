@@ -11,7 +11,7 @@ import { colorMap, dimMap } from '../../lib/data/colorMaps';
 const screenTitles = {
   borrower: 'Borrower Portal — Technology Reference',
   officer: 'Loan Officer Dashboard — Technology Reference',
-  demo: 'LendFlow AI — Technology Reference',
+  demo: 'Agentic Lending — Technology Reference',
 };
 
 /* ------------------------------------------------------------------ */
@@ -167,41 +167,6 @@ function HITLSection() {
         {hitl.persistence}
       </div>
       <CodeSnippet code={hitl.codeSample} />
-    </InsightCard>
-  );
-}
-
-function LangSmithSection() {
-  const ls = architectureContent.langsmithDescription;
-  return (
-    <InsightCard title={ls.title} icon="🔍">
-      <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 10 }}>
-        {ls.body}
-      </div>
-      <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 6 }}>
-        Trace Waterfall
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {ls.traceSteps.map((step, i) => (
-          <div key={i} style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '3px 6px',
-            borderRadius: 4,
-            background: i % 2 === 0 ? 'var(--bg-raised)' : 'transparent',
-            fontSize: 10,
-          }}>
-            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-dim)', width: 14, textAlign: 'right', flexShrink: 0 }}>
-              {i + 1}
-            </span>
-            <span style={{ flex: 1, color: 'var(--text-secondary)' }}>{step.label}</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: typeof step.ms === 'number' ? 'var(--mongo)' : 'var(--hitl-amber)', fontSize: 9 }}>
-              {typeof step.ms === 'number' ? `${step.ms}ms` : step.ms}
-            </span>
-          </div>
-        ))}
-      </div>
     </InsightCard>
   );
 }
@@ -380,11 +345,6 @@ export default function InfoWizardPanel({ isOpen, onClose, activeScreen = 'demo'
             <HITLSection />
           </div>
 
-          {/* LangSmith */}
-          <SectionHeader>Observability</SectionHeader>
-          <div style={{ padding: '8px 12px' }} data-section="langsmith">
-            <LangSmithSection />
-          </div>
         </div>
 
         {/* Footer */}
@@ -397,7 +357,7 @@ export default function InfoWizardPanel({ isOpen, onClose, activeScreen = 'demo'
           flexShrink: 0,
         }}>
           <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>
-            LendFlow AI Educational Panel
+            Agentic Lending Educational Panel
           </span>
           <button
             type="button"

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { apiGet } from '../../lib/api';
+import styles from './IntentPreview.module.css';
 
 const PLAN_STEPS = [
   {
@@ -12,6 +13,7 @@ const PLAN_STEPS = [
     step: 1,
     description: 'Extract and embed CRA notices, bank statements, and pay stubs using multimodal AI',
     editable: { skipable: true, label: 'Run document verification' },
+    dependsOn: [],
   },
   {
     id: 'creditPull',
@@ -21,6 +23,7 @@ const PLAN_STEPS = [
     step: 2,
     description: 'Retrieve credit report and score from primary bureau',
     editable: { skipable: false },
+    dependsOn: [],
   },
   {
     id: 'bankingEnrich',
@@ -30,6 +33,7 @@ const PLAN_STEPS = [
     step: 3,
     description: 'Pull 12-month transaction history for cash flow analysis',
     editable: { skipable: true, label: 'Include banking data' },
+    dependsOn: [],
   },
   {
     id: 'riskScore',
@@ -42,6 +46,7 @@ const PLAN_STEPS = [
       skipable: false,
       threshold: { label: 'Risk threshold', min: 50, max: 90, default: 65 },
     },
+    dependsOn: ['docVerify', 'creditPull', 'bankingEnrich'],
   },
   {
     id: 'policyRag',
@@ -51,6 +56,7 @@ const PLAN_STEPS = [
     step: 5,
     description: 'RAG query against institutional lending policies and regulatory requirements',
     editable: { skipable: false },
+    dependsOn: ['riskScore'],
   },
   {
     id: 'fraudScan',
@@ -64,11 +70,27 @@ const PLAN_STEPS = [
       label: 'Run fraud scan',
       hops: { label: 'Graph depth', min: 1, max: 5, default: 3 },
     },
+    dependsOn: ['creditPull'],
   },
 ];
 
+function parseEstMs(estString) {
+  if (!estString) return 0;
+  const match = estString.match(/~?(\d+(?:\.\d+)?)\s*(ms|s)/i);
+  if (!match) return 0;
+  const val = parseFloat(match[1]);
+  return match[2].toLowerCase() === 's' ? val * 1000 : val;
+}
+
+function getInputReadiness(step, livePlan) {
+  if (!step.dependsOn || step.dependsOn.length === 0) return null;
+  if (!livePlan) return { ready: 0, total: step.dependsOn.length };
+  const ready = step.dependsOn.filter((dep) => livePlan[dep] === 'complete').length;
+  return { ready, total: step.dependsOn.length };
+}
+
 export default function IntentPreview({ applicationId, onProceed, onManual }) {
-  const [editing, setEditing] = useState(false);
+  const [expandedSteps, setExpandedSteps] = useState(new Set());
   const [livePlan, setLivePlan] = useState(null);
 
   useEffect(() => {
@@ -110,6 +132,25 @@ export default function IntentPreview({ applicationId, onProceed, onManual }) {
 
   const enabledCount = PLAN_STEPS.filter((s) => settings[s.id]?.enabled !== false).length;
 
+  const totalEstMs = useMemo(() => {
+    return PLAN_STEPS
+      .filter((s) => settings[s.id]?.enabled !== false)
+      .reduce((sum, s) => sum + parseEstMs(s.est), 0);
+  }, [settings]);
+
+  const toggleStep = (stepId) => {
+    setExpandedSteps((prev) => {
+      const next = new Set(prev);
+      if (next.has(stepId)) next.delete(stepId);
+      else next.add(stepId);
+      return next;
+    });
+  };
+
+  const hasEditableControls = (step) => {
+    return step.editable?.skipable || step.editable?.threshold || step.editable?.hops;
+  };
+
   return (
     <div style={{
       padding: 16,
@@ -128,10 +169,10 @@ export default function IntentPreview({ applicationId, onProceed, onManual }) {
             fontWeight: 700,
             fontSize: 11,
           }}>
-            ▶ Execution Plan
+            {'\u25B6'} Execution Plan
           </span>
           <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-            {enabledCount} steps · Est. total ~750ms
+            {enabledCount} steps {'\u00b7'} Est. total ~{totalEstMs}ms
           </span>
         </div>
       </div>
@@ -139,145 +180,172 @@ export default function IntentPreview({ applicationId, onProceed, onManual }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
         {planSteps.map((step, i) => {
           const stepSettings = settings[step.id] || {};
-          const isDisabled = editing && step.editable?.skipable && !stepSettings.enabled;
+          const isDisabled = step.editable?.skipable && !stepSettings.enabled;
+          const isExpanded = expandedSteps.has(step.id);
+          const isLast = i === planSteps.length - 1;
+          const readiness = getInputReadiness(step, livePlan);
+
+          const connectorClass = [
+            styles.connector,
+            isDisabled ? styles.connectorDisabled : '',
+            isLast ? styles.connectorLast : '',
+          ].filter(Boolean).join(' ');
 
           return (
-            <div key={step.id} style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 10,
-              padding: '8px 10px',
-              background: isDisabled ? 'var(--bg-raised)' : 'var(--bg-base)',
-              borderRadius: 'var(--radius-sm)',
-              border: `1px solid ${isDisabled ? 'var(--border-dim)' : 'var(--border-base)'}`,
-              opacity: isDisabled ? 0.5 : 1,
-              transition: 'opacity 0.2s, background 0.2s',
-            }}>
-              <div style={{
-                width: 20,
-                height: 20,
-                borderRadius: '50%',
-                background: isDisabled ? 'var(--bg-raised)' : 'var(--agent-cyan-dim)',
-                border: `1.5px solid ${isDisabled ? 'var(--border-dim)' : 'var(--agent-cyan)'}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 9,
-                fontWeight: 700,
-                color: isDisabled ? 'var(--text-dim)' : 'var(--agent-cyan)',
-                flexShrink: 0,
-                marginTop: 1,
-              }}>
-                {i + 1}
-              </div>
+            <div
+              key={step.id}
+              className={connectorClass}
+              style={{
+                padding: '8px 10px',
+                background: isDisabled ? 'var(--bg-raised)' : 'var(--bg-base)',
+                borderRadius: 'var(--radius-sm)',
+                border: `1px solid ${isDisabled ? 'var(--border-dim)' : 'var(--border-base)'}`,
+                borderLeft: step.status === 'complete' ? '3px solid var(--success)' : undefined,
+                opacity: isDisabled ? 0.45 : 1,
+                transition: 'opacity 0.2s, background 0.2s, border 0.2s',
+                cursor: hasEditableControls(step) ? 'pointer' : 'default',
+              }}
+              onClick={() => hasEditableControls(step) && toggleStep(step.id)}
+              role={hasEditableControls(step) ? 'button' : undefined}
+              tabIndex={hasEditableControls(step) ? 0 : undefined}
+              onKeyDown={(e) => {
+                if (hasEditableControls(step) && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault();
+                  toggleStep(step.id);
+                }
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                <div style={{
+                  width: 20, height: 20, borderRadius: '50%',
+                  background: step.status === 'complete' ? 'var(--success)' : isDisabled ? 'var(--bg-raised)' : 'var(--agent-cyan-dim)',
+                  border: step.status === 'complete' ? 'none' : `1.5px solid ${isDisabled ? 'var(--border-dim)' : 'var(--agent-cyan)'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 9, fontWeight: 700,
+                  color: step.status === 'complete' ? '#fff' : isDisabled ? 'var(--text-dim)' : 'var(--agent-cyan)',
+                  flexShrink: 0, marginTop: 1,
+                }}>
+                  {step.status === 'complete' ? '\u2713' : i + 1}
+                </div>
 
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' }}>
                     <span style={{
-                      width: 18, height: 18, borderRadius: '50%',
-                      background: step.status === 'complete' ? 'var(--success)' : 'var(--bg-raised)',
-                      border: step.status === 'complete' ? 'none' : '1.5px solid var(--border-base)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 9, fontWeight: 700,
-                      color: step.status === 'complete' ? '#fff' : 'var(--text-dim)',
-                      flexShrink: 0,
-                    }}>{step.status === 'complete' ? '\u2713' : step.step}</span>
-                    {step.label}
-                  </span>
-                  <span style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 9,
-                    color: 'var(--tool-blue)',
-                    padding: '1px 5px',
-                    background: 'var(--tool-blue-dim)',
-                    borderRadius: 4,
-                  }}>
-                    {step.tool}
-                  </span>
-                  {step.status && (
-                    <span style={{
-                      fontSize: 9,
-                      fontWeight: 700,
-                      padding: '1px 5px',
-                      borderRadius: 4,
-                      background: step.status === 'complete' ? 'rgba(0,200,100,0.1)' : 'rgba(255,180,0,0.1)',
-                      color: step.status === 'complete' ? 'var(--success, #00c864)' : 'var(--hitl-amber, #ffb400)',
+                      fontSize: 12, fontWeight: 600,
+                      color: isDisabled ? 'var(--text-dim)' : 'var(--text-primary)',
+                      textDecoration: isDisabled ? 'line-through' : 'none',
                     }}>
-                      {step.status === 'complete' ? '✓ done' : '● pending'}
+                      {step.label}
                     </span>
-                  )}
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                  {step.description}
-                </div>
-
-                {editing && step.editable && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
-                    {step.editable.skipable && (
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={stepSettings.enabled}
-                          onChange={(e) => setSettings((prev) => ({
-                            ...prev,
-                            [step.id]: { ...prev[step.id], enabled: e.target.checked },
-                          }))}
-                          style={{ accentColor: 'var(--agent-cyan)' }}
-                        />
-                        {step.editable.label}
-                      </label>
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 9,
+                      color: 'var(--tool-blue)', padding: '1px 5px',
+                      background: 'var(--tool-blue-dim)', borderRadius: 4,
+                    }}>
+                      {step.tool}
+                    </span>
+                    {readiness && (
+                      <span style={{
+                        fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 4,
+                        background: readiness.ready === readiness.total ? 'var(--success-dim)' : 'var(--hitl-amber-dim)',
+                        color: readiness.ready === readiness.total ? 'var(--success)' : 'var(--hitl-amber)',
+                        fontFamily: 'var(--font-mono)',
+                      }}>
+                        {readiness.ready}/{readiness.total} inputs
+                      </span>
                     )}
-                    {step.editable.threshold && (
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-secondary)' }}>
-                        {step.editable.threshold.label}:
-                        <input
-                          type="range"
-                          min={step.editable.threshold.min}
-                          max={step.editable.threshold.max}
-                          value={stepSettings.threshold}
-                          onChange={(e) => setSettings((prev) => ({
-                            ...prev,
-                            [step.id]: { ...prev[step.id], threshold: +e.target.value },
-                          }))}
-                          style={{ width: 80, accentColor: 'var(--agent-cyan)' }}
-                        />
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600 }}>
-                          {stepSettings.threshold}
-                        </span>
-                      </label>
-                    )}
-                    {step.editable.hops && stepSettings.enabled && (
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-secondary)' }}>
-                        {step.editable.hops.label}:
-                        <input
-                          type="range"
-                          min={step.editable.hops.min}
-                          max={step.editable.hops.max}
-                          value={stepSettings.hops}
-                          onChange={(e) => setSettings((prev) => ({
-                            ...prev,
-                            [step.id]: { ...prev[step.id], hops: +e.target.value },
-                          }))}
-                          style={{ width: 60, accentColor: 'var(--agent-cyan)' }}
-                        />
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600 }}>
-                          {stepSettings.hops}-hop
-                        </span>
-                      </label>
+                    {step.status && (
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4,
+                        background: step.status === 'complete' ? 'rgba(0,200,100,0.1)' : 'rgba(255,180,0,0.1)',
+                        color: step.status === 'complete' ? 'var(--success, #00c864)' : 'var(--hitl-amber, #ffb400)',
+                      }}>
+                        {step.status === 'complete' ? '\u2713 done' : '\u25CF pending'}
+                      </span>
                     )}
                   </div>
-                )}
-              </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                    {step.description}
+                  </div>
 
-              <div style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 9,
-                color: 'var(--text-dim)',
-                flexShrink: 0,
-                marginTop: 2,
-              }}>
-                {step.est}
+                  {isExpanded && hasEditableControls(step) && (
+                    <div
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12, marginTop: 8,
+                        paddingTop: 8, borderTop: '1px solid var(--border-dim)', flexWrap: 'wrap',
+                        animation: 'slideDown 0.2s ease-out',
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {step.editable.skipable && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={stepSettings.enabled}
+                            onChange={(e) => setSettings((prev) => ({
+                              ...prev,
+                              [step.id]: { ...prev[step.id], enabled: e.target.checked },
+                            }))}
+                            style={{ accentColor: 'var(--agent-cyan)' }}
+                          />
+                          {step.editable.label}
+                        </label>
+                      )}
+                      {step.editable.threshold && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-secondary)' }}>
+                          {step.editable.threshold.label}:
+                          <input
+                            type="range"
+                            min={step.editable.threshold.min}
+                            max={step.editable.threshold.max}
+                            value={stepSettings.threshold}
+                            onChange={(e) => setSettings((prev) => ({
+                              ...prev,
+                              [step.id]: { ...prev[step.id], threshold: +e.target.value },
+                            }))}
+                            style={{ width: 80, accentColor: 'var(--agent-cyan)' }}
+                          />
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600 }}>
+                            {stepSettings.threshold}
+                          </span>
+                        </label>
+                      )}
+                      {step.editable.hops && stepSettings.enabled && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-secondary)' }}>
+                          {step.editable.hops.label}:
+                          <input
+                            type="range"
+                            min={step.editable.hops.min}
+                            max={step.editable.hops.max}
+                            value={stepSettings.hops}
+                            onChange={(e) => setSettings((prev) => ({
+                              ...prev,
+                              [step.id]: { ...prev[step.id], hops: +e.target.value },
+                            }))}
+                            style={{ width: 60, accentColor: 'var(--agent-cyan)' }}
+                          />
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600 }}>
+                            {stepSettings.hops}-hop
+                          </span>
+                        </label>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginTop: 2 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)' }}>
+                    {step.est}
+                  </span>
+                  {hasEditableControls(step) && (
+                    <span style={{
+                      fontSize: 10, color: 'var(--text-dim)',
+                      transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)',
+                      transition: 'transform 0.2s',
+                      display: 'inline-block',
+                    }}>{'\u25BE'}</span>
+                  )}
+                </div>
               </div>
             </div>
           );
@@ -299,21 +367,7 @@ export default function IntentPreview({ applicationId, onProceed, onManual }) {
           fontSize: 12,
           cursor: 'pointer',
         }}>
-          ▶ Proceed
-        </button>
-        <button type="button" onClick={() => setEditing(!editing)} style={{
-          flex: 1,
-          padding: 10,
-          borderRadius: 'var(--radius-md)',
-          border: `1px solid ${editing ? 'var(--agent-cyan)' : 'var(--border-base)'}`,
-          background: editing ? 'var(--agent-cyan-dim)' : 'var(--bg-raised)',
-          color: editing ? 'var(--agent-cyan)' : 'var(--text-primary)',
-          fontFamily: 'var(--font-display)',
-          fontWeight: 600,
-          fontSize: 12,
-          cursor: 'pointer',
-        }}>
-          {editing ? '✓ Done Editing' : '✎ Edit Parameters'}
+          {'\u25B6'} Proceed
         </button>
         <button type="button" onClick={onManual} style={{
           flex: 1,

@@ -43,6 +43,7 @@ function CompactDocCard({ doc, onView, justChanged }) {
   const [hovered, setHovered] = useState(false);
   const label = DOC_TYPE_LABELS[doc.doc_type] || doc.doc_type?.replace(/_/g, ' ') || 'Document';
   const abbr = DOC_TYPE_ABBR[doc.doc_type] || 'DOC';
+  const isProcessing = doc.status !== 'parsed' && doc.status !== 'error';
 
   return (
     <button
@@ -51,7 +52,11 @@ function CompactDocCard({ doc, onView, justChanged }) {
         padding: `${spacing[2]}px ${spacing[3]}px`,
         background: justChanged
           ? 'var(--success-dim, rgba(0, 104, 74, 0.08))'
-          : hovered ? 'var(--bg-raised, var(--bg-surface))' : 'var(--bg-surface)',
+          : isProcessing
+            ? 'linear-gradient(90deg, var(--bg-surface) 0%, var(--agent-cyan-dim) 50%, var(--bg-surface) 100%)'
+            : hovered ? 'var(--bg-raised, var(--bg-surface))' : 'var(--bg-surface)',
+        backgroundSize: isProcessing ? '200% 100%' : undefined,
+        animation: isProcessing && !justChanged ? 'shimmerCard 2s ease-in-out infinite' : undefined,
         borderRadius: 8,
         border: justChanged ? '1px solid var(--success)' : '1px solid var(--border-dim)',
         transition: justChanged

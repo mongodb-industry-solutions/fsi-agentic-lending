@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+import os
 import re
 import uuid
 from datetime import datetime, timezone
@@ -28,7 +29,8 @@ def _validate_app_id(app_id: str):
     if not APP_ID_PATTERN.match(app_id):
         raise HTTPException(status_code=400, detail=f"Invalid application ID format: {app_id}")
 
-UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "docs" / "uploads"
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+UPLOAD_DIR = _PROJECT_ROOT / "docs" / "uploads"
 
 VALID_DOC_TYPES = set(EXTRACTION_PROMPTS.keys()) | {"unknown"}
 
@@ -47,6 +49,19 @@ async def list_documents(app_id: str):
     return document_service.list_documents(app_id)
 
 
+@router.get("/documents/debug/pdf-paths")
+async def debug_pdf_paths():
+    """Dev-only diagnostic: show resolved PDF directories and file counts."""
+    if os.environ.get("ENV", "development").lower() in ("production", "prod"):
+        raise HTTPException(status_code=404, detail="Not found")
+    result = []
+    for d in PDF_DIRS:
+        exists = d.exists()
+        pdfs = sorted(p.name for p in d.glob("*.pdf")) if exists else []
+        result.append({"path": str(d), "exists": exists, "pdf_count": len(pdfs), "files": pdfs})
+    return {"pdf_dirs": result, "project_root": str(_PROJECT_ROOT)}
+
+
 @router.get("/documents/{doc_id}")
 async def get_document(doc_id: str):
     """Get a single document."""
@@ -57,19 +72,38 @@ async def get_document(doc_id: str):
     return doc
 
 
-PDF_DIRS = [
-    Path(__file__).resolve().parent.parent.parent / "docs" / "synthetic data",
-    Path(__file__).resolve().parent.parent.parent / "docs" / "uploads",
-]
+def _build_pdf_dirs():
+    """Build the list of directories to search for PDF files.
+
+    Supports an optional PDF_BASE_DIR env var for custom locations (e.g. Docker
+    volumes). Falls back to resolving relative to this source file.
+    """
+    base_override = os.environ.get("PDF_BASE_DIR")
+    if base_override:
+        base = Path(base_override).resolve()
+        dirs = [base / "synthetic data", base / "uploads", base]
+    else:
+        docs_root = _PROJECT_ROOT / "docs"
+        dirs = [docs_root / "synthetic data", docs_root / "uploads"]
+    return dirs
+
+
+PDF_DIRS = _build_pdf_dirs()
+
+for _d in PDF_DIRS:
+    _count = len(list(_d.glob("*.pdf"))) if _d.exists() else -1
+    logger.info("PDF directory: %s  (exists=%s, pdf_count=%s)", _d, _d.exists(), _count if _count >= 0 else "N/A")
 
 
 def _find_pdf(filename):
-    # Sanitize to prevent path traversal
     safe = PurePosixPath(filename).name
     for d in PDF_DIRS:
         p = d / safe
         if p.exists():
+            logger.debug("_find_pdf: found %s at %s", filename, p)
             return p
+        logger.debug("_find_pdf: not at %s", p)
+    logger.warning("_find_pdf: '%s' not found in any PDF_DIRS", filename)
     return None
 
 
@@ -79,10 +113,16 @@ async def serve_document_pdf(doc_id: str):
     _validate_doc_id(doc_id)
     doc = document_service.get_document(doc_id)
     if not doc or not doc.get("filename"):
+        logger.warning("PDF serve: doc %s has no filename (doc=%s)", doc_id, bool(doc))
         raise HTTPException(status_code=404, detail="Document not found")
 
     pdf_path = _find_pdf(doc["filename"])
     if not pdf_path:
+        logger.error(
+            "PDF serve: file '%s' not on disk. Searched: %s",
+            doc["filename"],
+            [str(d) for d in PDF_DIRS],
+        )
         raise HTTPException(status_code=404, detail="PDF file not found on disk")
 
     return FileResponse(str(pdf_path), media_type="application/pdf", filename=doc["filename"])

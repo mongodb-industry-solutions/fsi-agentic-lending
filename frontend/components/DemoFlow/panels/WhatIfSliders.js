@@ -78,7 +78,6 @@ export default function WhatIfSliders() {
           {decision}
         </div>
       </div>
-      <div style={{ marginTop: 8, fontSize: 10, color: 'var(--text-dim)' }}>LangSmith trace available.</div>
     </div>
   );
 }

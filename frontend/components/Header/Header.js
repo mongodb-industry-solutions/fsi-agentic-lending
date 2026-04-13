@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { palette } from '@leafygreen-ui/palette';
 import { spacing } from '@leafygreen-ui/tokens';
-import { apiGet } from '../../lib/api';
+import { apiPost } from '../../lib/api';
+import styles from './Header.module.css';
 
 const SCREENS = [
   { id: "borrower", label: "Borrower Portal" },
@@ -11,26 +13,23 @@ const SCREENS = [
 ];
 
 export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
-  const [backendHealth, setBackendHealth] = useState(null);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [hasSession, setHasSession] = useState(false);
 
   useEffect(() => {
-    const check = async () => {
-      const result = await apiGet('/');
-      setBackendHealth(result);
-    };
-    check();
-    const interval = setInterval(check, 15000);
-    return () => clearInterval(interval);
+    setHasSession(!!sessionStorage.getItem('lendflow_demo_session'));
   }, []);
 
-  const isBackendUp = backendHealth?.status === 'ok';
-  const isMongoUp = backendHealth?.mongodb === 'connected';
+  const handleReset = async () => {
+    setResetting(true);
+    await apiPost('/demo/reset', {}, { 'X-Demo-Reset': 'confirm' });
+    sessionStorage.removeItem('lendflow_demo_session');
+    setResetting(false);
+    setShowResetModal(false);
+    window.location.reload();
+  };
 
-  const statusChips = [
-    { label: "Atlas", on: isMongoUp },
-    { label: "LangGraph", on: isBackendUp },
-    { label: "LangSmith", on: isBackendUp },
-  ];
   return (
     <header
       style={{
@@ -44,9 +43,8 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        background: "#023430",
-        backdropFilter: "none",
-        borderBottom: "1px solid rgba(255,255,255,0.1)",
+        background: palette.green.dark2,
+        borderBottom: `1px solid rgba(255,255,255,0.08)`,
         boxShadow: "var(--shadow-sm)",
       }}
     >
@@ -55,16 +53,15 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
           style={{
             width: 30,
             height: 30,
-            borderRadius: 8,
-            background:
-              "linear-gradient(135deg, var(--mongo) 0%, var(--mongo-bright) 100%)",
+            borderRadius: "var(--radius-sm)",
+            background: `linear-gradient(135deg, ${palette.green.dark1} 0%, ${palette.green.base} 100%)`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             fontFamily: "var(--font-display)",
             fontWeight: 800,
-            fontSize: 16,
-            color: "var(--text-inverse, #fff)",
+            fontSize: 15,
+            color: "#fff",
             position: "relative",
             overflow: "hidden",
           }}
@@ -86,11 +83,11 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
             fontWeight: 700,
             fontSize: 16,
             letterSpacing: -0.3,
-            color: "var(--text-inverse, #fff)",
+            color: "#fff",
           }}
         >
-          Lend<em style={{ fontStyle: "normal", color: "var(--mongo)" }}>Flow</em>{" "}
-          AI
+          Agentic{" "}
+          <span style={{ color: palette.green.base }}>Lending</span>
         </span>
       </div>
 
@@ -104,81 +101,159 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
           transform: "translateX(-50%)",
         }}
       >
-        {SCREENS.map((screen) => (
-          <button
-            key={screen.id}
-            type="button"
-            aria-current={activeScreen === screen.id ? "page" : undefined}
-            onClick={() => onScreenChange(screen.id)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "7px 14px",
-              borderRadius: 20,
-              border: "1px solid rgba(255,255,255,0.1)",
-              background:
-                activeScreen === screen.id
-                  ? "rgba(0, 237, 100, 0.15)"
-                  : "rgba(255,255,255,0.08)",
-              color:
-                activeScreen === screen.id
-                  ? "var(--mongo)"
+        {SCREENS.map((screen) => {
+          const isActive = activeScreen === screen.id;
+          return (
+            <button
+              key={screen.id}
+              type="button"
+              className={styles.navPill}
+              aria-current={isActive ? "page" : undefined}
+              onClick={() => onScreenChange(screen.id)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: spacing[1],
+                padding: `${spacing[2]}px ${spacing[4]}px`,
+                minHeight: 34,
+                borderRadius: "var(--radius-xl)",
+                border: isActive
+                  ? `1px solid ${palette.green.base}4d`
+                  : "1px solid rgba(255,255,255,0.1)",
+                background: isActive
+                  ? `${palette.green.base}26`
+                  : "rgba(255,255,255,0.06)",
+                color: isActive
+                  ? palette.green.base
                   : "rgba(255,255,255,0.7)",
-              fontFamily: "var(--font-display)",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "all 0.3s",
-            }}
-          >
-            {screen.label}
-          </button>
-        ))}
+                fontFamily: "var(--font-display)",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 150ms ease",
+              }}
+            >
+              {screen.label}
+            </button>
+          );
+        })}
       </nav>
 
-      <div style={{ display: "flex", alignItems: "center", gap: spacing[4] }}>
-        {onInfoOpen && (
+      <div style={{ display: "flex", alignItems: "center", gap: spacing[3] }}>
+        {hasSession && (
           <button
             type="button"
-            onClick={onInfoOpen}
+            onClick={() => setShowResetModal(true)}
             style={{
-              width: 28, height: 28, borderRadius: '50%',
-              border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)',
-              color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-display)',
-              fontSize: 12, fontWeight: 700, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: `${spacing[1]}px ${spacing[3]}px`,
+              minHeight: 28,
+              borderRadius: "var(--radius-sm)",
+              border: '1px solid rgba(219, 48, 48, 0.4)',
+              background: 'rgba(219, 48, 48, 0.1)',
+              color: 'rgba(219, 48, 48, 0.8)',
+              fontFamily: 'var(--font-display)',
+              fontSize: 10,
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 150ms ease',
             }}
-            aria-label="Open technology reference panel"
+            aria-label="Reset demo data"
           >
-            i
+            Reset Demo
           </button>
         )}
-        {statusChips.map((chip) => (
-          <span
-            key={chip.label}
+        {onInfoOpen && (
+          <>
+            {hasSession && (
+              <div style={{
+                width: 1,
+                height: 20,
+                background: 'rgba(255,255,255,0.12)',
+                flexShrink: 0,
+              }} />
+            )}
+            <button
+              type="button"
+              onClick={onInfoOpen}
+              style={{
+                width: 28, height: 28, borderRadius: '50%',
+                border: '1px solid rgba(255,255,255,0.15)',
+                background: 'rgba(255,255,255,0.08)',
+                color: 'rgba(255,255,255,0.7)',
+                fontFamily: 'var(--font-display)',
+                fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 150ms ease',
+              }}
+              aria-label="Open technology reference panel"
+            >
+              i
+            </button>
+          </>
+        )}
+      </div>
+
+      {showResetModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'backdropEnter 0.2s ease-out both',
+        }}
+          onClick={() => !resetting && setShowResetModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 11,
-              fontFamily: "var(--font-mono)",
-              color: "rgba(255,255,255,0.6)",
+              background: 'var(--bg-base)', borderRadius: 'var(--radius-lg)',
+              border: '1px solid var(--danger)',
+              padding: 24, maxWidth: 360, width: '90%',
+              boxShadow: 'var(--shadow-xl)',
+              animation: 'modalEnter 0.25s cubic-bezier(0.33, 1, 0.68, 1) both',
             }}
           >
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: chip.on ? "var(--mongo)" : "var(--danger)",
-                boxShadow: chip.on ? "0 0 6px rgba(0,237,100,0.4)" : "none",
-              }}
-            />
-            {chip.label}
-          </span>
-        ))}
-      </div>
+            <div style={{
+              fontFamily: 'var(--font-display)', fontWeight: 700,
+              fontSize: 16, color: 'var(--text-primary)', marginBottom: 8,
+            }}>
+              Reset Demo Data?
+            </div>
+            <div style={{
+              fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 20,
+            }}>
+              This will clear all applications, documents, and conversation history created during this demo session. This action cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={handleReset}
+                disabled={resetting}
+                style={{
+                  flex: 1, padding: '8px 16px', borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--danger)', background: 'var(--danger-dim)',
+                  color: 'var(--danger)', fontFamily: 'var(--font-display)',
+                  fontWeight: 700, fontSize: 12, cursor: resetting ? 'default' : 'pointer',
+                }}
+              >
+                {resetting ? 'Resetting...' : 'Yes, Reset'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowResetModal(false)}
+                disabled={resetting}
+                style={{
+                  flex: 1, padding: '8px 16px', borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-dim)', background: 'var(--bg-surface)',
+                  color: 'var(--text-secondary)', fontFamily: 'var(--font-display)',
+                  fontWeight: 600, fontSize: 12, cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

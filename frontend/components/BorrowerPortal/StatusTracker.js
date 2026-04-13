@@ -3,309 +3,9 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import { apiSSE } from '../../lib/api';
-
-const AGENT_COLORS = {
-  loan_app_agent: { color: 'var(--agent-cyan)', bg: 'var(--agent-cyan-dim)', label: 'Loan Agent' },
-  underwriter: { color: 'var(--hitl-amber)', bg: 'var(--hitl-amber-dim)', label: 'Underwriter' },
-  supervisor: { color: 'var(--voyage)', bg: 'var(--voyage-dim)', label: 'Supervisor' },
-  default: { color: 'var(--text-dim)', bg: 'var(--bg-raised)', label: 'Agent' },
-};
-
-function getAgentStyle(agentName) {
-  return AGENT_COLORS[agentName] || AGENT_COLORS.default;
-}
-
-const ACTION_TO_STAGE_MAP = {
-  document_ingestion: 1,
-  verification: 1,
-  risk_assessment: 4,
-  underwriting: 4,
-  decision: 5,
-  intervention: 6,
-  autonomy_gate: 6,
-  status_update: null,
-};
-
-function mapEventToStageIdx(event, currentStageIdx) {
-  if (event.action && ACTION_TO_STAGE_MAP[event.action] !== undefined) {
-    return ACTION_TO_STAGE_MAP[event.action];
-  }
-  return currentStageIdx;
-}
-
-function ActivityItem({ event }) {
-  const agentStyle = getAgentStyle(event.agent);
-  const time = event.timestamp
-    ? new Date(event.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    : '';
-
-  return (
-    <div style={{
-      display: 'flex', gap: 6, alignItems: 'flex-start',
-      padding: '4px 0',
-      animation: 'cardEnter 0.3s cubic-bezier(0.4, 0, 0.2, 1) both',
-    }}>
-      <div style={{
-        fontFamily: 'var(--font-mono)', fontSize: 9,
-        color: 'var(--text-dim)', flexShrink: 0, marginTop: 1,
-        minWidth: 58,
-      }}>
-        {time}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 1 }}>
-          <span style={{
-            fontSize: 8, fontWeight: 700, textTransform: 'uppercase',
-            letterSpacing: '0.04em', color: agentStyle.color,
-            padding: '1px 5px', borderRadius: 4,
-            background: agentStyle.bg,
-          }}>
-            {agentStyle.label}
-          </span>
-          {event.action && (
-            <span style={{
-              fontSize: 8, color: 'var(--text-dim)', fontWeight: 600,
-              textTransform: 'uppercase', letterSpacing: '0.03em',
-            }}>
-              {event.action}
-            </span>
-          )}
-        </div>
-        <div style={{
-          fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4,
-        }}>
-          {event.detail}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ActivityFeed({ events, collapsed, onToggle }) {
-  const feedRef = useRef(null);
-
-  useEffect(() => {
-    if (feedRef.current && !collapsed) {
-      feedRef.current.scrollTop = feedRef.current.scrollHeight;
-    }
-  }, [events.length, collapsed]);
-
-  if (events.length === 0) return null;
-
-  return (
-    <div style={{
-      marginTop: spacing[2],
-      borderTop: '1px solid var(--border-dim)',
-      paddingTop: spacing[2],
-    }}>
-      <button
-        type="button"
-        onClick={onToggle}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          background: 'none', border: 'none', cursor: 'pointer',
-          padding: '2px 0', width: '100%', textAlign: 'left',
-          font: 'inherit',
-        }}
-      >
-        <span style={{
-          fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
-          letterSpacing: '0.05em', color: 'var(--agent-cyan)',
-          fontFamily: 'var(--font-display)',
-        }}>
-          Live Activity
-        </span>
-        <span style={{
-          fontSize: 8, fontWeight: 700, fontFamily: 'var(--font-mono)',
-          padding: '1px 5px', borderRadius: 4,
-          background: 'var(--agent-cyan-dim)',
-          color: 'var(--agent-cyan)',
-        }}>
-          {events.length}
-        </span>
-        <span style={{
-          fontSize: 10, color: 'var(--text-dim)',
-          transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-          transition: 'transform 150ms ease',
-          marginLeft: 'auto',
-        }}>
-          {'\u25BE'}
-        </span>
-      </button>
-
-      {!collapsed && (
-        <div
-          ref={feedRef}
-          style={{
-            maxHeight: 200, overflowY: 'auto', marginTop: 4,
-            paddingRight: 2,
-          }}
-        >
-          {events.map((ev, idx) => (
-            <ActivityItem key={`${ev.timestamp}-${idx}`} event={ev} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-const STAGES = [
-  {
-    id: 'received',
-    label: 'Application Received',
-    type: 'clean',
-    detail: 'Your application APP-2026-00001 has been received and queued for processing.',
-    icon: '1',
-    delayMs: 0,
-    agentStatus: 'Our AI assistant is reviewing your submission...',
-    whatHappened: 'Your application was received and queued for processing. All required fields validated — personal information, employment details, and loan parameters confirmed complete.',
-  },
-  {
-    id: 'docs',
-    label: 'Document Verification',
-    type: 'intervention',
-    detail: 'AI detected 2 issues during document analysis and resolved both automatically.',
-    icon: '2',
-    delayMs: 3000,
-    agentStatus: 'AI assistant detected document issues — resolving automatically...',
-    agentStatusActive: 'Our AI assistant is verifying your documents...',
-    whatHappened: 'Our AI verified your CRA tax notices, bank statements, and pay stubs. Two issues were detected and resolved without requiring any action from you.',
-    interventions: [
-      {
-        issue: 'Bank statement pages 2-3 had insufficient image quality — text extraction failed on first attempt.',
-        resolution: 'AI auto-enhanced the images using voyage-multimodal-3.5 and re-processed successfully on retry. All 247 transactions extracted.',
-        icon: null,
-      },
-      {
-        issue: 'Pay stub shows "M. Delgado" while credit report shows "Marcus Alejandro Delgado" — name mismatch flagged.',
-        resolution: 'AI cross-referenced SIN and address across all documents to confirm identity match. Name variation logged as verified alias.',
-        icon: null,
-      },
-    ],
-  },
-  {
-    id: 'action-required',
-    label: 'Additional Document Needed',
-    type: 'action-required',
-    detail: 'Your bank statement covers only 2 months. Our policy requires a minimum of 3 months. Please upload an additional statement.',
-    icon: '3',
-    delayMs: 4000,
-    agentStatus: 'Waiting for you to upload an additional bank statement...',
-    agentStatusActive: 'AI assistant identified a missing document requirement...',
-    whatHappened: 'Our AI detected that your bank statement covered only January–February 2026, but policy §2.3.1 requires a minimum of 3 consecutive months. After you uploaded the December 2025 statement, the AI verified it in 320ms and resumed processing.',
-    actionLabel: 'Upload December 2025 Bank Statement',
-    actionDetail: 'Policy §2.3.1 requires 3 consecutive months of bank statements. Your current upload covers January–February 2026.',
-  },
-  {
-    id: 'credit',
-    label: 'Credit & Income Analysis',
-    type: 'intervention',
-    detail: 'AI investigated 2 discrepancies in your credit and income records and resolved both.',
-    icon: '4',
-    delayMs: 5000,
-    agentStatus: 'AI assistant found discrepancies in your records — investigating...',
-    agentStatusActive: 'Our AI assistant is analyzing your credit and income data...',
-    whatHappened: 'Credit and income analysis identified two discrepancies that the AI investigated and resolved, preventing unnecessary score penalties and ensuring accurate income reporting.',
-    interventions: [
-      {
-        issue: '3 hard inquiries detected within 180 days, which would trigger a -8pt score penalty under policy §4.2.1.',
-        resolution: 'AI identified that 2 of the 3 inquiries were rate-shopping for an auto loan within a 14-day window. Per FCAC guidelines, these are combined into 1 inquiry — effective count reduced to 2, avoiding the penalty trigger.',
-        icon: null,
-      },
-      {
-        issue: 'Plaid monthly average ($18,150/mo) does not match combined T4 annualized income ($18,558/mo) — $408/mo discrepancy flagged.',
-        resolution: 'AI found $4,900 in freelance deposits across the 12-month Plaid history (averaging $408/mo), fully explaining the gap. Combined income reconciled at $222,700/yr with $4,900 supplemental.',
-        icon: null,
-      },
-    ],
-  },
-  {
-    id: 'underwriting',
-    label: 'Underwriting Risk Assessment',
-    type: 'intervention',
-    detail: 'Initial score: 68 (B). AI corrected a misclassified debt payment and improved the score to 72 (B+).',
-    icon: '5',
-    delayMs: 5000,
-    agentStatus: 'AI assistant corrected a scoring error — recalculating your risk profile...',
-    agentStatusActive: 'Our AI assistant is running the underwriting risk assessment...',
-    whatHappened: 'The 7-stage aggregation pipeline initially scored your application at 68 (B tier). The AI identified that your car loan payment was classified at the full $620/mo amount, but verified Scotiabank records show the actual payment is $482/mo. After correction, GDS dropped from 33.8% to 31.2% and the composite score improved to 72 (B+).',
-    interventions: [
-      {
-        issue: 'Car loan payment classified at full amount ($620/mo) instead of verified Scotiabank payment ($482/mo), inflating GDS to 33.8%.',
-        resolution: 'AI verified actual payment through Scotiabank loan records. Corrected monthly payment from $620 to $482, reducing GDS from 33.8% to 31.2%. Additionally, comparable borrower analysis shows 92% successful repayment for similar profiles.',
-        icon: null,
-      },
-    ],
-    beforeAfter: {
-      metrics: [
-        { label: 'Risk Score', before: '68 (B)', after: '72 (B+)' },
-        { label: 'GDS Ratio', before: '33.8%', after: '31.2%' },
-        { label: 'Car Loan', before: '$620/mo', after: '$482/mo (verified)' },
-      ],
-    },
-  },
-  {
-    id: 'decision',
-    label: 'Decision Ready',
-    type: 'clean',
-    detail: 'Underwriting complete. Risk score: 72 (B+). 5 issues resolved by AI across the process.',
-    icon: '6',
-    delayMs: 3000,
-    agentStatus: 'Analysis complete — preparing your results...',
-    whatHappened: 'Underwriting completed with a risk score of 72 (B+ tier). Throughout the process, our AI assistant resolved 5 issues autonomously and flagged 1 for your action — preventing unnecessary score penalties, correcting income records, and ensuring accurate debt calculations. The proposed rate of 4.89% reflects your corrected profile.',
-  },
-  {
-    id: 'review',
-    label: 'Officer Review',
-    type: 'clean',
-    detail: 'A loan officer is reviewing your application and the AI assistant\'s intervention history.',
-    icon: '7',
-    delayMs: 4000,
-    agentStatus: 'A loan officer is reviewing your application...',
-    whatHappened: 'A senior loan officer reviewed the AI\'s assessment, including all 5 automated interventions. The officer verified the car loan correction, confirmed the FCAC rate-shopping consolidation, and approved the income reconciliation methodology.',
-  },
-  {
-    id: 'approved',
-    label: 'Approved',
-    type: 'clean',
-    detail: 'Congratulations! Your mortgage has been approved at 4.89% APR.',
-    icon: '8',
-    delayMs: 4000,
-    agentStatus: 'Great news — your loan has been approved!',
-    whatHappened: 'Your 5yr Fixed (25yr Amort) mortgage at 4.89% APR has been formally approved with a monthly payment of $4,047. Without the AI assistant\'s interventions, your application would have scored 68 (B tier) with a higher rate of 5.24%. The AI saved you an estimated $135/mo ($40,500 over the life of the loan).',
-  },
-  {
-    id: 'active',
-    label: 'Loan Active',
-    type: 'clean',
-    detail: 'Your mortgage is now active. $700,000 disbursed. First payment: May 1, 2026.',
-    icon: '9',
-    delayMs: 3000,
-    agentStatus: 'Your loan is now active and being monitored.',
-    whatHappened: 'EFT disbursement of $700,000 has been initiated to your designated account. Mortgage servicing has begun — your first payment of $4,047 is due May 1, 2026. Our AI assistant will continue to monitor your mortgage for renewal opportunities.',
-  },
-];
-
-// Maps backend status values to STAGES indices for SSE-driven progression
-const STATUS_TO_STAGE = {
-  submitted: 0,      // received
-  processing: 1,     // docs
-  action_required: 2, // action-required (note underscore vs hyphen)
-  credit: 3,         // credit
-  underwriting: 4,   // underwriting
-  decision: 5,       // decision
-  review: 6,         // officer review
-  approved: 7,       // approved
-  declined: 7,       // declined (same position, could add distinct visual)
-  funded: 8,         // active/funded
-  active: 8,         // active
-  error: -1,         // error state
-};
-
-function formatTime(date) {
-  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
+import { STAGES, STATUS_TO_STAGE, mapEventToStageIdx } from './statusTrackerConstants';
+import { SavingsSummary } from './SavingsSummary';
+import { TimelineStageCard } from './TimelineStageCard';
 
 export default function StatusTracker({ onNotification, applicationId, applicationData }) {
   const [activeStage, setActiveStage] = useState(0);
@@ -336,7 +36,6 @@ export default function StatusTracker({ onNotification, applicationId, applicati
     setTimestamps((prev) => [...prev, now]);
     sendNotification(stage, now);
 
-    // Send intervention sub-notifications for stages with interventions
     if (stage.interventions) {
       stage.interventions.forEach((intv, idx) => {
         setTimeout(() => {
@@ -356,7 +55,6 @@ export default function StatusTracker({ onNotification, applicationId, applicati
       });
     }
 
-    // Pause at action-required stages
     if (stage.type === 'action-required') {
       setActionPaused(true);
       return;
@@ -383,14 +81,12 @@ export default function StatusTracker({ onNotification, applicationId, applicati
         new Date(),
         { subType: 'action-resolved' }
       );
-      // Continue advancing
       stageIdxRef.current++;
       if (stageIdxRef.current < STAGES.length) {
         const now = new Date();
         setActiveStage(stageIdxRef.current);
         setTimestamps((prev) => [...prev, now]);
         sendNotification(STAGES[stageIdxRef.current], now);
-        // Send intervention sub-notifications
         const nextStage = STAGES[stageIdxRef.current];
         if (nextStage.interventions) {
           nextStage.interventions.forEach((intv, idx) => {
@@ -418,7 +114,6 @@ export default function StatusTracker({ onNotification, applicationId, applicati
   }, [actionPaused, sendNotification, advanceStageLoop]);
 
   useEffect(() => {
-    // SSE drives progression when connected — skip timer-based progression
     if (sseConnected) return;
 
     stageIdxRef.current = 0;
@@ -432,14 +127,13 @@ export default function StatusTracker({ onNotification, applicationId, applicati
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [sseConnected]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // SSE connection for real-time backend status (supplementary to timer-based stages)
+  // SSE connection for real-time backend status
   useEffect(() => {
     if (!applicationId) return;
 
     const source = apiSSE(
       `/applications/${applicationId}/status`,
       (event) => {
-        // Mark SSE as connected on first event
         if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
         setSseConnected(true);
 
@@ -450,15 +144,12 @@ export default function StatusTracker({ onNotification, applicationId, applicati
           }
           const targetIdx = STATUS_TO_STAGE[event.status];
           if (targetIdx !== undefined && targetIdx >= 0 && targetIdx > stageIdxRef.current) {
-            // Clear any pending timer-based progression
             if (timerRef.current) clearTimeout(timerRef.current);
-            // Advance directly to the target stage, skipping intermediate timers
             const now = new Date();
             const newTimestamps = [];
             while (stageIdxRef.current < targetIdx) {
               stageIdxRef.current++;
               newTimestamps.push(now);
-              // Fire notification for each skipped/reached stage
               sendNotification(STAGES[stageIdxRef.current], now);
             }
             setActiveStage(targetIdx);
@@ -681,329 +372,32 @@ export default function StatusTracker({ onNotification, applicationId, applicati
           }} />
         </div>
 
-        {STAGES.map((stage, i) => {
-          const isCompleted = i < activeStage;
-          const isActive = i === activeStage;
-          const isFuture = i > activeStage;
-          const isExpanded = expandedStage === stage.id;
-          const canExpand = isCompleted;
-          const hasInterventions = stage.type === 'intervention';
-          const isActionReq = stage.type === 'action-required';
-          const isActiveAction = isActive && isActionReq && actionPaused;
-
-          // Determine node dot color
-          let dotBg, dotBorder;
-          if (isCompleted && hasInterventions) {
-            dotBg = 'var(--success)';
-            dotBorder = 'var(--success)';
-          } else if (isCompleted && isActionReq) {
-            dotBg = 'var(--success)';
-            dotBorder = 'var(--success)';
-          } else if (isCompleted) {
-            dotBg = 'var(--success)';
-            dotBorder = 'var(--success)';
-          } else if (isActiveAction) {
-            dotBg = 'var(--hitl-amber)';
-            dotBorder = 'var(--hitl-amber)';
-          } else if (isActive && hasInterventions) {
-            dotBg = 'var(--hitl-amber)';
-            dotBorder = 'var(--hitl-amber)';
-          } else if (isActive) {
-            dotBg = 'var(--mongo)';
-            dotBorder = 'var(--mongo)';
-          } else {
-            dotBg = 'var(--bg-raised)';
-            dotBorder = 'var(--border-dim)';
-          }
-
-          // Card border/background
-          let cardBg, cardBorder;
-          if (isActiveAction) {
-            cardBg = 'var(--hitl-amber-dim)';
-            cardBorder = 'var(--hitl-amber)';
-          } else if (isActive && hasInterventions) {
-            cardBg = 'var(--hitl-amber-dim)';
-            cardBorder = 'var(--hitl-amber)';
-          } else if (isActive) {
-            cardBg = 'var(--mongo-dim)';
-            cardBorder = 'var(--mongo)';
-          } else if (isExpanded) {
-            cardBg = 'var(--bg-surface)';
-            cardBorder = 'var(--agent-cyan)';
-          } else if (isCompleted) {
-            cardBg = 'var(--bg-surface)';
-            cardBorder = 'var(--border-dim)';
-          } else {
-            cardBg = 'var(--bg-raised)';
-            cardBorder = 'var(--border-dim)';
-          }
-
-          const labelColor = isActiveAction
-            ? 'var(--hitl-amber)'
-            : isActive && hasInterventions
-              ? 'var(--hitl-amber)'
-              : isActive
-                ? 'var(--mongo)'
-                : isCompleted
-                  ? 'var(--text-primary)'
-                  : 'var(--text-dim)';
-
-          return (
-            <div key={stage.id} style={{
-              position: 'relative',
-              paddingBottom: 20,
-              opacity: isFuture ? 0.35 : 1,
-              transition: 'opacity 0.4s',
-            }}>
-              {/* Node dot */}
-              <div style={{
-                position: 'absolute', left: -22, top: 2,
-                width: 20, height: 20, borderRadius: '50%',
-                background: dotBg,
-                border: `2px solid ${dotBorder}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 10, color: '#fff', zIndex: 1,
-                animation: isActive ? 'pulse 1.5s infinite' : undefined,
-              }}>
-                {isCompleted ? '✓' : isActive ? (isActiveAction ? '!' : stage.icon) : ''}
-              </div>
-
-              {/* Content */}
-              <div
-                style={{
-                  padding: '10px 14px',
-                  background: cardBg,
-                  borderRadius: 'var(--radius-md)',
-                  border: `1px solid ${cardBorder}`,
-                  marginLeft: 8,
-                  cursor: canExpand ? 'pointer' : 'default',
-                  transition: 'border-color 0.2s, background 0.2s',
-                }}
-                onClick={() => canExpand && setExpandedStage(isExpanded ? null : stage.id)}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{
-                      fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13,
-                      color: labelColor,
-                    }}>
-                      {stage.id === 'approved' && isDeclined ? 'Declined' : stage.label}
-                    </div>
-                    {/* Badges */}
-                    {isCompleted && hasInterventions && (
-                      <span style={{
-                        padding: '1px 6px', borderRadius: 6,
-                        background: 'var(--success-dim)', color: 'var(--success)',
-                        fontSize: 8, fontWeight: 700,
-                      }}>
-                        {stage.interventions.length} RESOLVED
-                      </span>
-                    )}
-                    {isActive && hasInterventions && !isCompleted && (
-                      <span style={{
-                        padding: '1px 6px', borderRadius: 6,
-                        background: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)',
-                        fontSize: 8, fontWeight: 700,
-                        animation: 'pulse 1.5s infinite',
-                      }}>
-                        ISSUES DETECTED
-                      </span>
-                    )}
-                    {isActiveAction && (
-                      <span style={{
-                        padding: '1px 6px', borderRadius: 6,
-                        background: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)',
-                        fontSize: 8, fontWeight: 700,
-                      }}>
-                        ACTION NEEDED
-                      </span>
-                    )}
-                    {isCompleted && isActionReq && (
-                      <span style={{
-                        padding: '1px 6px', borderRadius: 6,
-                        background: 'var(--success-dim)', color: 'var(--success)',
-                        fontSize: 8, fontWeight: 700,
-                      }}>
-                        UPLOADED
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {timestamps[i] && (
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)' }}>
-                        {formatTime(timestamps[i])}
-                      </span>
-                    )}
-                    {canExpand && (
-                      <span style={{
-                        fontSize: 10, color: 'var(--text-dim)',
-                        transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)',
-                        transition: 'transform 0.2s',
-                        display: 'inline-block',
-                      }}>
-                        ▾
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                  {stage.id === 'approved' && isDeclined
-                    ? 'Application has been declined after officer review.'
-                    : stage.detail}
-                </div>
-
-                {stage.id === 'approved' && (isCompleted || isActive) && !isDeclined && (
-                  <div
-                    onAnimationEnd={() => setStampAnimated(true)}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 8,
-                      padding: '8px 20px', background: 'var(--success-dim)',
-                      border: '2px solid var(--success)', borderRadius: 'var(--radius-md)',
-                      animation: stampAnimated ? 'none' : 'approvedStamp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, celebratePulse 1s ease-out 0.5s',
-                      fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16,
-                      color: 'var(--success)', letterSpacing: '0.02em',
-                      marginTop: 8,
-                    }}>
-                    APPROVED
-                  </div>
-                )}
-
-                {/* Action-required: upload button */}
-                {isActiveAction && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{
-                      padding: '8px 10px', marginBottom: 8,
-                      background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)',
-                      fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5,
-                      borderLeft: '2px solid var(--hitl-amber)',
-                    }}>
-                      {stage.actionDetail}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); advanceFromAction(); }}
-                      disabled={actionUploading}
-                      style={{
-                        padding: '8px 16px', borderRadius: 'var(--radius-md)',
-                        border: 'none', background: actionUploading ? 'var(--text-dim)' : 'var(--mongo)',
-                        color: '#fff', fontFamily: 'var(--font-display)',
-                        fontWeight: 700, fontSize: 11, cursor: actionUploading ? 'default' : 'pointer',
-                        width: '100%',
-                      }}
-                    >
-                      {actionUploading ? '📤 Uploading & Verifying...' : `📎 ${stage.actionLabel}`}
-                    </button>
-                  </div>
-                )}
-
-                {/* Active processing indicator (non-action stages) */}
-                {isActive && !isActiveAction && !isComplete && (
-                  <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-dim)', animation: 'pulse 1.5s infinite' }}>
-                    {hasInterventions ? 'Investigating and resolving issues...' : 'Processing...'}
-                  </div>
-                )}
-
-                {/* Live agent activity feed */}
-                {(isActive || isCompleted) && (activityEvents[stage.id] || []).length > 0 && (
-                  <ActivityFeed
-                    events={activityEvents[stage.id]}
-                    collapsed={isCompleted ? true : feedCollapsed}
-                    onToggle={() => setFeedCollapsed((p) => !p)}
-                  />
-                )}
-
-                {/* Expandable "What happened" section */}
-                {isExpanded && (
-                  <div style={{
-                    marginTop: 8, padding: '8px 10px',
-                    background: 'var(--bg-raised)', borderRadius: 'var(--radius-sm)',
-                    borderLeft: `2px solid ${hasInterventions ? 'var(--hitl-amber)' : 'var(--agent-cyan)'}`,
-                  }}>
-                    <div style={{
-                      fontSize: 9, fontWeight: 700,
-                      color: hasInterventions ? 'var(--hitl-amber)' : 'var(--agent-cyan)',
-                      textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4,
-                    }}>
-                      What happened
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: stage.interventions ? 8 : 0 }}>
-                      {stage.whatHappened}
-                    </div>
-
-                    {/* Intervention sub-list */}
-                    {stage.interventions && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[2] }}>
-                        {stage.interventions.map((intv, idx) => (
-                          <div key={idx} style={{
-                            padding: '6px 8px',
-                            background: 'var(--bg-surface)',
-                            borderRadius: 'var(--radius-sm)',
-                            border: '1px solid var(--border-dim)',
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 4 }}>
-                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--hitl-amber)', flexShrink: 0, marginTop: 3 }} />
-                              <div>
-                                <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--hitl-amber)', marginBottom: 2 }}>
-                                  Issue Detected
-                                </div>
-                                <div style={{ fontSize: 9, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                                  {intv.issue}
-                                </div>
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--success)', flexShrink: 0, marginTop: 3 }} />
-                              <div>
-                                <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--success)', marginBottom: 2 }}>
-                                  Resolved by AI
-                                </div>
-                                <div style={{ fontSize: 9, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                                  {intv.resolution}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Before/after metrics */}
-                    {stage.beforeAfter && (
-                      <div style={{
-                        marginTop: 8, padding: '6px 8px',
-                        background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)',
-                        border: '1px solid var(--success)',
-                      }}>
-                        <div style={{
-                          fontSize: 9, fontWeight: 700, color: 'var(--success)',
-                          textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6,
-                        }}>
-                          Correction Summary
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[1] }}>
-                          {stage.beforeAfter.metrics.map((m, idx) => (
-                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 9 }}>
-                              <span style={{ color: 'var(--text-dim)', minWidth: 70 }}>{m.label}:</span>
-                              <span style={{ color: 'var(--danger)', fontFamily: 'var(--font-mono)', fontWeight: 600, textDecoration: 'line-through' }}>
-                                {m.before}
-                              </span>
-                              <span style={{ color: 'var(--text-dim)' }}>→</span>
-                              <span style={{ color: 'var(--success)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-                                {m.after}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {STAGES.map((stage, i) => (
+          <TimelineStageCard
+            key={stage.id}
+            stage={stage}
+            index={i}
+            activeStage={activeStage}
+            timestamps={timestamps}
+            expandedStage={expandedStage}
+            activityEvents={activityEvents}
+            isDeclined={isDeclined}
+            stampAnimated={stampAnimated}
+            onStampAnimated={() => setStampAnimated(true)}
+            actionPaused={actionPaused}
+            actionUploading={actionUploading}
+            feedCollapsed={feedCollapsed}
+            onToggleFeed={() => setFeedCollapsed((p) => !p)}
+            onToggleExpand={setExpandedStage}
+            onAdvanceFromAction={advanceFromAction}
+          />
+        ))}
       </div>
+
+      {/* Post-Approval Savings Summary */}
+      {isComplete && !isDeclined && (
+        <SavingsSummary interventionsResolved={interventionsResolved} />
+      )}
     </div>
   );
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import ApplicationQueue from './ApplicationQueue';
 import AgentActivityLog from './AgentActivityLog';
@@ -9,984 +8,43 @@ import ApplicationDetail from './ApplicationDetail';
 import DecisionSummary from './DecisionSummary';
 import WorkflowCanvas from '../DemoFlow/WorkflowCanvas';
 import NotificationToast, { useToasts } from '../NotificationToast/NotificationToast';
-import { apiPost, apiGet, apiSSE, apiWebSocket } from '../../lib/api';
-
-const WORKFLOW_STAGES = [
-  {
-    label: 'Origination',
-    currentScene: 'origination',
-    activeNodes: ['supervisor', 'appAgent', 'voyageEmbed', 'creditAPI', 'mongoAtlas'],
-    activeEdges: [['supervisor', 'appAgent'], ['appAgent', 'voyageEmbed'], ['appAgent', 'creditAPI']],
-    pulsingNodes: ['appAgent'],
-    nodeKey: 'loan_app',
-  },
-  {
-    label: 'Decisioning',
-    currentScene: 'decisioning',
-    activeNodes: ['supervisor', 'underwriter', 'aggregation', 'vectorSearch', 'graphLookup', 'mongoAtlas'],
-    activeEdges: [['supervisor', 'underwriter'], ['underwriter', 'aggregation'], ['underwriter', 'vectorSearch'], ['underwriter', 'graphLookup']],
-    pulsingNodes: ['underwriter'],
-    nodeKey: 'underwriter',
-  },
-  {
-    label: 'HITL Review',
-    currentScene: 'approval',
-    activeNodes: ['underwriter', 'hitlGate', 'checkpoint', 'mongoAtlas'],
-    activeEdges: [['underwriter', 'hitlGate'], ['hitlGate', 'checkpoint'], ['checkpoint', 'mongoAtlas']],
-    pulsingNodes: ['hitlGate'],
-    nodeKey: 'hitl_gate',
-  },
-];
-
-const NODE_TO_STAGE = {};
-WORKFLOW_STAGES.forEach((s, i) => { NODE_TO_STAGE[s.nodeKey] = i; });
-
-function formatCurrency(amount) {
-  if (amount == null) return 'N/A';
-  return `$${Number(amount).toLocaleString('en-US')}`;
-}
-
-function getAppDisplayName(detail, queueData) {
-  if (detail?.borrower_names?.length) return detail.borrower_names.join(' & ');
-  return queueData?.name || 'Application';
-}
-
-// ─── Modified Parameters Badge ───
-
-function ModifiedParamsBadge({ settings }) {
-  if (!settings) return null;
-  const mods = [];
-  if (settings.docVerify && !settings.docVerify.enabled) mods.push('Doc verify: off');
-  if (settings.bankingEnrich && !settings.bankingEnrich.enabled) mods.push('Banking: off');
-  if (settings.fraudScan && !settings.fraudScan.enabled) mods.push('Fraud scan: off');
-  if (settings.riskScore && settings.riskScore.threshold !== 65) mods.push(`Risk threshold: ${settings.riskScore.threshold}`);
-  if (settings.fraudScan && settings.fraudScan.enabled && settings.fraudScan.hops !== 3) mods.push(`Graph depth: ${settings.fraudScan.hops}`);
-  if (mods.length === 0) return null;
-  return (
-    <div style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      padding: '3px 8px', borderRadius: 8,
-      background: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)',
-      fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-mono)',
-    }}>
-      {mods.join(' · ')}
-    </div>
-  );
-}
-
-// ─── Policy Bounds Indicator (shown during bounded execution) ───
-
-function PolicyBoundsIndicator({ exceeded, policyCitations }) {
-  const bounds = policyCitations?.length > 0
-    ? policyCitations.map((c) => ({ rule: c.detail || c.action || c, marker: 'ESC' }))
-    : [
-        { rule: 'Auto-approve if score > 80 and GDS < 36%', marker: 'PASS' },
-        { rule: 'Escalate if property value > $500,000', marker: 'ESC' },
-        { rule: 'Auto-decline if GDS > 50% or score < 35', marker: 'FAIL' },
-      ];
-
-  return (
-    <div style={{
-      position: 'absolute', top: 12, left: 12, zIndex: 10,
-      padding: '10px 12px', width: 240,
-      background: 'var(--bg-overlay-alpha)',
-      backdropFilter: 'blur(8px)',
-      borderRadius: 8,
-      border: `1px solid ${exceeded ? 'var(--hitl-amber)' : 'var(--tool-blue)'}`,
-      animation: 'slideDown 0.3s ease-out',
-    }}>
-      <div style={{
-        fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
-        color: exceeded ? 'var(--hitl-amber)' : 'var(--tool-blue)', marginBottom: 6,
-      }}>
-        {exceeded ? 'Boundary Exceeded — Escalating' : 'Active Policy Bounds'}
-      </div>
-      {bounds.map((b, i) => (
-        <div key={i} style={{
-          fontSize: 9, color: 'var(--text-secondary)', lineHeight: 1.6,
-          opacity: exceeded && i >= bounds.length - 1 ? 1 : 0.8,
-        }}>
-          <span style={{
-            display: 'inline-block', fontFamily: 'var(--font-mono)', fontSize: 7, fontWeight: 700,
-            padding: '1px 3px', borderRadius: 2, marginRight: 4,
-            background: b.marker === 'PASS' ? 'var(--success-dim)' : b.marker === 'FAIL' ? 'var(--danger-dim)' : 'var(--hitl-amber-dim)',
-            color: b.marker === 'PASS' ? 'var(--success)' : b.marker === 'FAIL' ? 'var(--danger)' : 'var(--hitl-amber)',
-          }}>{b.marker}</span>
-          {b.rule}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Manual Review Workspace ───
-
-function ManualWorkspace({ appDetail, queueData, onApprove, onDecline, addToast }) {
-  const [rate, setRate] = useState(4.89);
-  const [conditions, setConditions] = useState('');
-  const [decided, setDecided] = useState(null);
-
-  const appName = getAppDisplayName(appDetail, queueData);
-  const product = appDetail?.product || queueData?.product || '';
-  const loanAmount = appDetail?.loan_amount ? formatCurrency(appDetail.loan_amount) : (queueData?.amount || '');
-
-  const handleApprove = () => {
-    setDecided('approved');
-    onApprove({ mode: 'manual', rate: `${rate.toFixed(3)}%`, conditions });
-  };
-
-  const handleDecline = () => {
-    setDecided('declined');
-    onDecline?.();
-    if (addToast) addToast({ type: 'warning', icon: '✕', title: 'Application Declined', message: `${appName} — manually declined by officer.` });
-  };
-
-  if (decided === 'approved') {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <div style={{ padding: 20, background: 'var(--success-dim)', borderRadius: 8, border: '1px solid var(--success)', textAlign: 'center', maxWidth: 360 }}>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 4px', fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 800, color: 'var(--success)' }}>&#10003;</div>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16, color: 'var(--success)' }}>MANUALLY APPROVED</div>
-          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
-            {product} @ {rate.toFixed(3)}% · {appName}
-            {conditions && <><br/>Conditions: {conditions}</>}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (decided === 'declined') {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <div style={{ padding: 20, background: 'var(--danger-dim)', borderRadius: 8, border: '1px solid var(--danger)', textAlign: 'center', maxWidth: 360 }}>
-          <div style={{ fontSize: 24, marginBottom: 4 }}>✕</div>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16, color: 'var(--danger)' }}>DECLINED</div>
-          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
-            {appName} — {loanAmount} {product}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-      <div style={{ width: '100%', maxWidth: 460, padding: 20 }}>
-        <div style={{
-          padding: '8px 10px', marginBottom: 12,
-          background: 'var(--bg-raised)', borderRadius: 8,
-          border: '1px solid var(--border-dim)',
-          fontSize: 10, color: 'var(--hitl-amber)', fontWeight: 600,
-        }}>
-          Agent activity log paused — manual review in progress
-        </div>
-
-        <div style={{
-          padding: spacing[3], marginBottom: spacing[3],
-          background: 'var(--bg-surface)', borderRadius: 8,
-          border: '1px solid var(--border-base)',
-        }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, marginBottom: spacing[2] }}>
-            {appName}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: spacing[2], marginBottom: spacing[2] }}>
-            {[
-              { label: 'Amount', value: loanAmount },
-              { label: 'Product', value: product },
-              { label: 'Credit Score', value: appDetail?.credit_reports?.[0]?.score ?? 'N/A' },
-            ].map((item) => (
-              <div key={item.label}>
-                <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600, marginBottom: 1 }}>{item.label}</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600 }}>{item.value || 'N/A'}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: spacing[2] }}>
-            {[
-              { label: 'Risk Score', value: appDetail?.risk_score != null ? `${appDetail.risk_score}/100` : 'N/A', color: appDetail?.risk_score > 65 ? 'var(--danger)' : appDetail?.risk_score > 50 ? 'var(--hitl-amber)' : undefined },
-              { label: 'Risk Tier', value: appDetail?.risk_tier || 'N/A' },
-              { label: 'GDS', value: appDetail?.gds_ratio != null ? `${(appDetail.gds_ratio * 100).toFixed(1)}%` : 'N/A' },
-              { label: 'TDS', value: appDetail?.tds_ratio != null ? `${(appDetail.tds_ratio * 100).toFixed(1)}%` : 'N/A' },
-            ].map((item) => (
-              <div key={item.label}>
-                <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600, marginBottom: 1 }}>{item.label}</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: item.color }}>{item.value || 'N/A'}</div>
-              </div>
-            ))}
-          </div>
-          {appDetail?.property && (
-            <div style={{ marginTop: spacing[2], display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: spacing[2] }}>
-              {[
-                { label: 'Property', value: appDetail.property.type || 'N/A' },
-                { label: 'Location', value: appDetail.property.city || 'N/A' },
-                { label: 'Documents', value: `${appDetail.documents?.length || 0} uploaded` },
-              ].map((item) => (
-                <div key={item.label}>
-                  <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600, marginBottom: 1 }}>{item.label}</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600 }}>{item.value}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div style={{
-          padding: spacing[3],
-          background: 'var(--bg-surface)', borderRadius: 8,
-          border: '1px solid var(--border-base)',
-        }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
-            Officer Decision
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: spacing[2], marginBottom: 10 }}>
-            <label htmlFor="rate-slider" style={{ fontSize: 10, color: 'var(--text-secondary)', whiteSpace: 'nowrap', minWidth: 50 }}>Rate (%):</label>
-            <input id="rate-slider" type="range" min={5.0} max={9.0} step={0.125} value={rate}
-              aria-label="Interest rate percentage"
-              onChange={(e) => setRate(+e.target.value)}
-              style={{ flex: 1, accentColor: 'var(--mongo)' }}
-            />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--mongo)', minWidth: 55 }}>
-              {rate.toFixed(3)}%
-            </span>
-          </div>
-
-          <div style={{ marginBottom: 12 }}>
-            <label htmlFor="conditions-input" style={{ fontSize: 10, color: 'var(--text-secondary)', display: 'block', marginBottom: 3 }}>Conditions:</label>
-            <input id="conditions-input" type="text" placeholder="e.g., Require 6-month reserve verification"
-              value={conditions} onChange={(e) => setConditions(e.target.value)}
-              style={{
-                width: '100%', padding: '6px 8px', fontSize: 10, fontFamily: 'var(--font-body)',
-                background: 'var(--bg-raised)', border: '1px solid var(--border-dim)',
-                borderRadius: 6, color: 'var(--text-primary)', outline: 'none',
-              }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: spacing[2] }}>
-            <button type="button" onClick={handleApprove} style={{
-              flex: 1, padding: 10, borderRadius: 8, border: 'none',
-              background: 'var(--mongo)', color: '#fff',
-              fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, cursor: 'pointer',
-            }}>
-              Approve
-            </button>
-            <button type="button" onClick={handleDecline} style={{
-              flex: 1, padding: 10, borderRadius: 8,
-              border: '1px solid var(--danger)', background: 'transparent',
-              color: 'var(--danger)', fontFamily: 'var(--font-display)',
-              fontWeight: 600, fontSize: 11, cursor: 'pointer',
-            }}>
-              Decline
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── HITL Review Card (wired to backend) ───
-
-function HITLReviewCard({ applicationId, appDetail, queueData, onApprove, onDecline, addToast }) {
-  const [showProvenance, setShowProvenance] = useState(false);
-  const [showModify, setShowModify] = useState(false);
-  const [fetchingContext, setFetchingContext] = useState(false);
-  const [hitlContext, setHitlContext] = useState(null);
-  const [modFields, setModFields] = useState({ rate: 4.89, conditions: '', requestDocs: false, loanAmount: '' });
-
-  const app = hitlContext?.application || appDetail || {};
-  const activityTrail = hitlContext?.activity_trail || [];
-  const appName = getAppDisplayName(app, queueData);
-  const loanAmount = app.loan_amount ? formatCurrency(app.loan_amount) : (queueData?.amount || 'N/A');
-  const product = app.product || queueData?.product || 'N/A';
-  const riskScore = app.risk_score ?? null;
-  const policyCitations = activityTrail.filter((a) =>
-    a.action?.includes('policy') || a.action?.includes('escalat') || a.action?.includes('autonomy_gate')
-  );
-  const recommendation = activityTrail.find((a) =>
-    a.action?.includes('decision') || a.action?.includes('complete') || a.detail?.includes('recommend')
-  );
-
-  const fetchContext = useCallback(async () => {
-    setFetchingContext(true);
-    const ctx = await apiGet(`/hitl/${applicationId}/context`);
-    setFetchingContext(false);
-    if (ctx) {
-      setHitlContext(ctx);
-    } else {
-      if (addToast) addToast({ type: 'warning', title: 'Context Unavailable', message: 'Could not retrieve HITL context from backend.' });
-    }
-  }, [applicationId, addToast]);
-
-  useEffect(() => {
-    if (applicationId) fetchContext();
-  }, [applicationId, fetchContext]);
-
-  const handleModifySubmit = () => {
-    const loanAmountNum = modFields.loanAmount ? parseFloat(modFields.loanAmount.replace(/[^0-9.]/g, '')) : null;
-    const details = {
-      mode: 'modified',
-      rate: `${modFields.rate.toFixed(3)}%`,
-      conditions: modFields.conditions,
-      requestDocs: modFields.requestDocs,
-      ...(loanAmountNum ? { loanAmount: loanAmountNum } : {}),
-    };
-    if (addToast) {
-      const parts = [`Rate: ${details.rate}`];
-      if (loanAmountNum) parts.push(`Amount: $${loanAmountNum.toLocaleString()}`);
-      if (modFields.conditions) parts.push(`Condition: ${modFields.conditions}`);
-      if (modFields.requestDocs) parts.push('Additional docs requested');
-      addToast({ type: 'info', title: 'Submitting Modifications', message: parts.join(' · ') });
-    }
-    onApprove(details);
-  };
-
-  const handleApproveRecommended = () => {
-    onApprove({ mode: 'recommended', rate: recommendation?.detail?.match(/[\d.]+%/)?.[0] || 'as recommended' });
-  };
-
-  const modSummary = showModify ? (() => {
-    const parts = [];
-    if (modFields.rate !== 4.89) parts.push(`Rate adjusted to ${modFields.rate.toFixed(3)}%`);
-    if (modFields.loanAmount) parts.push(`Amount: $${modFields.loanAmount}`);
-    if (modFields.conditions) parts.push(`Condition: ${modFields.conditions}`);
-    if (modFields.requestDocs) parts.push('Additional docs: requested');
-    return parts;
-  })() : [];
-
-  return (
-    <div
-      role="region"
-      aria-label="Human-in-the-loop review"
-      aria-live="polite"
-      style={{
-        padding: spacing[4],
-        background: 'var(--bg-surface)',
-        borderRadius: 8,
-        border: '2px solid var(--hitl-amber)',
-        animation: 'slideDown 0.3s ease-out',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: spacing[2], marginBottom: spacing[3] }}>
-        <span style={{
-          padding: `${spacing[1]}px 10px`, borderRadius: 12,
-          background: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)',
-          fontWeight: 700, fontSize: 11,
-        }}>
-          Human Review Required
-        </span>
-        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>LangGraph interrupt()</span>
-      </div>
-
-      {/* Agent activity summary */}
-      <div style={{
-        padding: '8px 10px',
-        background: 'var(--bg-raised)',
-        borderRadius: 6,
-        marginBottom: 12,
-        fontSize: 11,
-        color: 'var(--text-secondary)',
-        lineHeight: 1.5,
-      }}>
-        <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Agent attempted: </span>
-        {recommendation?.detail
-          ? recommendation.detail.slice(0, 200)
-          : `Process ${product} for ${appName} (${loanAmount}). Workflow halted — policy constraints triggered during underwriting.`
-        }
-      </div>
-
-      {/* Constraints triggered */}
-      {policyCitations.length > 0 && (
-        <div style={{
-          padding: '8px 10px',
-          background: 'var(--danger-dim)',
-          borderRadius: 6,
-          border: '1px solid var(--danger)',
-          marginBottom: 12,
-        }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
-            Constraints Triggered
-          </div>
-          <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            {policyCitations.map((c, i) => (
-              <div key={i}>
-                {'\u2022'} <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9 }}>{c.agent}</span> — {c.detail || c.action}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Agent recommendation */}
-      {recommendation && (
-        <div style={{
-          padding: '10px 12px',
-          background: 'var(--mongo-dim)',
-          borderRadius: 6,
-          border: '1px solid var(--mongo)',
-          marginBottom: 12,
-        }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--mongo)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
-            Agent Recommendation
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--text-primary)', fontWeight: 600 }}>
-            {recommendation.detail?.slice(0, 200) || 'Review and make a decision.'}
-          </div>
-        </div>
-      )}
-
-      {/* Key metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: spacing[3], marginBottom: spacing[3] }}>
-        <div>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>Risk Score</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 800, color: riskScore != null && riskScore < 50 ? 'var(--danger)' : 'var(--hitl-amber)' }}>
-            {riskScore != null ? riskScore : 'N/A'} {riskScore != null && <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>/ 100</span>}
-          </div>
-        </div>
-        <div>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>Loan Amount</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700 }}>{loanAmount}</div>
-        </div>
-        <div>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 2 }}>Product</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: 'var(--mongo)' }}>{product}</div>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: spacing[2], marginBottom: spacing[3], padding: 10, background: 'var(--bg-raised)', borderRadius: 8 }}>
-        {[
-          { label: 'Applicant', value: appName },
-          { label: 'Status', value: app.status || 'review' },
-          { label: 'Documents', value: app.documents?.length ?? 'N/A' },
-        ].map((item) => (
-          <div key={item.label}>
-            <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 1 }}>{item.label}</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600 }}>{item.value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Additional context from HITL endpoint */}
-      {hitlContext && hitlContext.activity_trail?.length > 0 && (
-        <div style={{
-          padding: '10px 12px',
-          background: 'var(--bg-raised)',
-          borderRadius: 6,
-          marginBottom: 12,
-          animation: 'slideDown 0.3s ease-out',
-        }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
-            Agent Activity Trail ({hitlContext.activity_trail.length} entries)
-          </div>
-          {hitlContext.activity_trail.slice(0, 5).map((entry, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 4 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--success)', flexShrink: 0, marginTop: 5 }} />
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-primary)' }}>{entry.agent}: {entry.action}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{entry.detail?.slice(0, 120)}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Expandable provenance panel */}
-      <button
-        type="button"
-        onClick={() => setShowProvenance(!showProvenance)}
-        aria-expanded={showProvenance}
-        aria-controls="provenance-panel"
-        style={{
-          width: '100%',
-          padding: '6px 10px',
-          marginBottom: showProvenance ? 0 : 12,
-          background: 'var(--bg-raised)',
-          border: '1px solid var(--border-dim)',
-          borderRadius: showProvenance ? '6px 6px 0 0' : 6,
-          cursor: 'pointer',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: 10,
-          fontWeight: 600,
-          color: 'var(--text-secondary)',
-          fontFamily: 'var(--font-display)',
-        }}
-      >
-        <span>Why this escalation?</span>
-        <span style={{
-          transform: showProvenance ? 'rotate(180deg)' : 'rotate(0)',
-          transition: 'transform 0.2s',
-          display: 'inline-block',
-        }}>{'\u25BE'}</span>
-      </button>
-      {showProvenance && (
-        <div id="provenance-panel" style={{
-          padding: '10px 12px',
-          background: 'var(--bg-raised)',
-          border: '1px solid var(--border-dim)',
-          borderTop: 'none',
-          borderRadius: '0 0 6px 6px',
-          marginBottom: 12,
-        }}>
-          {policyCitations.length > 0 ? policyCitations.map((rec, i) => (
-            <div key={i} style={{ marginBottom: i < policyCitations.length - 1 ? 10 : 0 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
-                {rec.agent}
-              </div>
-              <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginBottom: 2 }}>
-                {rec.detail || rec.action}
-              </div>
-            </div>
-          )) : (
-            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-              {fetchingContext ? 'Loading activity trail...' : 'No policy-related activity found in the trail.'}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Inline modification form */}
-      {showModify && (
-        <div style={{
-          padding: 12,
-          background: 'var(--bg-raised)',
-          borderRadius: 6,
-          border: '1px solid var(--border-base)',
-          marginBottom: 12,
-          animation: 'slideDown 0.3s ease-out',
-        }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: spacing[2] }}>
-            Modify Terms
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: spacing[2], marginBottom: spacing[2] }}>
-            <label htmlFor="hitl-rate" style={{ fontSize: 10, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Rate (%):</label>
-            <input
-              id="hitl-rate"
-              type="range"
-              min={3.0}
-              max={12.0}
-              step={0.125}
-              value={modFields.rate}
-              aria-label="Modified interest rate"
-              onChange={(e) => setModFields((p) => ({ ...p, rate: +e.target.value }))}
-              style={{ flex: 1, accentColor: 'var(--mongo)' }}
-            />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: 'var(--mongo)', minWidth: 45 }}>
-              {modFields.rate.toFixed(3)}%
-            </span>
-          </div>
-          <div style={{ marginBottom: spacing[2] }}>
-            <label htmlFor="hitl-conditions" style={{ fontSize: 10, color: 'var(--text-secondary)', display: 'block', marginBottom: 3 }}>Additional Conditions:</label>
-            <input
-              id="hitl-conditions"
-              type="text"
-              placeholder="e.g., Require 6-month reserve verification"
-              value={modFields.conditions}
-              onChange={(e) => setModFields((p) => ({ ...p, conditions: e.target.value }))}
-              style={{
-                width: '100%', padding: '5px 8px', fontSize: 10,
-                fontFamily: 'var(--font-body)',
-                background: 'var(--bg-surface)', border: '1px solid var(--border-dim)',
-                borderRadius: 6, color: 'var(--text-primary)', outline: 'none',
-              }}
-            />
-          </div>
-          <div style={{ marginBottom: spacing[2] }}>
-            <label htmlFor="hitl-loanamt" style={{ fontSize: 10, color: 'var(--text-secondary)', display: 'block', marginBottom: 3 }}>Loan Amount Override:</label>
-            <input
-              id="hitl-loanamt"
-              type="text"
-              placeholder={app.loan_amount ? `Current: $${Number(app.loan_amount).toLocaleString()}` : 'e.g., 350000'}
-              value={modFields.loanAmount}
-              onChange={(e) => setModFields((p) => ({ ...p, loanAmount: e.target.value }))}
-              style={{
-                width: '100%', padding: '5px 8px', fontSize: 10,
-                fontFamily: 'var(--font-mono)',
-                background: 'var(--bg-surface)', border: '1px solid var(--border-dim)',
-                borderRadius: 6, color: 'var(--text-primary)', outline: 'none',
-              }}
-            />
-          </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-secondary)', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={modFields.requestDocs}
-              onChange={(e) => setModFields((p) => ({ ...p, requestDocs: e.target.checked }))}
-              style={{ accentColor: 'var(--mongo)' }}
-            />
-            Request additional documentation from borrower
-          </label>
-
-          {modSummary.length > 0 && (
-            <div style={{
-              marginTop: spacing[2], padding: '6px 8px',
-              background: 'var(--agent-cyan-dim)', borderRadius: 6,
-              border: '1px solid var(--agent-cyan)',
-              fontSize: 9, color: 'var(--agent-cyan)', lineHeight: 1.5,
-            }}>
-              <span style={{ fontWeight: 700 }}>Modified Terms: </span>
-              {modSummary.join(' · ')}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Action buttons */}
-      <div style={{ display: 'flex', gap: spacing[2], flexWrap: 'wrap' }}>
-        {showModify ? (
-          <button type="button" onClick={handleModifySubmit} style={{
-            flex: '1 1 auto', padding: 10, borderRadius: 8, border: 'none',
-            background: 'var(--agent-cyan)', color: '#fff', fontFamily: 'var(--font-display)',
-            fontWeight: 700, fontSize: 11, cursor: 'pointer',
-          }}>
-            Submit Modified Terms
-          </button>
-        ) : (
-          <button type="button" onClick={handleApproveRecommended} style={{
-            flex: '1 1 auto', padding: 10, borderRadius: 8, border: 'none',
-            background: 'var(--mongo)', color: '#fff', fontFamily: 'var(--font-display)',
-            fontWeight: 700, fontSize: 11, cursor: 'pointer',
-          }}>
-            Approve as Recommended
-          </button>
-        )}
-        <button type="button" onClick={() => setShowModify(!showModify)} style={{
-          flex: '1 1 auto', padding: 10, borderRadius: 8,
-          border: `1px solid ${showModify ? 'var(--agent-cyan)' : 'var(--border-base)'}`,
-          background: showModify ? 'var(--agent-cyan-dim)' : 'var(--bg-raised)',
-          color: showModify ? 'var(--agent-cyan)' : 'var(--text-primary)',
-          fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
-        }}>
-          {showModify ? 'Back' : 'Modify & Approve'}
-        </button>
-        <button type="button" onClick={fetchContext} disabled={fetchingContext} style={{
-          flex: '1 1 auto', padding: 10, borderRadius: 8,
-          border: '1px solid var(--tool-blue)',
-          background: fetchingContext ? 'var(--tool-blue-dim)' : 'transparent',
-          color: 'var(--tool-blue)',
-          fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 11,
-          cursor: fetchingContext ? 'default' : 'pointer',
-        }}>
-          {fetchingContext ? 'Fetching...' : 'Refresh Context'}
-        </button>
-        <button type="button" onClick={() => onDecline?.()} style={{
-          flex: '1 1 auto', padding: 10, borderRadius: 8,
-          border: '1px solid var(--danger)', background: 'transparent',
-          color: 'var(--danger)', fontFamily: 'var(--font-display)',
-          fontWeight: 600, fontSize: 11, cursor: 'pointer',
-        }}>
-          Decline
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Main Dashboard ───
+import { WORKFLOW_STAGES } from './constants';
+import { getAppDisplayName } from './utils';
+import { ModifiedParamsBadge } from './ModifiedParamsBadge';
+import { PolicyBoundsIndicator } from './PolicyBoundsIndicator';
+import { ManualWorkspace } from './ManualWorkspace';
+import { HITLReviewCard } from './HITLReviewCard';
+import { PolicyExplorer } from './PolicyExplorer';
+import { PortfolioIntelligence } from './PortfolioIntelligence';
+import { LiveUnderwritingResults } from './LiveUnderwritingResults';
+import { StageProgressBar } from './StageProgressBar';
+import { useLoanOfficerWorkflow } from './useLoanOfficerWorkflow';
 
 export default function LoanOfficerDashboard() {
-  const [selectedApp, setSelectedApp] = useState(null);
-  const [workflowPhase, setWorkflowPhase] = useState('idle');
-  const [workflowStage, setWorkflowStage] = useState(0);
-  const [hitlReached, setHitlReached] = useState(false);
-  const [approved, setApproved] = useState(false);
-  const [planSettings, setPlanSettings] = useState(null);
-  const [approvalDetails, setApprovalDetails] = useState(null);
-  const sseRef = useRef(null);
   const { toasts, addToast, removeToast } = useToasts();
-  const [liveApplications, setLiveApplications] = useState([]);
-  const [selectedAppDetail, setSelectedAppDetail] = useState(null);
-  const [portfolioStats, setPortfolioStats] = useState(null);
 
-  // Real-time application queue via WebSocket + MongoDB Change Stream
-  const snapshotReceived = useRef(false);
-  const selectedAppRef = useRef(selectedApp);
-  selectedAppRef.current = selectedApp;
-  const liveApplicationsRef = useRef(liveApplications);
-  liveApplicationsRef.current = liveApplications;
-
-  useEffect(() => {
-    snapshotReceived.current = false;
-    const ws = apiWebSocket('/applications/ws', {
-      onMessage: (data) => {
-        if (data.type === 'snapshot') {
-          snapshotReceived.current = true;
-          setLiveApplications(data.applications ?? []);
-        } else if (data.type === 'change' && snapshotReceived.current) {
-          const app = data.application;
-          if (app) {
-            setLiveApplications((prev) => {
-              const idx = prev.findIndex((a) => a.application_id === app.application_id);
-              if (idx >= 0) {
-                const next = [...prev];
-                next[idx] = app;
-                return next;
-              }
-              return [app, ...prev];
-            });
-            if (app.application_id === selectedAppRef.current) {
-              apiGet(`/applications/${app.application_id}`).then((detail) => {
-                if (detail) setSelectedAppDetail(detail);
-              });
-            }
-          }
-        }
-      },
-    });
-
-    return () => ws.close();
-  }, []);
-
-  // Fetch portfolio stats on mount
-  useEffect(() => {
-    apiGet('/portfolio/stats').then((data) => {
-      if (data) setPortfolioStats(data);
-    }).catch(() => {});
-  }, []);
-
-  // Fetch selected application detail from backend
-  useEffect(() => {
-    if (!selectedApp) {
-      setSelectedAppDetail(null);
-      return;
-    }
-    apiGet(`/applications/${selectedApp}`).then((data) => {
-      setSelectedAppDetail(data);
-    });
-  }, [selectedApp]);
-
-  // Dashboard stats derived from real data + portfolio stats
-  const dashboardStats = useMemo(() => {
-    const pendingCount = liveApplications.filter(
-      (a) => ['review', 'pending_review'].includes(a.status)
-    ).length;
-    const approvedCount = liveApplications.filter((a) => a.status === 'approved').length;
-    const stats = [
-      { label: 'Applications', value: String(liveApplications.length), color: 'var(--mongo)' },
-      { label: 'Processing', value: String(liveApplications.filter((a) => a.status === 'processing' || a.status === 'underwriting').length), color: 'var(--agent-cyan)' },
-      { label: 'Approved', value: String(approvedCount), color: 'var(--success)' },
-      { label: 'Pending Reviews', value: String(pendingCount), color: 'var(--hitl-amber)' },
-    ];
-    if (portfolioStats) {
-      if (portfolioStats.total_portfolio_value) {
-        stats.push({ label: 'Portfolio Value', value: `$${(portfolioStats.total_portfolio_value / 1_000_000).toFixed(1)}M`, color: 'var(--mongo)' });
-      }
-      if (portfolioStats.active_loans != null) {
-        stats.push({ label: 'Active Loans', value: String(portfolioStats.active_loans), color: 'var(--tool-blue)' });
-      }
-      if (portfolioStats.delinquency_rate != null) {
-        stats.push({ label: 'Delinquency', value: `${(portfolioStats.delinquency_rate * 100).toFixed(1)}%`, color: portfolioStats.delinquency_rate > 0.05 ? 'var(--danger)' : 'var(--success)' });
-      }
-    }
-    return stats;
-  }, [liveApplications, portfolioStats]);
-
-  // Clean up SSE on unmount
-  useEffect(() => {
-    return () => { if (sseRef.current) { sseRef.current.close(); sseRef.current = null; } };
-  }, []);
-
-  const reconnectActivitySSERef = useRef(reconnectActivitySSE);
-  reconnectActivitySSERef.current = reconnectActivitySSE;
-
-  // Status-aware reset when selected app changes
-  useEffect(() => {
-    if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
-    setWorkflowStage(0);
-    setHitlReached(false);
-    setApproved(false);
-    setPlanSettings(null);
-    setApprovalDetails(null);
-
-    if (!selectedApp) {
-      setWorkflowPhase('idle');
-      return;
-    }
-
-    const queueApp = liveApplicationsRef.current.find((a) => a.application_id === selectedApp);
-    const status = queueApp?.status || 'submitted';
-
-    if (status === 'review' || status === 'pending_review') {
-      setWorkflowPhase('executing');
-      setWorkflowStage(2);
-      setHitlReached(true);
-    } else if (status === 'processing' || status === 'underwriting') {
-      setWorkflowPhase('executing');
-      setWorkflowStage(status === 'underwriting' ? 1 : 0);
-      reconnectActivitySSERef.current(selectedApp);
-    } else if (status === 'approved') {
-      setWorkflowPhase('executing');
-      setApproved(true);
-      setApprovalDetails({ mode: 'auto' });
-    } else if (status === 'declined') {
-      setWorkflowPhase('executing');
-      setApproved(true);
-      setApprovalDetails({ mode: 'declined' });
-    } else if (status === 'error') {
-      setWorkflowPhase('preview');
-    } else {
-      setWorkflowPhase('preview');
-    }
-  }, [selectedApp]);
-
-  // SSE-driven workflow stage progression via run-stream (starts graph + streams events)
-  const startWorkflowSSE = useCallback((appId) => {
-    if (sseRef.current) sseRef.current.close();
-
-    setWorkflowStage(0);
-    setHitlReached(false);
-    setApproved(false);
-    setWorkflowPhase('executing');
-
-    const source = apiSSE(
-      `/agent/${appId}/run-stream?autonomy_level=bounded`,
-      (event) => {
-        if (event.type === 'node_start') {
-          const agentName = event.agent || event.name || '';
-          const stageIdx = NODE_TO_STAGE[agentName];
-          if (stageIdx !== undefined) {
-            setWorkflowStage(stageIdx);
-          }
-        }
-
-        if (event.type === 'node_complete') {
-          const agentName = event.agent || '';
-          const stageIdx = NODE_TO_STAGE[agentName];
-          if (stageIdx !== undefined) {
-            setWorkflowStage(stageIdx);
-          }
-          if (agentName === 'hitl_gate') {
-            setHitlReached(true);
-            addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
-          }
-        }
-
-        if (event.type === 'hitl_waiting') {
-          setHitlReached(true);
-          setWorkflowStage(2);
-          addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
-        }
-
-        if (event.type === 'complete') {
-          setApproved(true);
-          setApprovalDetails({ mode: 'auto' });
-          addToast({ type: 'success', title: 'Pipeline Complete', message: `Agent pipeline completed for ${appId}.` });
-        }
-      }
-    );
-
-    sseRef.current = source;
-  }, [addToast]);
-
-  // Reconnect to activity stream for apps already processing (no graph start)
-  const reconnectActivitySSE = useCallback((appId) => {
-    if (sseRef.current) sseRef.current.close();
-
-    const source = apiSSE(
-      `/agent/${appId}/stream`,
-      (event) => {
-        if (event.type === 'agent_step') {
-          const agentName = event.agent || '';
-          const stageIdx = NODE_TO_STAGE[agentName];
-          if (stageIdx !== undefined) {
-            setWorkflowStage(stageIdx);
-          }
-          if (agentName === 'hitl_gate' && event.action === 'interrupt') {
-            setHitlReached(true);
-            addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
-          }
-        }
-        if (event.type === 'complete') {
-          setApproved(true);
-          setApprovalDetails({ mode: 'auto' });
-          addToast({ type: 'success', title: 'Pipeline Complete', message: `Agent pipeline completed for ${appId}.` });
-        }
-      }
-    );
-
-    sseRef.current = source;
-  }, [addToast]);
-
-  const handleProceed = useCallback((settings) => {
-    if (!selectedApp) return;
-    setPlanSettings(settings || null);
-    startWorkflowSSE(selectedApp);
-    addToast({ type: 'info', title: 'Workflow Started', message: `Processing ${selectedApp} with bounded autonomy.` });
-  }, [selectedApp, addToast, startWorkflowSSE]);
-
-  const handleManual = useCallback(() => {
-    setWorkflowPhase('manual');
-    addToast({ type: 'info', title: 'Manual Mode', message: 'Agent bypassed. You are handling this application directly.' });
-  }, [addToast]);
+  const {
+    selectedApp, setSelectedApp,
+    workflowPhase, workflowStage,
+    hitlReached, approved,
+    planSettings,
+    approvalDetails,
+    liveAgentOutput,
+    elapsedSeconds,
+    liveApplications,
+    selectedAppDetail,
+    dashboardStats,
+    stageTimestamps,
+    handleProceed,
+    handleManual,
+    handleApprove,
+    handleDecline,
+    handleAgentEvent,
+  } = useLoanOfficerWorkflow(addToast);
 
   const selectedAppData = liveApplications.find((a) => a.application_id === selectedApp);
   const appName = getAppDisplayName(selectedAppDetail, selectedAppData);
-
-  const handleApprove = useCallback(async (details) => {
-    if (!selectedApp) return;
-
-    if (details?.mode === 'modified') {
-      addToast({ type: 'info', title: 'Modifications Applied', message: 'Agent re-running underwriting with updated terms.' });
-      await apiPost(`/hitl/${selectedApp}/decision`, {
-        action: 'modify_and_continue',
-        officer_notes: details.conditions || 'Modified terms',
-        conditions: details.conditions ? [details.conditions] : [],
-        overrides: {
-          ...(details.rate ? { rate: parseFloat(details.rate) } : {}),
-          ...(details.loanAmount ? { loan_amount: details.loanAmount } : {}),
-        },
-      });
-      setHitlReached(false);
-      setApproved(false);
-      setApprovalDetails(null);
-      reconnectActivitySSE(selectedApp);
-      return;
-    }
-
-    setApproved(true);
-    setApprovalDetails(details || { mode: 'recommended' });
-    const rate = details?.rate || '';
-    const suffix = details?.conditions ? ` · Conditions: ${details.conditions}` : '';
-    addToast({ type: 'success', title: 'Loan Approved', message: `${rate ? `@ ${rate} ` : ''}for ${appName}.${suffix}` });
-
-    await apiPost(`/hitl/${selectedApp}/decision`, {
-      action: 'approve',
-      officer_notes: details?.conditions || 'Approved after manual review',
-    });
-  }, [addToast, selectedApp, appName, reconnectActivitySSE]);
-
-  const handleDecline = useCallback(async () => {
-    setApproved(true);
-    setApprovalDetails({ mode: 'declined' });
-    addToast({ type: 'warning', title: 'Application Declined', message: `${appName} — declined after manual review.` });
-
-    if (selectedApp) {
-      await apiPost(`/hitl/${selectedApp}/decision`, {
-        action: 'decline',
-        officer_notes: 'Declined after manual review',
-      });
-    }
-  }, [addToast, selectedApp, appName]);
-
-  const handleAgentEvent = useCallback((entry) => {
-    if (!entry) return;
-    const agentName = entry.agent || '';
-    const stageIdx = NODE_TO_STAGE[agentName.toLowerCase().includes('underwrit') ? 'underwriter'
-      : agentName.toLowerCase().includes('loan_app') ? 'loan_app'
-      : agentName.toLowerCase().includes('hitl') ? 'hitl_gate' : ''];
-    if (stageIdx !== undefined) {
-      setWorkflowStage(stageIdx);
-    }
-    if (entry.agent === 'hitl_gate' && entry.action === 'interrupt') {
-      setHitlReached(true);
-    }
-  }, []);
-
   const currentWorkflow = WORKFLOW_STAGES[workflowStage] || WORKFLOW_STAGES[WORKFLOW_STAGES.length - 1];
-
   const selectedAppStatus = selectedAppData?.status;
 
   const statusBadge = () => {
@@ -1023,7 +81,20 @@ export default function LoanOfficerDashboard() {
             boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
           }}>
             <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600, marginBottom: 2, letterSpacing: '0.5px' }}>{s.label}</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 800, color: s.color, transition: 'all 0.5s cubic-bezier(0.33, 1, 0.68, 1)' }}>{s.value}</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 800, color: s.color, transition: 'all 0.5s cubic-bezier(0.33, 1, 0.68, 1)' }}>{s.value}</span>
+              {s.trend && (
+                <span style={{
+                  fontSize: 12, fontWeight: 700,
+                  color: s.trend === '\u2191'
+                    ? (s.label === 'Pending Reviews' ? 'var(--danger)' : 'var(--success)')
+                    : (s.label === 'Pending Reviews' ? 'var(--success)' : 'var(--text-dim)'),
+                  animation: 'slideDown 0.3s ease-out',
+                }}>
+                  {s.trend}
+                </span>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -1047,14 +118,24 @@ export default function LoanOfficerDashboard() {
               )}
               <ModifiedParamsBadge settings={planSettings} />
             </div>
-            {badge && (
-              <span style={{
-                fontSize: 10, fontWeight: 600, padding: '4px 10px', borderRadius: 12,
-                background: badge.bg, color: badge.color,
-              }}>
-                {badge.label}
-              </span>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {workflowPhase === 'executing' && !approved && elapsedSeconds > 0 && (
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
+                  color: 'var(--agent-cyan)',
+                }}>
+                  {Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, '0')}
+                </span>
+              )}
+              {badge && (
+                <span style={{
+                  fontSize: 10, fontWeight: 600, padding: '4px 10px', borderRadius: 12,
+                  background: badge.bg, color: badge.color,
+                }}>
+                  {badge.label}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Compact detail bar during executing/HITL */}
@@ -1062,6 +143,17 @@ export default function LoanOfficerDashboard() {
             <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-base)' }}>
               <ApplicationDetail appDetail={selectedAppDetail} compact />
             </div>
+          )}
+
+          {/* Stage Progress Bar */}
+          {selectedApp && (workflowPhase === 'executing' || workflowPhase === 'preview') && (
+            <StageProgressBar
+              stage={workflowPhase === 'preview' ? -1 : workflowStage}
+              hitlReached={hitlReached}
+              approved={approved}
+              approvalDetails={approvalDetails}
+              stageTimestamps={stageTimestamps}
+            />
           )}
 
           {/* Intent Preview (pre-action) */}
@@ -1091,6 +183,10 @@ export default function LoanOfficerDashboard() {
                   <PolicyBoundsIndicator exceeded={hitlReached} />
                 )}
 
+                {workflowPhase === 'executing' && (
+                  <LiveUnderwritingResults data={liveAgentOutput} />
+                )}
+
                 <div style={{
                   position: 'absolute', bottom: 12, left: 12, right: 12,
                   padding: '10px 14px',
@@ -1115,7 +211,17 @@ export default function LoanOfficerDashboard() {
                       ? 'Agent workflow paused. All state persisted to MongoDB via MongoDBSaver. Awaiting officer decision.'
                       : approved
                         ? 'Decision recorded. Workflow resuming from checkpoint.'
-                        : `Agents are processing this application through the ${currentWorkflow.label.toLowerCase()} stage.`
+                        : (() => {
+                            const parts = [];
+                            if (liveAgentOutput.primary_credit_score) parts.push(`Credit score ${liveAgentOutput.primary_credit_score}`);
+                            if (liveAgentOutput.document_count) parts.push(`${liveAgentOutput.document_count} docs verified`);
+                            if (liveAgentOutput.risk_score != null) parts.push(`Risk ${liveAgentOutput.risk_score}/100`);
+                            if (liveAgentOutput.gds_ratio != null) parts.push(`GDS ${(liveAgentOutput.gds_ratio * 100).toFixed(1)}%`);
+                            if (parts.length > 0) {
+                              return `${parts.join(' \u00b7 ')}. Running ${currentWorkflow.label.toLowerCase()} stage...`;
+                            }
+                            return `Agents are processing this application through the ${currentWorkflow.label.toLowerCase()} stage.`;
+                          })()
                   }
                 </div>
               </>
@@ -1125,16 +231,56 @@ export default function LoanOfficerDashboard() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                 <div style={{
                   textAlign: 'center', padding: spacing[5],
-                  border: '2px dashed var(--border-dim)', borderRadius: 8,
-                  background: '#FAFBFA',
+                  border: '2px dashed var(--border-dim)', borderRadius: 12,
+                  background: '#FAFBFA', maxWidth: 380,
                 }}>
-                  <div style={{ width: 48, height: 48, borderRadius: 8, border: '2px dashed var(--border-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', opacity: 0.5 }}>APP</div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-dim)', fontSize: 13 }}>
-                    Select an application from the queue
+                  {/* Mini pipeline sketch */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, marginBottom: 16 }}>
+                    {['Origination', 'Decisioning', 'HITL'].map((label, i) => (
+                      <div key={label} style={{ display: 'flex', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <div style={{
+                            width: 24, height: 24, borderRadius: '50%',
+                            border: '2px dashed var(--border-base)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 9, fontWeight: 700, color: 'var(--text-dim)',
+                          }}>
+                            {i + 1}
+                          </div>
+                          <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 3, fontFamily: 'var(--font-display)', fontWeight: 600 }}>
+                            {label}
+                          </div>
+                        </div>
+                        {i < 2 && (
+                          <div style={{ width: 28, height: 1, background: 'var(--border-base)', margin: '0 4px', marginBottom: 16 }} />
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
-                    Submit one from the Borrower Portal to get started
-                  </div>
+
+                  {(() => {
+                    const pendingCount = liveApplications.filter(
+                      (a) => ['submitted', 'review', 'pending_review', 'processing', 'underwriting'].includes(a.status)
+                    ).length;
+                    return (
+                      <>
+                        {pendingCount > 0 && (
+                          <div style={{
+                            fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 700,
+                            color: 'var(--mongo)', marginBottom: 4,
+                          }}>
+                            {pendingCount} application{pendingCount > 1 ? 's' : ''} in queue
+                          </div>
+                        )}
+                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-dim)', fontSize: 13 }}>
+                          {pendingCount > 0 ? 'Select one from the queue to begin' : 'No applications in queue'}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+                          {pendingCount === 0 ? 'Submit an application from the Borrower Portal to get started' : 'Review the plan, adjust parameters, then run the agent pipeline'}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             ) : null}
@@ -1150,11 +296,12 @@ export default function LoanOfficerDashboard() {
                 onApprove={handleApprove}
                 onDecline={handleDecline}
                 addToast={addToast}
+                liveAgentOutput={liveAgentOutput}
               />
             </div>
           )}
 
-          {/* Decision Summary (replaces minimal approved/declined card) */}
+          {/* Decision Summary */}
           {selectedApp && approved && (
             <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '55vh' }}>
               <DecisionSummary
@@ -1168,10 +315,22 @@ export default function LoanOfficerDashboard() {
           )}
         </div>
 
-        <AgentActivityLog
-          onEvent={handleAgentEvent}
-          applicationId={selectedApp}
-        />
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          width: 360,
+          minWidth: 260,
+          maxWidth: 420,
+          flexShrink: 0,
+          overflow: 'hidden',
+        }}>
+          <AgentActivityLog
+            onEvent={handleAgentEvent}
+            applicationId={selectedApp}
+          />
+          <PolicyExplorer />
+          <PortfolioIntelligence />
+        </div>
       </div>
 
       <NotificationToast toasts={toasts} onDismiss={removeToast} />

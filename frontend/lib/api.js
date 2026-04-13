@@ -6,11 +6,11 @@
 
 const API_BASE = '/api/backend';
 
-export async function apiPost(path, body) {
+export async function apiPost(path, body, extraHeaders = {}) {
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...extraHeaders },
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`API error: ${res.status}`);

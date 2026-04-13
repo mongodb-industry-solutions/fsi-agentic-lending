@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export function useCountUp(target, duration = 1500, enabled = true) {
   const [value, setValue] = useState(0);
+  const cancelled = useRef(false);
 
   useEffect(() => {
+    cancelled.current = false;
     if (!enabled) {
       setValue(target);
       return;
@@ -13,6 +15,7 @@ export function useCountUp(target, duration = 1500, enabled = true) {
     let start = null;
     let frameId;
     const step = (timestamp) => {
+      if (cancelled.current) return;
       if (!start) start = timestamp;
       const elapsed = timestamp - start;
       const progress = Math.min(elapsed / duration, 1);
@@ -20,7 +23,10 @@ export function useCountUp(target, duration = 1500, enabled = true) {
       if (progress < 1) frameId = requestAnimationFrame(step);
     };
     frameId = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(frameId);
+    return () => {
+      cancelled.current = true;
+      cancelAnimationFrame(frameId);
+    };
   }, [target, duration, enabled]);
 
   return value;

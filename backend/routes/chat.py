@@ -115,6 +115,7 @@ async def send_message_stream(application_id: str, req: ChatMessageRequest):
 
     async def event_generator():
         accumulated = []
+        citations = []
         queue = asyncio.Queue()
         sentinel = object()
 
@@ -133,8 +134,15 @@ async def send_message_stream(application_id: str, req: ChatMessageRequest):
             item = await queue.get()
             if item is sentinel:
                 break
-            accumulated.append(item)
-            yield f"data: {json.dumps({'type': 'token', 'content': item})}\n\n"
+            if isinstance(item, dict) and item.get("type") == "tool_calls":
+                for tool in item["tools"]:
+                    yield f"data: {json.dumps({'type': 'tool_call', **tool})}\n\n"
+                    if tool.get("citations"):
+                        citations.extend(tool["citations"])
+                continue
+            if isinstance(item, str):
+                accumulated.append(item)
+                yield f"data: {json.dumps({'type': 'token', 'content': item})}\n\n"
 
         await task
 
@@ -159,7 +167,10 @@ async def send_message_stream(application_id: str, req: ChatMessageRequest):
             },
         )
 
-        yield f"data: {json.dumps({'type': 'done', 'content': filtered, 'timestamp': now.isoformat()})}\n\n"
+        done_payload = {"type": "done", "content": filtered, "timestamp": now.isoformat()}
+        if citations:
+            done_payload["citations"] = citations
+        yield f"data: {json.dumps(done_payload)}\n\n"
 
     return StreamingResponse(
         event_generator(),

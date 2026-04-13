@@ -31,7 +31,7 @@ const sourceCodePro = Source_Code_Pro({
 });
 
 export const metadata = {
-  title: "LendFlow AI — Agentic Lending Demo",
+  title: "Agentic Lending",
   description:
     "End-to-end agentic lending platform powered by MongoDB Atlas, LangGraph, and Voyage AI",
 };

@@ -27,6 +27,45 @@ const SUBMIT_STEPS = [
   { label: 'Launching AI agents...', done: 'AI agents running' },
 ];
 
+function FloatingChatDrawer({ open, onToggle }) {
+  return (
+    <>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={open ? 'Close chat' : 'Ask LendFlow'}
+        style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 400,
+          width: 48, height: 48, borderRadius: '50%',
+          background: open ? 'var(--text-dim)' : 'var(--mongo)',
+          color: '#fff', border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: 'var(--shadow-lg)',
+          fontSize: 20, fontFamily: 'var(--font-display)', fontWeight: 700,
+          transition: 'background 200ms ease, transform 100ms ease',
+        }}
+      >
+        {open ? '\u2715' : '\uD83D\uDCAC'}
+      </button>
+      {open && (
+        <div style={{
+          position: 'fixed', bottom: 84, right: 24, zIndex: 400,
+          width: 360, height: 460,
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--border-dim)',
+          boxShadow: 'var(--shadow-xl)',
+          overflow: 'hidden',
+          animation: 'cardEnter 0.25s cubic-bezier(0.33, 1, 0.68, 1) both',
+          display: 'flex', flexDirection: 'column',
+          background: 'var(--bg-base)',
+        }}>
+          <ApplicationAgent applicationId={null} applicationStatus={null} />
+        </div>
+      )}
+    </>
+  );
+}
+
 function SubmittingOverlay({ currentStep, applicationId }) {
   return (
     <div style={{
@@ -125,6 +164,7 @@ export default function BorrowerPortal() {
   const [demoSessionId, setDemoSessionId] = useState('');
   const [submitStep, setSubmitStep] = useState(0);
   const [applicationStatus, setApplicationStatus] = useState('submitted');
+  const [chatOpen, setChatOpen] = useState(false);
   const statusSourceRef = useRef(null);
 
   useEffect(() => {
@@ -206,6 +246,7 @@ export default function BorrowerPortal() {
     return (
       <>
         <BorrowerSelection onSelect={handleBorrowerSelect} />
+        <FloatingChatDrawer open={chatOpen} onToggle={() => setChatOpen(p => !p)} />
         <NotificationToast toasts={toasts} onDismiss={removeToast} />
       </>
     );
@@ -240,6 +281,7 @@ export default function BorrowerPortal() {
         <ApplicationForm onSubmit={handleSubmit} borrowerProfile={borrowerProfile} />
         <DocumentUpload applicationId={applicationId} borrowerProfile={borrowerProfile} />
       </div>
+      <FloatingChatDrawer open={chatOpen} onToggle={() => setChatOpen(p => !p)} />
       <NotificationToast toasts={toasts} onDismiss={removeToast} />
     </div>
   );

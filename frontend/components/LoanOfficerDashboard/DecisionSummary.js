@@ -105,9 +105,87 @@ function PolicyViolations({ trail }) {
   );
 }
 
+function ProvenanceChain({ trail, approvalDetails, isDeclined }) {
+  const recommendation = (trail || []).find((a) =>
+    a.action?.includes('decision') || a.action?.includes('complete') || a.detail?.includes('recommend')
+  );
+
+  const isModified = approvalDetails?.mode === 'modified';
+  const isHITL = approvalDetails?.mode === 'recommended' || isModified;
+
+  const nodes = [
+    {
+      label: recommendation?.agent || 'Agent',
+      detail: recommendation?.detail?.slice(0, 80) || 'Processed application',
+      timestamp: recommendation?.timestamp,
+      color: 'var(--agent-cyan)',
+      bg: 'var(--agent-cyan-dim)',
+    },
+  ];
+
+  if (isHITL || approvalDetails?.mode === 'manual') {
+    nodes.push({
+      label: 'Officer',
+      detail: isModified ? 'Modified terms' : 'Approved as recommended',
+      color: 'var(--hitl-amber)',
+      bg: 'var(--hitl-amber-dim)',
+    });
+  }
+
+  nodes.push({
+    label: isDeclined ? 'Declined' : 'Approved',
+    detail: approvalDetails?.rate ? `@ ${approvalDetails.rate}` : '',
+    color: isDeclined ? 'var(--danger)' : 'var(--success)',
+    bg: isDeclined ? 'var(--danger-dim)' : 'var(--success-dim)',
+  });
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 0,
+      padding: `${spacing[2]}px 0`, marginBottom: spacing[3],
+    }}>
+      {nodes.map((node, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+          <div style={{
+            padding: '6px 10px', borderRadius: 6,
+            background: node.bg, border: `1px solid ${node.color}`,
+            flex: 1, minWidth: 0,
+          }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: node.color, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              {node.label}
+            </div>
+            {node.detail && (
+              <div style={{ fontSize: 9, color: 'var(--text-secondary)', marginTop: 2, lineHeight: 1.3 }}>
+                {node.detail}
+              </div>
+            )}
+            {node.timestamp && (
+              <div style={{ fontSize: 8, fontFamily: 'var(--font-mono)', color: 'var(--text-dim)', marginTop: 1 }}>
+                {new Date(node.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </div>
+            )}
+          </div>
+          {i < nodes.length - 1 && (
+            <div style={{
+              width: 20, height: 1, background: 'var(--border-base)', flexShrink: 0,
+              position: 'relative',
+            }}>
+              <div style={{
+                position: 'absolute', right: -3, top: -3,
+                fontSize: 8, color: 'var(--text-dim)',
+              }}>{'\u25B6'}</div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function DecisionSummary({ applicationId, appDetail, approvalDetails, appName, onClose }) {
   const [trail, setTrail] = useState(null);
   const [showAudit, setShowAudit] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!applicationId) return;
@@ -124,11 +202,12 @@ export default function DecisionSummary({ applicationId, appDetail, approvalDeta
   const statusColor = isDeclined ? 'var(--danger)' : 'var(--success)';
   const statusDimColor = isDeclined ? 'var(--danger-dim)' : 'var(--success-dim)';
 
-  const totalTime = trail && trail.length >= 2
+  const totalTime = trail && trail.length >= 2 && trail[0].timestamp && trail[trail.length - 1].timestamp
     ? (() => {
         const first = new Date(trail[0].timestamp);
         const last = new Date(trail[trail.length - 1].timestamp);
         const ms = last - first;
+        if (!Number.isFinite(ms) || ms < 0) return null;
         return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
       })()
     : null;
@@ -172,6 +251,9 @@ export default function DecisionSummary({ applicationId, appDetail, approvalDeta
         </div>
       </div>
 
+      {/* Decision Provenance Chain */}
+      <ProvenanceChain trail={trail} approvalDetails={approvalDetails} isDeclined={isDeclined} />
+
       {/* Officer modifications (HITL) */}
       {(isHITL || isManual) && (
         <div style={{
@@ -207,6 +289,49 @@ export default function DecisionSummary({ applicationId, appDetail, approvalDeta
               <span style={{ fontWeight: 600 }}>Conditions:</span> {approvalDetails.conditions}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Before/After comparison for modified decisions */}
+      {approvalDetails?.mode === 'modified' && trail && (
+        <div style={{
+          padding: spacing[2], background: 'var(--bg-surface)',
+          borderRadius: 6, border: '1px solid var(--border-dim)',
+          marginBottom: spacing[3],
+        }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
+            Decision Comparison
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing[2] }}>
+            <div style={{ padding: '6px 8px', borderRadius: 4, background: 'var(--agent-cyan-dim)' }}>
+              <div style={{ fontSize: 8, fontWeight: 700, color: 'var(--agent-cyan)', textTransform: 'uppercase', marginBottom: 4 }}>Agent Proposed</div>
+              {(() => {
+                const rec = trail.find((a) => a.action?.includes('decision') || a.detail?.includes('recommend'));
+                const rateMatch = rec?.detail?.match(/([\d.]+)%/);
+                return (
+                  <>
+                    {rateMatch && <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>Rate: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{rateMatch[1]}%</span></div>}
+                    {appDetail?.loan_amount && <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>Amount: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{formatCurrency(appDetail.loan_amount)}</span></div>}
+                  </>
+                );
+              })()}
+            </div>
+            <div style={{
+              padding: '6px 8px', borderRadius: 4,
+              background: 'var(--hitl-amber-dim)',
+            }}>
+              <div style={{ fontSize: 8, fontWeight: 700, color: 'var(--hitl-amber)', textTransform: 'uppercase', marginBottom: 4 }}>Officer Decided</div>
+              {approvalDetails.rate && (
+                <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>Rate: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--hitl-amber)' }}>{approvalDetails.rate}</span></div>
+              )}
+              {approvalDetails.loanAmount && (
+                <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>Amount: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--hitl-amber)' }}>{formatCurrency(approvalDetails.loanAmount)}</span></div>
+              )}
+              {approvalDetails.conditions && (
+                <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>Condition: {approvalDetails.conditions}</div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -273,7 +398,7 @@ export default function DecisionSummary({ applicationId, appDetail, approvalDeta
             <div style={{
               padding: '8px 10px', background: 'var(--bg-surface)',
               border: '1px solid var(--border-dim)', borderTop: 'none',
-              borderRadius: '0 0 6px 6px', marginBottom: spacing[3],
+              borderRadius: '0 0 6px 6px', marginBottom: spacing[2],
               maxHeight: 200, overflowY: 'auto',
             }}>
               {trail.map((entry, i) => (
@@ -291,6 +416,37 @@ export default function DecisionSummary({ applicationId, appDetail, approvalDeta
               ))}
             </div>
           )}
+
+          {/* Copy Audit Trail */}
+          <button
+            type="button"
+            onClick={() => {
+              const payload = {
+                applicationId,
+                appName,
+                decision: isDeclined ? 'declined' : 'approved',
+                mode: approvalDetails?.mode || 'unknown',
+                approvalDetails,
+                trail,
+              };
+              navigator.clipboard.writeText(JSON.stringify(payload, null, 2)).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              });
+            }}
+            style={{
+              width: '100%', padding: '6px 10px', marginBottom: spacing[3],
+              background: copied ? 'var(--success-dim)' : 'var(--bg-surface)',
+              border: `1px solid ${copied ? 'var(--success)' : 'var(--border-dim)'}`,
+              borderRadius: 6, cursor: 'pointer',
+              fontSize: 10, fontWeight: 600,
+              color: copied ? 'var(--success)' : 'var(--text-secondary)',
+              fontFamily: 'var(--font-display)',
+              transition: 'all 200ms ease',
+            }}
+          >
+            {copied ? '\u2713 Copied to Clipboard' : '\u2398 Copy Audit Trail'}
+          </button>
         </>
       )}
 

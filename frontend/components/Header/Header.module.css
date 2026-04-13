@@ -1,0 +1,5 @@
+/* palette.blue.light2 = #C3E7FE — high contrast on dark green header */
+.navPill:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #C3E7FE;
+}
