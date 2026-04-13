@@ -8,7 +8,6 @@ import { mergeCanvasState } from '../engine/canvasUtils';
 import WorkflowCanvas from '../WorkflowCanvas';
 import AnnotationOverlay from '../AnnotationOverlay';
 import WhatIfSliders from '../panels/WhatIfSliders';
-import FraudGraph from '../panels/FraudGraph';
 import PipelineDrawer from '../PipelineDrawer';
 import StatCard from '../../visualizations/StatCard';
 import { apiGet } from '../../../lib/api';
@@ -98,7 +97,6 @@ function RiskRing({ score, maxScore = 100, tier, fico }) {
 }
 
 export default function UnderwritingScene({ sceneStep, currentStepData }) {
-  const fraudTakeover = currentStepData?.id === 'd-4';
   const [hoveredNode, setHoveredNode] = useState(null);
   const [timelineHighlight, setTimelineHighlight] = useState(null);
   const [pipelineData, setPipelineData] = useState(null);
@@ -137,9 +135,6 @@ export default function UnderwritingScene({ sceneStep, currentStepData }) {
       <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: '1fr' }}>
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div style={{ position: 'relative', flex: '1.4 1 0%', minHeight: 240, overflow: 'hidden' }}>
-            {fraudTakeover ? (
-              <FraudGraph fillContainer hopReveal={3} />
-            ) : (
               <WorkflowCanvas
                 activeNodes={canvasState.activeNodes}
                 activeEdges={canvasState.activeEdges}
@@ -149,7 +144,6 @@ export default function UnderwritingScene({ sceneStep, currentStepData }) {
                 onNodeHover={handleNodeHover}
                 highlightNode={timelineHighlight}
               />
-            )}
           </div>
           <AnnotationOverlay
             currentStep={currentStepData}

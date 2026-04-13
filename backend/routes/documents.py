@@ -136,7 +136,12 @@ async def serve_document_pdf(doc_id: str):
         )
         raise HTTPException(status_code=404, detail="PDF file not found on disk")
 
-    return FileResponse(str(pdf_path), media_type="application/pdf", filename=doc["filename"])
+    return FileResponse(
+        str(pdf_path),
+        media_type="application/pdf",
+        filename=doc["filename"],
+        content_disposition_type="inline",
+    )
 
 
 @router.get("/documents/{doc_id}/json")
