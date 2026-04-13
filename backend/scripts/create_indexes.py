@@ -23,25 +23,6 @@ def main():
     db_connector = MongoDBConnector()
     db = db_connector.client[os.getenv("DATABASE_NAME", "lendflow")]
 
-    # Create time-series collection for agent_activity
-    print("Creating agent_activity time-series collection...")
-    ts_config = COLLECTIONS["agent_activity"]["time_series"]
-    try:
-        db.create_collection(
-            "agent_activity",
-            timeseries={
-                "timeField": ts_config["timeField"],
-                "metaField": ts_config["metaField"],
-                "granularity": ts_config["granularity"],
-            },
-        )
-        print("  Created agent_activity time-series collection")
-    except Exception as e:
-        if "already exists" in str(e):
-            print("  agent_activity already exists, skipping")
-        else:
-            raise
-
     # Create time-series collection for payments
     print("Creating payments time-series collection...")
     ts_payments_config = COLLECTIONS["payments"]["time_series"]

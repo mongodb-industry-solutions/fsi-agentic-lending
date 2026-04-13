@@ -36,12 +36,7 @@ COLLECTIONS = {
         ],
     },
     "agent_activity": {
-        "description": "Time-series of agent actions (time-series collection)",
-        "time_series": {
-            "timeField": "timestamp",
-            "metaField": "application_id",
-            "granularity": "seconds",
-        },
+        "description": "Agent actions log (supports change streams for SSE)",
         "indexes": [
             {"keys": [("application_id", 1), ("timestamp", -1)]},
         ],
