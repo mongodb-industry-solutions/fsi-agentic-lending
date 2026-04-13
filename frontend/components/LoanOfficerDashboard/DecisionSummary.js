@@ -5,6 +5,54 @@ import { spacing } from '@leafygreen-ui/tokens';
 import Badge from '@leafygreen-ui/badge';
 import { apiGet } from '../../lib/api';
 
+const POST_APPROVAL_STAGES = [
+  { label: 'Closing in progress', icon: '📑', delay: 1500 },
+  { label: 'Documents signed', icon: '✍️', delay: 2500 },
+  { label: 'Funded', icon: '💰', delay: 1500 },
+];
+
+function PostApprovalProgression({ active, applicationId }) {
+  const [stage, setStage] = useState(0);
+
+  useEffect(() => {
+    setStage(0);
+    if (!active) return;
+    let cancelled = false;
+    let cumulative = 0;
+    POST_APPROVAL_STAGES.forEach((s, i) => {
+      if (i === 0) return;
+      cumulative += POST_APPROVAL_STAGES[i - 1].delay;
+      setTimeout(() => { if (!cancelled) setStage(i); }, cumulative);
+    });
+    return () => { cancelled = true; };
+  }, [active, applicationId]);
+
+  if (!active) return null;
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: `${spacing[2]}px 0`, marginBottom: spacing[3] }}>
+      {POST_APPROVAL_STAGES.map((s, i) => (
+        <div key={s.label} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+          <div style={{
+            padding: '4px 8px', borderRadius: 4, flex: 1,
+            background: i <= stage ? 'var(--bg-raised)' : 'transparent',
+            border: `1px solid ${i <= stage ? 'var(--mongo)' : 'var(--border-dim)'}`,
+            opacity: i <= stage ? 1 : 0.4,
+            transition: 'all 400ms ease',
+          }}>
+            <div style={{ fontSize: 9, fontWeight: 600, color: i <= stage ? 'var(--mongo)' : 'var(--text-dim)' }}>
+              {s.icon} {s.label}
+            </div>
+          </div>
+          {i < POST_APPROVAL_STAGES.length - 1 && (
+            <div style={{ width: 12, height: 1, background: i < stage ? 'var(--mongo)' : 'var(--border-dim)', flexShrink: 0, transition: 'background 400ms ease' }} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function formatCurrency(amount) {
   if (amount == null) return 'N/A';
   return `$${Number(amount).toLocaleString('en-US')}`;
@@ -253,6 +301,9 @@ export default function DecisionSummary({ applicationId, appDetail, approvalDeta
 
       {/* Decision Provenance Chain */}
       <ProvenanceChain trail={trail} approvalDetails={approvalDetails} isDeclined={isDeclined} />
+
+      {/* Post-approval micro-progression */}
+      {!isDeclined && <PostApprovalProgression active={!isDeclined} applicationId={applicationId} />}
 
       {/* Officer modifications (HITL) */}
       {(isHITL || isManual) && (

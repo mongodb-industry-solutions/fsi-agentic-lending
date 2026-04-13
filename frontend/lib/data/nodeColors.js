@@ -4,7 +4,7 @@ export const NODE_COLORS = {
   supervisor: palette.green.dark2,    // #00684A
   appAgent: '#0891b2',
   underwriter: '#2563eb',
-  renewalAgent: '#6341e0',
+  servicingAgent: '#6341e0',
   creditAPI: '#64748b',
   voyageEmbed: '#6341e0',
   vectorSearch: '#6341e0',
@@ -18,4 +18,6 @@ export const NODE_COLORS = {
   mongoAtlas: palette.green.dark2,    // #00684A
   decision: palette.green.dark2,      // #00684A
   fundingEngine: '#059669',
+  closingEngine: '#0e7490',
+  eSign: '#0e7490',
 };

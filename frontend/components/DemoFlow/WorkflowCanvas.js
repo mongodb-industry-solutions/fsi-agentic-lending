@@ -13,31 +13,33 @@ const NODE_TYPES = {
 };
 
 const NODES = {
-  supervisor:    { label: 'Supervisor',           icon: '🧭', color: NODE_COLORS.supervisor, w: 120, h: 44, type: NODE_TYPES.agent },
-  appAgent:      { label: 'Loan App Agent',       icon: '📝', color: NODE_COLORS.appAgent,   w: 114, h: 42, type: NODE_TYPES.agent },
-  underwriter:   { label: 'Underwriting',         icon: '🧠', color: NODE_COLORS.underwriter, w: 120, h: 42, type: NODE_TYPES.agent },
-  renewalAgent:  { label: 'Renewal Agent',        icon: '🔄', color: NODE_COLORS.renewalAgent, w: 114, h: 42, type: NODE_TYPES.agent },
-  creditAPI:     { label: 'Credit Bureau',        icon: '📋', color: NODE_COLORS.creditAPI,   w: 104, h: 34, type: NODE_TYPES.tool },
-  voyageEmbed:   { label: 'Voyage MM 3.5',        icon: '🧬', color: NODE_COLORS.voyageEmbed, w: 104, h: 34, type: NODE_TYPES.tool },
-  vectorSearch:  { label: 'Vector Search',        icon: '🔎', color: NODE_COLORS.vectorSearch, w: 110, h: 34, type: NODE_TYPES.tool },
-  graphLookup:   { label: '$graphLookup',         icon: '🕸', color: NODE_COLORS.graphLookup, w: 104, h: 34, type: NODE_TYPES.tool },
-  aggregation:   { label: 'Aggregation',          icon: '📊', color: NODE_COLORS.aggregation, w: 104, h: 34, type: NODE_TYPES.tool },
-  changeStream:  { label: 'Change Streams',       icon: '📡', color: NODE_COLORS.changeStream, w: 110, h: 34, type: NODE_TYPES.output },
-  timeSeries:    { label: 'Time Series',          icon: '⏱', color: NODE_COLORS.timeSeries,  w: 96,  h: 34, type: NODE_TYPES.tool },
-  hitlGate:      { label: 'HITL Gate',            icon: '✋', color: NODE_COLORS.hitlGate,    w: 96,  h: 42, type: NODE_TYPES.gate },
-  checkpoint:    { label: 'Checkpointer',         icon: '💾', color: NODE_COLORS.checkpoint,  w: 110, h: 34, type: NODE_TYPES.storage },
-  memory:        { label: 'Memory Store',         icon: '🧠', color: NODE_COLORS.memory,      w: 110, h: 34, type: NODE_TYPES.storage },
-  mongoAtlas:    { label: 'MongoDB Atlas',        icon: '🍃', color: NODE_COLORS.mongoAtlas,  w: 140, h: 46, type: NODE_TYPES.storage },
-  decision:      { label: 'DECISION',             icon: '✅', color: NODE_COLORS.decision,    w: 100, h: 42, type: NODE_TYPES.gate },
-  fundingEngine: { label: 'Funding Engine',       icon: '💰', color: NODE_COLORS.fundingEngine, w: 114, h: 38, type: NODE_TYPES.output },
-  ledger:        { label: 'Loan Ledger',          icon: '📒', color: NODE_COLORS.fundingEngine, w: 100, h: 34, type: NODE_TYPES.storage },
-  renewalOffer:  { label: 'Renewal Offer',        icon: '📋', color: NODE_COLORS.renewalAgent, w: 110, h: 34, type: NODE_TYPES.output },
+  supervisor:    { label: 'Supervisor',           abbr: 'S',  color: NODE_COLORS.supervisor, w: 120, h: 44, type: NODE_TYPES.agent },
+  appAgent:      { label: 'Loan App Agent',       abbr: 'A',  color: NODE_COLORS.appAgent,   w: 114, h: 42, type: NODE_TYPES.agent },
+  underwriter:   { label: 'Underwriting',         abbr: 'U',  color: NODE_COLORS.underwriter, w: 120, h: 42, type: NODE_TYPES.agent },
+  servicingAgent:  { label: 'Servicing Agent',    abbr: 'SA', color: NODE_COLORS.servicingAgent, w: 114, h: 42, type: NODE_TYPES.agent },
+  creditAPI:     { label: 'Credit Bureau',        abbr: 'C',  color: NODE_COLORS.creditAPI,   w: 104, h: 34, type: NODE_TYPES.tool },
+  voyageEmbed:   { label: 'Voyage MM 3.5',        abbr: 'V',  color: NODE_COLORS.voyageEmbed, w: 104, h: 34, type: NODE_TYPES.tool },
+  vectorSearch:  { label: 'Vector Search',        abbr: 'VS', color: NODE_COLORS.vectorSearch, w: 110, h: 34, type: NODE_TYPES.tool },
+  graphLookup:   { label: '$graphLookup',         abbr: 'GL', color: NODE_COLORS.graphLookup, w: 104, h: 34, type: NODE_TYPES.tool },
+  aggregation:   { label: 'Aggregation',          abbr: 'AG', color: NODE_COLORS.aggregation, w: 104, h: 34, type: NODE_TYPES.tool },
+  changeStream:  { label: 'Change Streams',       abbr: 'CS', color: NODE_COLORS.changeStream, w: 110, h: 34, type: NODE_TYPES.output },
+  timeSeries:    { label: 'Time Series',          abbr: 'TS', color: NODE_COLORS.timeSeries,  w: 96,  h: 34, type: NODE_TYPES.tool },
+  hitlGate:      { label: 'HITL Gate',            abbr: 'H',  color: NODE_COLORS.hitlGate,    w: 96,  h: 42, type: NODE_TYPES.gate },
+  checkpoint:    { label: 'Checkpointer',         abbr: 'CP', color: NODE_COLORS.checkpoint,  w: 110, h: 34, type: NODE_TYPES.storage },
+  memory:        { label: 'Memory Store',         abbr: 'ME', color: NODE_COLORS.memory,      w: 110, h: 34, type: NODE_TYPES.storage },
+  mongoAtlas:    { label: 'MongoDB Atlas',        abbr: 'M',  color: NODE_COLORS.mongoAtlas,  w: 140, h: 46, type: NODE_TYPES.storage },
+  decision:      { label: 'DECISION',             abbr: 'D',  color: NODE_COLORS.decision,    w: 100, h: 42, type: NODE_TYPES.gate },
+  fundingEngine: { label: 'Funding Engine',       abbr: 'F',  color: NODE_COLORS.fundingEngine, w: 114, h: 38, type: NODE_TYPES.output },
+  ledger:        { label: 'Loan Ledger',          abbr: 'L',  color: NODE_COLORS.fundingEngine, w: 100, h: 34, type: NODE_TYPES.storage },
+  closingEngine: { label: 'Closing Engine',       abbr: 'CL', color: NODE_COLORS.closingEngine, w: 114, h: 38, type: NODE_TYPES.output },
+  eSign:         { label: 'E-Sign',               abbr: 'ES', color: NODE_COLORS.eSign, w: 96,  h: 34, type: NODE_TYPES.gate },
+  modificationOffer:  { label: 'Modification Offer', abbr: 'MO', color: NODE_COLORS.servicingAgent, w: 110, h: 34, type: NODE_TYPES.output },
 };
 
 const EDGES = [
   ['supervisor', 'appAgent'],
   ['supervisor', 'underwriter'],
-  ['supervisor', 'renewalAgent'],
+  ['supervisor', 'servicingAgent'],
   ['appAgent', 'creditAPI'],
   ['appAgent', 'voyageEmbed'],
   ['underwriter', 'aggregation'],
@@ -54,15 +56,19 @@ const EDGES = [
   ['checkpoint', 'mongoAtlas'],
   ['memory', 'mongoAtlas'],
   ['hitlGate', 'checkpoint'],
-  ['decision', 'fundingEngine'],
+  ['decision', 'closingEngine'],
+  ['closingEngine', 'eSign'],
+  ['eSign', 'fundingEngine'],
+  ['closingEngine', 'mongoAtlas'],
+  ['eSign', 'mongoAtlas'],
   ['fundingEngine', 'ledger'],
   ['fundingEngine', 'changeStream'],
   ['ledger', 'mongoAtlas'],
-  ['changeStream', 'renewalAgent'],
-  ['timeSeries', 'renewalAgent'],
-  ['renewalAgent', 'vectorSearch'],
-  ['renewalAgent', 'renewalOffer'],
-  ['renewalOffer', 'mongoAtlas'],
+  ['changeStream', 'servicingAgent'],
+  ['timeSeries', 'servicingAgent'],
+  ['servicingAgent', 'vectorSearch'],
+  ['servicingAgent', 'modificationOffer'],
+  ['modificationOffer', 'mongoAtlas'],
 ];
 
 const EDGE_LABELS = {
@@ -74,53 +80,61 @@ const EDGE_LABELS = {
   'underwriter>hitlGate': 'risk score',
   'hitlGate>decision': 'approval',
   'hitlGate>checkpoint': 'state save',
-  'decision>fundingEngine': 'disburse',
+  'decision>closingEngine': 'documents',
+  'closingEngine>eSign': 'sign',
+  'eSign>fundingEngine': 'disburse',
+  'closingEngine>mongoAtlas': 'stored',
+  'eSign>mongoAtlas': 'executed',
   'fundingEngine>ledger': 'accounting',
   'fundingEngine>changeStream': 'events',
-  'changeStream>renewalAgent': 'alerts',
-  'renewalAgent>vectorSearch': 'similarity',
-  'renewalAgent>renewalOffer': 'offer',
+  'changeStream>servicingAgent': 'alerts',
+  'servicingAgent>vectorSearch': 'similarity',
+  'servicingAgent>modificationOffer': 'offer',
   'aggregation>mongoAtlas': 'scores',
   'vectorSearch>mongoAtlas': 'results',
   'graphLookup>mongoAtlas': 'graph',
   'checkpoint>mongoAtlas': 'checkpoint',
   'ledger>mongoAtlas': 'ledger',
-  'renewalOffer>mongoAtlas': 'stored',
+  'modificationOffer>mongoAtlas': 'stored',
 };
 
 const STAGE_COLUMNS = [
-  { key: 'origination', label: 'ORIGINATION', px: 0.11 },
-  { key: 'decisioning', label: 'DECISIONING', px: 0.30 },
-  { key: 'approval',    label: 'APPROVAL',    px: 0.50 },
-  { key: 'funding',     label: 'FUNDING',     px: 0.69 },
-  { key: 'management',  label: 'MANAGEMENT',  px: 0.89 },
+  { key: 'origination',  label: 'ORIGINATION',  px: 0.08 },
+  { key: 'underwriting', label: 'UNDERWRITING', px: 0.24 },
+  { key: 'approval',     label: 'APPROVAL',     px: 0.40 },
+  { key: 'closing',      label: 'CLOSING',      px: 0.56 },
+  { key: 'funding',      label: 'FUNDING',      px: 0.72 },
+  { key: 'servicing',    label: 'SERVICING',    px: 0.90 },
 ];
 
 const PIPELINE_LAYOUT = {
-  supervisor:    { px: 0.11, py: 0.18 },
-  appAgent:      { px: 0.11, py: 0.50 },
-  creditAPI:     { px: 0.06, py: 0.78 },
-  voyageEmbed:   { px: 0.17, py: 0.78 },
+  supervisor:    { px: 0.08, py: 0.18 },
+  appAgent:      { px: 0.08, py: 0.50 },
+  creditAPI:     { px: 0.03, py: 0.78 },
+  voyageEmbed:   { px: 0.14, py: 0.78 },
 
-  underwriter:   { px: 0.30, py: 0.18 },
-  aggregation:   { px: 0.24, py: 0.50 },
-  vectorSearch:  { px: 0.36, py: 0.50 },
-  graphLookup:   { px: 0.24, py: 0.78 },
-  timeSeries:    { px: 0.36, py: 0.78 },
+  underwriter:   { px: 0.24, py: 0.18 },
+  aggregation:   { px: 0.18, py: 0.50 },
+  vectorSearch:  { px: 0.30, py: 0.50 },
+  graphLookup:   { px: 0.18, py: 0.78 },
+  timeSeries:    { px: 0.30, py: 0.78 },
 
-  hitlGate:      { px: 0.50, py: 0.18 },
-  checkpoint:    { px: 0.56, py: 0.50 },
-  decision:      { px: 0.50, py: 0.78 },
+  hitlGate:      { px: 0.40, py: 0.18 },
+  checkpoint:    { px: 0.46, py: 0.50 },
+  decision:      { px: 0.40, py: 0.78 },
 
-  fundingEngine: { px: 0.69, py: 0.18 },
-  ledger:        { px: 0.63, py: 0.50 },
-  changeStream:  { px: 0.75, py: 0.50 },
+  closingEngine: { px: 0.56, py: 0.18 },
+  eSign:         { px: 0.56, py: 0.50 },
 
-  renewalAgent:  { px: 0.89, py: 0.18 },
-  renewalOffer:  { px: 0.89, py: 0.50 },
+  fundingEngine: { px: 0.72, py: 0.18 },
+  ledger:        { px: 0.66, py: 0.50 },
+  changeStream:  { px: 0.78, py: 0.50 },
+
+  servicingAgent:      { px: 0.90, py: 0.18 },
+  modificationOffer:   { px: 0.90, py: 0.50 },
 
   mongoAtlas:    { px: 0.50, py: 0.92 },
-  memory:        { px: 0.44, py: 0.50 },
+  memory:        { px: 0.34, py: 0.50 },
 };
 
 if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
@@ -556,22 +570,23 @@ export default function WorkflowCanvas({
         ctx.shadowBlur = 0;
 
         // Labels
-        const showIcon = (isActive || isPulsing || isCompleted || isSceneRelevant);
-        if (nodeType === NODE_TYPES.agent && showIcon) {
-          ctx.font = '12px sans-serif';
+        const showAbbr = (isActive || isPulsing || isCompleted || isSceneRelevant);
+        if (nodeType === NODE_TYPES.agent && showAbbr) {
+          ctx.font = `700 11px "Euclid Circular A", Manrope, sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(n.icon, pos.x, pos.y - 7);
+          ctx.fillStyle = n.color;
+          ctx.fillText(n.abbr, pos.x, pos.y - 7);
 
           ctx.font = `700 9px "Euclid Circular A", Manrope, sans-serif`;
           ctx.fillStyle = isCompleted ? theme.textInactive : (isActive || isPulsing) ? theme.textActive : theme.textInactive;
           ctx.fillText(n.label, pos.x, pos.y + 9);
         } else {
-          ctx.font = `600 ${showIcon ? 8.5 : 7.5}px "Euclid Circular A", Manrope, sans-serif`;
+          ctx.font = `600 ${showAbbr ? 8.5 : 7.5}px "Euclid Circular A", Manrope, sans-serif`;
           ctx.fillStyle = (isActive || isPulsing) ? theme.textActive : theme.textInactive;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          const label = showIcon ? n.icon + ' ' + n.label : n.label;
+          const label = showAbbr ? n.abbr + ' ' + n.label : n.label;
           ctx.fillText(label, pos.x, pos.y);
         }
 

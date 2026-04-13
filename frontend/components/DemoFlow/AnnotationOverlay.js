@@ -2,9 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import Icon from '@leafygreen-ui/icon';
 import FeatureBadge from '../FeatureBadge/FeatureBadge';
 import CapabilityPopover from '../educational/CapabilityPopover';
 import { CAPABILITIES } from '../../lib/data/capabilities';
+import { uiTokens } from '../../lib/uiTokens';
+import { spacing } from '@leafygreen-ui/tokens';
 
 const FEATURE_MAP = Object.fromEntries(CAPABILITIES.map((c) => [c.id, c]));
 
@@ -41,7 +44,7 @@ export default function AnnotationOverlay({
       <div
         style={{
           flexShrink: 0,
-          padding: '8px 14px',
+          padding: `${spacing[2]}px ${spacing[300]}px`,
           background: 'var(--bg-surface)',
           borderTop: '1px solid var(--border-dim)',
           borderBottom: '1px solid var(--border-dim)',
@@ -49,11 +52,11 @@ export default function AnnotationOverlay({
           color: 'var(--text-dim)',
           display: 'flex',
           alignItems: 'center',
-          gap: 8,
+          gap: spacing[2],
         }}
       >
-        <span style={{ fontSize: 14 }}>▶</span>
-        Click Play or Step to begin the demo.
+        <Icon glyph="Play" size={14} />
+        Scripted walkthrough — press Play or Step to advance.
       </div>
     );
   }
@@ -74,11 +77,11 @@ export default function AnnotationOverlay({
     >
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '6px 14px 0',
+        padding: `${spacing[150]}px ${spacing[300]}px 0`,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: spacing[2] }}>
           <span style={{
-            fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 10,
+            fontFamily: uiTokens.font, fontWeight: 700, fontSize: 10,
             color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px',
           }}>
             {sceneTitle || ''}
@@ -91,14 +94,14 @@ export default function AnnotationOverlay({
                   style={{
                     width: i === stepIndex ? 14 : 6,
                     height: 4,
-                    borderRadius: 2,
+                    borderRadius: 8,
                     background: i <= stepIndex ? 'var(--mongo)' : 'var(--border-dim)',
                     transition: '220ms cubic-bezier(0.33, 1, 0.68, 1)',
                   }}
                 />
               ))}
               <span style={{
-                fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)', marginLeft: 4,
+                fontFamily: uiTokens.monoFont, fontSize: 9, color: 'var(--text-dim)', marginLeft: spacing[1],
               }}>
                 {stepIndex + 1}/{totalSteps}
               </span>
@@ -107,8 +110,8 @@ export default function AnnotationOverlay({
         </div>
         {timing && (
           <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
-            padding: '2px 8px', borderRadius: 4,
+            fontFamily: uiTokens.monoFont, fontSize: 10, fontWeight: 700,
+            padding: `2px ${spacing[2]}px`, borderRadius: 8,
             background: 'var(--mongo-dim)', color: 'var(--mongo)',
           }}>
             {timing}
@@ -116,10 +119,10 @@ export default function AnnotationOverlay({
         )}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '4px 14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {reasoning?.icon && <span style={{ fontSize: 13 }}>{reasoning.icon}</span>}
-          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: spacing[2], padding: `${spacing[1]}px ${spacing[300]}px` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: spacing[150] }}>
+          {reasoning?.glyph && <Icon glyph={reasoning.glyph} size={14} />}
+          <span style={{ fontFamily: uiTokens.font, fontWeight: 700, fontSize: 11 }}>
             {currentStep.agent}
           </span>
         </div>
@@ -130,7 +133,7 @@ export default function AnnotationOverlay({
 
       <div style={{
         display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap',
-        padding: '0 14px 6px',
+        padding: `0 ${spacing[300]}px ${spacing[150]}px`,
       }}>
         {features.map((fId) => {
           const cap = FEATURE_MAP[fId];
@@ -138,7 +141,7 @@ export default function AnnotationOverlay({
           return (
             <span key={fId} ref={(el) => { badgeRefs.current[fId] = el; }}>
               <FeatureBadge
-                icon={cap.icon}
+                glyph={cap.glyph}
                 label={cap.label}
                 colorVar={cap.colorVar}
                 active
@@ -162,13 +165,14 @@ export default function AnnotationOverlay({
             onClick={() => setReasoningExpanded(!reasoningExpanded)}
             style={{
               marginLeft: 'auto',
-              fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-display)',
-              padding: '2px 8px', borderRadius: 4,
+              fontSize: 9, fontWeight: 600, fontFamily: uiTokens.font,
+              padding: `2px ${spacing[2]}px`, borderRadius: 8,
               border: '1px solid var(--border-dim)', background: 'var(--bg-raised)',
               color: 'var(--text-dim)', cursor: 'pointer',
               transition: '150ms cubic-bezier(0.33, 1, 0.68, 1)',
+              outline: 'none',
             }}
-            onFocus={(e) => { e.currentTarget.style.boxShadow = '0 0 0 2px #C3E7FE'; }}
+            onFocus={(e) => { e.currentTarget.style.boxShadow = uiTokens.focusRing; }}
             onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
           >
             {reasoningExpanded ? '▾ Hide reasoning' : '▸ Show reasoning'}
@@ -178,10 +182,10 @@ export default function AnnotationOverlay({
 
       {reasoningExpanded && reasoning?.text && (
         <div style={{
-          padding: '6px 14px 8px',
+          padding: `${spacing[150]}px ${spacing[300]}px ${spacing[2]}px`,
           borderTop: '1px solid var(--border-dim)',
           fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5,
-          fontFamily: 'var(--font-body)',
+          fontFamily: uiTokens.font,
         }}>
           {reasoning.text}
         </div>

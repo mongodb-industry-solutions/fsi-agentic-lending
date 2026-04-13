@@ -25,6 +25,11 @@ export const STATUS_SUGGESTIONS = {
     'When is my first payment due?',
     'What was my final interest rate?',
   ],
+  closing: [
+    'What documents do I need to sign?',
+    'How long does closing take?',
+    'What happens after I sign?',
+  ],
   declined: [
     'Why was my application declined?',
     'Can I reapply with changes?',

@@ -174,10 +174,10 @@ export const architectureContent = {
       responsibilities:
         'Multi-document ingestion (CRA notices, bank statements, pay stubs), identity verification, open banking data enrichment, and abandonment prevention.',
       tools: [
-        { icon: '📋', label: 'creditBureau()', colorVar: 'tool-blue' },
-        { icon: '🧬', label: 'voyage-multimodal-3.5', colorVar: 'voyage' },
-        { icon: '📡', label: 'Change Streams', colorVar: 'success' },
-        { icon: '🏦', label: 'Open Banking (Plaid)', colorVar: 'agent-cyan' },
+        { glyph: 'CreditCard', label: 'creditBureau()', colorVar: 'tool-blue' },
+        { glyph: 'Beaker', label: 'voyage-multimodal-3.5', colorVar: 'voyage' },
+        { glyph: 'Visibility', label: 'Change Streams', colorVar: 'success' },
+        { glyph: 'Building', label: 'Open Banking (Plaid)', colorVar: 'agent-cyan' },
       ],
       collections: 'loanApplications, loanDocuments',
       dataSources: [
@@ -197,10 +197,10 @@ export const architectureContent = {
       responsibilities:
         'Cash flow underwriting, alternative data scoring, risk tiering, champion/challenger model evaluation, and explainable decisions.',
       tools: [
-        { icon: '📊', label: 'Aggregation', colorVar: 'agent-cyan' },
-        { icon: '🔎', label: 'Vector Search', colorVar: 'voyage' },
-        { icon: '🕸', label: '$graphLookup', colorVar: 'danger' },
-        { icon: '⏱', label: 'Time Series', colorVar: 'voyage' },
+        { glyph: 'Charts', label: 'Aggregation', colorVar: 'agent-cyan' },
+        { glyph: 'MagnifyingGlass', label: 'Vector Search', colorVar: 'voyage' },
+        { glyph: 'Connect', label: '$graphLookup', colorVar: 'danger' },
+        { glyph: 'TimeSeries', label: 'Time Series', colorVar: 'voyage' },
       ],
       collections: 'riskScores, creditReports',
       dataSources: [
@@ -216,16 +216,16 @@ export const architectureContent = {
         'Champion/challenger evaluation',
       ],
     },
-    renewalAgent: {
-      name: 'Renewal Agent',
+    servicingAgent: {
+      name: 'Servicing Agent',
       responsibilities:
         'Early warning system monitoring, propensity-to-pay scoring, proactive intervention triggers, and multi-channel outreach for retention and collections.',
       tools: [
-        { icon: '📡', label: 'Change Streams', colorVar: 'success' },
-        { icon: '⏱', label: 'Time Series', colorVar: 'voyage' },
-        { icon: '🔎', label: 'Vector Search', colorVar: 'voyage' },
+        { glyph: 'Visibility', label: 'Change Streams', colorVar: 'success' },
+        { glyph: 'TimeSeries', label: 'Time Series', colorVar: 'voyage' },
+        { glyph: 'MagnifyingGlass', label: 'Vector Search', colorVar: 'voyage' },
       ],
-      collections: 'renewalOffers, ewsAlerts, paymentPatterns',
+      collections: 'modificationOffers, ewsAlerts, paymentPatterns',
       dataSources: [
         'Payment History',
         'Behavioral Signals',

@@ -1,13 +1,16 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { MANAGEMENT_STEPS } from '../engine/demoScenes';
+import Icon from '@leafygreen-ui/icon';
+import { SERVICING_STEPS } from '../engine/demoScenes';
 import { mergeCanvasState } from '../engine/canvasUtils';
 import WorkflowCanvas from '../WorkflowCanvas';
 import AnnotationOverlay from '../AnnotationOverlay';
 import PipelineDrawer from '../PipelineDrawer';
 import { apiGet } from '../../../lib/api';
 import { spacing } from '@leafygreen-ui/tokens';
+import { palette } from '@leafygreen-ui/palette';
+import { uiTokens } from '../../../lib/uiTokens';
 
 const DEFAULT_STATS = [
   { label: 'Active Loans', value: 4287, format: (v) => v.toLocaleString('en-US'), color: 'var(--mongo)' },
@@ -17,28 +20,28 @@ const DEFAULT_STATS = [
 ];
 
 const EWS_SIGNALS = [
-  { signal: 'Credit utilization trend', status: 'red', detail: 'Rising 3 consecutive months', icon: '⚠️' },
-  { signal: 'Payment pattern change', status: 'amber', detail: '2 late in 90 days', icon: '⚠️' },
-  { signal: 'Income stability', status: 'green', detail: 'Stable — verified monthly', icon: '✓' },
+  { signal: 'Credit utilization trend', status: 'red', detail: 'Rising 3 consecutive months', glyph: 'Warning' },
+  { signal: 'Payment pattern change', status: 'amber', detail: '2 late in 90 days', glyph: 'Warning' },
+  { signal: 'Income stability', status: 'green', detail: 'Stable — verified monthly', glyph: 'Checkmark' },
 ];
 
 const EVENT_TEMPLATES = [
-  { type: 'payment', icon: '💰', color: 'var(--success)', messages: ['Payment received: $4,047 on L-00001', 'Payment received: $2,450 on L-91205', 'Payment received: $1,320 on L-64817'] },
-  { type: 'status', icon: '🔄', color: 'var(--tool-blue)', messages: ['Status update: L-55023 → funded', 'Status update: L-82910 → underwriting', 'Status update: L-41892 → closing'] },
-  { type: 'alert', icon: '⚠️', color: 'var(--hitl-amber)', messages: ['Alert: Delinquency threshold on L-33719', 'Alert: Late payment flagged on L-28104'] },
-  { type: 'agent', icon: '🔄', color: 'var(--voyage)', messages: [
-    'Renewal Agent: rate comparison triggered for L-33719',
-    'Renewal Agent: similar borrower analysis initiated',
-    'Renewal Agent: personalized offer generated for L-33719',
-    'Renewal Agent: EWS alert evaluated — proactive intervention',
+  { type: 'payment', glyph: 'CreditCard', color: 'var(--success)', messages: ['Payment received: $4,047 on L-00001', 'Payment received: $2,450 on L-91205', 'Payment received: $1,320 on L-64817'] },
+  { type: 'status', glyph: 'Refresh', color: 'var(--tool-blue)', messages: ['Status update: L-55023 → funded', 'Status update: L-82910 → underwriting', 'Status update: L-41892 → closing'] },
+  { type: 'alert', glyph: 'Warning', color: 'var(--hitl-amber)', messages: ['Alert: Delinquency threshold on L-33719', 'Alert: Late payment flagged on L-28104'] },
+  { type: 'agent', glyph: 'Refresh', color: 'var(--voyage)', messages: [
+    'Servicing Agent: rate comparison triggered for L-33719',
+    'Servicing Agent: similar borrower analysis initiated',
+    'Servicing Agent: personalized offer generated for L-33719',
+    'Servicing Agent: EWS alert evaluated — proactive intervention',
   ] },
 ];
 
 const INTERVENTION_STEPS = [
-  { label: 'EWS Alert', detail: 'Payment anomaly detected (Day 47 late, 2nd occurrence)', icon: '🚨', color: 'var(--danger)' },
-  { label: 'Propensity-to-Pay', detail: 'Score: 0.73 — Atlas Vector Search on 500M+ patterns', icon: '🎯', color: 'var(--voyage)' },
-  { label: 'Similar Borrowers', detail: '82% resolved with modification, 12% self-cured', icon: '👥', color: 'var(--agent-cyan)' },
-  { label: 'Offer Generated', detail: 'Rate 4.89% → 4.29% for 6 months, payment $4,047 → $3,840', icon: '📝', color: 'var(--mongo)' },
+  { label: 'EWS Alert', detail: 'Payment anomaly detected (Day 47 late, 2nd occurrence)', glyph: 'Warning', color: 'var(--danger)' },
+  { label: 'Propensity-to-Pay', detail: 'Score: 0.73 — Atlas Vector Search on 500M+ patterns', glyph: 'MagnifyingGlass', color: 'var(--voyage)' },
+  { label: 'Similar Borrowers', detail: '82% resolved with modification, 12% self-cured', glyph: 'Person', color: 'var(--agent-cyan)' },
+  { label: 'Offer Generated', detail: 'Rate 4.89% → 4.29% for 6 months, payment $4,047 → $3,840', glyph: 'Edit', color: 'var(--mongo)' },
 ];
 
 function AnimatedStat({ stat }) {
@@ -59,9 +62,9 @@ function AnimatedStat({ stat }) {
   }, [stat.value]);
 
   return (
-    <div style={{ padding: `10px ${spacing[300]}px`, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)' }}>
+    <div style={{ padding: `${spacing[200]}px ${spacing[300]}px`, background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border-dim)' }}>
       <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600, marginBottom: spacing[100] }}>{stat.label}</div>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 800, color: stat.color }}>{stat.format(value)}</div>
+      <div style={{ fontFamily: uiTokens.monoFont, fontSize: 18, fontWeight: 800, color: stat.color }}>{stat.format(value)}</div>
     </div>
   );
 }
@@ -80,14 +83,14 @@ function StatusDot({ status }) {
 function EWSPanel({ highlightAlert, signals }) {
   const data = signals || EWS_SIGNALS;
   return (
-    <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)', animation: 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' }}>
+    <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border-dim)', animation: 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[200] }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12 }}>Early Warning System</div>
+        <div style={{ fontFamily: uiTokens.font, fontWeight: 700, fontSize: 12 }}>Early Warning System</div>
         <div style={{ display: 'flex', gap: spacing[100], alignItems: 'center' }}>
-          <span style={{ fontSize: 8, fontWeight: 600, padding: `${spacing[50]}px ${spacing[150]}px`, borderRadius: 4, background: 'var(--voyage-dim)', color: 'var(--voyage)' }}>
+          <span style={{ fontSize: 8, fontWeight: 600, padding: `${spacing[50]}px ${spacing[150]}px`, borderRadius: 8, background: 'var(--voyage-dim)', color: 'var(--voyage)' }}>
             Time Series &middot; $setWindowFields
           </span>
-          <span style={{ fontSize: 8, fontWeight: 600, padding: `${spacing[50]}px ${spacing[150]}px`, borderRadius: 4, background: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' }}>
+          <span style={{ fontSize: 8, fontWeight: 600, padding: `${spacing[50]}px ${spacing[150]}px`, borderRadius: 8, background: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' }}>
             Change Streams
           </span>
         </div>
@@ -99,7 +102,7 @@ function EWSPanel({ highlightAlert, signals }) {
             <div key={s.signal} style={{
               display: 'flex', alignItems: 'center', gap: spacing[200], padding: `${spacing[150]}px ${spacing[200]}px`,
               borderBottom: '1px solid var(--border-dim)',
-              background: isHighlighted ? (s.status === 'red' ? 'rgba(239,68,68,0.06)' : 'rgba(245,158,11,0.06)') : 'transparent',
+              background: isHighlighted ? (s.status === 'red' ? palette.red.light3 : palette.yellow.light3) : 'transparent',
               transition: 'background 220ms cubic-bezier(0.33, 1, 0.68, 1)',
             }}>
               <StatusDot status={s.status} />
@@ -107,7 +110,7 @@ function EWSPanel({ highlightAlert, signals }) {
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary)' }}>{s.signal}</div>
                 <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{s.detail}</div>
               </div>
-              <span style={{ fontSize: 10 }}>{s.icon}</span>
+              <Icon glyph={s.glyph || 'Warning'} size={10} />
             </div>
           );
         })}
@@ -119,30 +122,30 @@ function EWSPanel({ highlightAlert, signals }) {
   );
 }
 
-function RenewalInterventionCard({ sceneStep }) {
+function ServicingInterventionCard({ sceneStep }) {
   const visibleSteps = Math.min(sceneStep >= 3 ? 4 : sceneStep >= 2 ? 2 : 0, INTERVENTION_STEPS.length);
   if (visibleSteps === 0) return null;
 
   return (
-    <div style={{ padding: 14, background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', border: '2px solid var(--voyage)', animation: 'sceneEnter 220ms cubic-bezier(0.33, 1, 0.68, 1)' }}>
+    <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 8, border: '2px solid var(--voyage)', animation: 'sceneEnter 220ms cubic-bezier(0.33, 1, 0.68, 1)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: spacing[200], marginBottom: spacing[300] }}>
-        <span style={{ fontSize: 18 }}>🔄</span>
+        <Icon glyph="Refresh" size={18} />
         <div>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 13, color: 'var(--voyage)' }}>Renewal Agent — Proactive Intervention</div>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Renewal + collections-grade capabilities via MongoDB + AI</div>
+          <div style={{ fontFamily: uiTokens.font, fontWeight: 800, fontSize: 13, color: 'var(--voyage)' }}>Servicing Agent — Proactive Intervention</div>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Servicing + collections-grade capabilities via MongoDB + AI</div>
         </div>
       </div>
 
       <div style={{ position: 'relative', paddingLeft: spacing[500] }}>
         <div style={{ position: 'absolute', left: 8, top: 0, bottom: 0, width: 2, background: 'var(--border-dim)' }} />
         {INTERVENTION_STEPS.slice(0, visibleSteps).map((step, i) => (
-          <div key={step.label} style={{ position: 'relative', paddingLeft: spacing[500], paddingBottom: 10, animation: 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' }}>
+          <div key={step.label} style={{ position: 'relative', paddingLeft: spacing[500], paddingBottom: spacing[200], animation: 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' }}>
             <div style={{
               position: 'absolute', left: 0, top: 4, width: 16, height: 16, borderRadius: '50%',
               background: 'var(--bg-surface)', border: `2px solid ${step.color}`, zIndex: 1,
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8,
             }}>
-              {step.icon}
+              <Icon glyph={step.glyph} size={10} />
             </div>
             <div style={{ fontWeight: 600, fontSize: 11, color: step.color, marginBottom: 1 }}>{step.label}</div>
             <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.4 }}>{step.detail}</div>
@@ -151,9 +154,9 @@ function RenewalInterventionCard({ sceneStep }) {
       </div>
 
       <div style={{ marginTop: spacing[200], fontSize: 11, color: 'var(--text-dim)', display: 'flex', gap: spacing[150] }}>
-        <span style={{ padding: `${spacing[50]}px ${spacing[150]}px`, background: 'var(--voyage-dim)', color: 'var(--voyage)', borderRadius: 3 }}>Vector Search</span>
-        <span style={{ padding: `${spacing[50]}px ${spacing[150]}px`, background: 'var(--bg-raised)', color: 'var(--agent-cyan)', borderRadius: 3 }}>Time Series</span>
-        <span style={{ padding: `${spacing[50]}px ${spacing[150]}px`, background: 'var(--bg-raised)', color: 'var(--success)', borderRadius: 3 }}>Change Streams</span>
+        <span style={{ padding: `${spacing[50]}px ${spacing[150]}px`, background: 'var(--voyage-dim)', color: 'var(--voyage)', borderRadius: 8 }}>Vector Search</span>
+        <span style={{ padding: `${spacing[50]}px ${spacing[150]}px`, background: 'var(--bg-raised)', color: 'var(--agent-cyan)', borderRadius: 8 }}>Time Series</span>
+        <span style={{ padding: `${spacing[50]}px ${spacing[150]}px`, background: 'var(--bg-raised)', color: 'var(--success)', borderRadius: 8 }}>Change Streams</span>
       </div>
     </div>
   );
@@ -169,7 +172,7 @@ function LiveEventFeed({ sceneStep, backendEvents }) {
       const seeded = backendEvents.map((e, i) => ({
         id: `be-${i}`,
         type: e.type || 'payment',
-        icon: e.icon || '💰',
+        glyph: e.glyph || 'CreditCard',
         color: e.color || 'var(--text-secondary)',
         text: e.message || '',
         time: e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : '',
@@ -193,9 +196,9 @@ function LiveEventFeed({ sceneStep, backendEvents }) {
   }, [sceneStep, backendEvents]);
 
   return (
-    <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-dim)' }}>
+    <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border-dim)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[200] }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11 }}>Live Change Stream</div>
+        <div style={{ fontFamily: uiTokens.font, fontWeight: 700, fontSize: 11 }}>Live Change Stream</div>
         <span style={{ display: 'flex', alignItems: 'center', gap: spacing[100], fontSize: 9, fontWeight: 600, color: 'var(--success)' }}>
           <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--success)', boxShadow: '0 0 6px var(--success)', animation: 'pulse 1.5s infinite' }} />
           Streaming
@@ -204,9 +207,9 @@ function LiveEventFeed({ sceneStep, backendEvents }) {
       <div style={{ maxHeight: 80, overflowY: 'auto' }}>
         {events.map((e) => (
           <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: spacing[150], padding: `${spacing[100]}px 0`, borderBottom: '1px solid var(--border-dim)', fontSize: 10, animation: 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' }}>
-            <span style={{ fontSize: 11, flexShrink: 0 }}>{e.icon}</span>
+            <Icon glyph={e.glyph || 'CreditCard'} size={11} />
             <span style={{ flex: 1, color: e.type === 'agent' ? 'var(--voyage)' : 'var(--text-secondary)', fontWeight: e.type === 'agent' ? 600 : 400 }}>{e.text}</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)', flexShrink: 0 }}>{e.time}</span>
+            <span style={{ fontFamily: uiTokens.monoFont, fontSize: 8, color: 'var(--text-dim)', flexShrink: 0 }}>{e.time}</span>
           </div>
         ))}
       </div>
@@ -214,11 +217,11 @@ function LiveEventFeed({ sceneStep, backendEvents }) {
   );
 }
 
-export default function ManagementScene({ sceneStep, currentStepData }) {
+export default function ServicingScene({ sceneStep, currentStepData }) {
   const started = sceneStep >= 0;
   const showEWS = sceneStep >= 0;
   const showAlertHighlight = sceneStep >= 2;
-  const showRenewalAgent = sceneStep >= 2;
+  const showServicingAgent = sceneStep >= 2;
 
   const [hoveredNode, setHoveredNode] = useState(null);
   const [timelineHighlight, setTimelineHighlight] = useState(null);
@@ -274,7 +277,7 @@ export default function ManagementScene({ sceneStep, currentStepData }) {
   const handleTimelineHover = useCallback((nodeId) => setTimelineHighlight(nodeId), []);
 
   const canvasState = useMemo(
-    () => mergeCanvasState(MANAGEMENT_STEPS, sceneStep),
+    () => mergeCanvasState(SERVICING_STEPS, sceneStep),
     [sceneStep],
   );
 
@@ -289,7 +292,7 @@ export default function ManagementScene({ sceneStep, currentStepData }) {
                 activeEdges={canvasState.activeEdges}
                 pulsingNodes={canvasState.pulsingNodes}
                 completedNodes={canvasState.completedNodes}
-                currentScene="management"
+                currentScene="servicing"
                 onNodeHover={handleNodeHover}
                 highlightNode={timelineHighlight}
               />
@@ -297,11 +300,11 @@ export default function ManagementScene({ sceneStep, currentStepData }) {
           </div>
           <AnnotationOverlay
             currentStep={currentStepData}
-            sceneTitle="Management"
+            sceneTitle="Servicing"
             stepIndex={sceneStep}
-            totalSteps={MANAGEMENT_STEPS.length}
+            totalSteps={SERVICING_STEPS.length}
           />
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: spacing[300], display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: spacing[300], display: 'flex', flexDirection: 'column', gap: spacing[200] }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: spacing[200] }}>
               {(liveStats
                 ? [
@@ -318,12 +321,12 @@ export default function ManagementScene({ sceneStep, currentStepData }) {
 
             <LiveEventFeed sceneStep={sceneStep} backendEvents={liveEvents} />
 
-            {showRenewalAgent && <RenewalInterventionCard sceneStep={sceneStep} />}
+            {showServicingAgent && <ServicingInterventionCard sceneStep={sceneStep} />}
           </div>
         </div>
 
         <PipelineDrawer
-          steps={MANAGEMENT_STEPS}
+          steps={SERVICING_STEPS}
           stepIndex={sceneStep}
           onEntryHover={handleTimelineHover}
           highlightNodeId={hoveredNode}

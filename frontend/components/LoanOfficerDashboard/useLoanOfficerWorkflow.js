@@ -180,7 +180,11 @@ export function useLoanOfficerWorkflow(addToast) {
       setWorkflowPhase('executing');
       setWorkflowStage(status === 'underwriting' ? 1 : 0);
       reconnectActivitySSERef.current(selectedApp);
-    } else if (status === 'approved') {
+    } else if (status === 'approved' || status === 'closing') {
+      setWorkflowPhase('executing');
+      setApproved(true);
+      setApprovalDetails({ mode: 'auto' });
+    } else if (status === 'funded' || status === 'active') {
       setWorkflowPhase('executing');
       setApproved(true);
       setApprovalDetails({ mode: 'auto' });

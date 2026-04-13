@@ -1,6 +1,7 @@
 "use client";
 
 import Badge from '@leafygreen-ui/badge';
+import Icon from '@leafygreen-ui/icon';
 import { CAPABILITIES } from '../../lib/data/capabilities';
 import { colorMap, dimMap } from '../../lib/data/colorMaps';
 
@@ -37,7 +38,7 @@ export default function TechBreadcrumb({ activatedCapabilities = [] }) {
                 border: active ? `1px solid ${accent}22` : '1px solid transparent',
               }}
             >
-              <span style={{ fontSize: 10 }}>{cap.icon}</span>
+              <Icon glyph={cap.glyph} size={10} />
               {cap.label}
             </span>
             {i < CAPABILITIES.length - 1 && (

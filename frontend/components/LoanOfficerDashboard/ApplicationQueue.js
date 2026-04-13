@@ -12,6 +12,7 @@ function getStatusVariant(status) {
     review: 'yellow',
     pending_review: 'yellow',
     approved: 'green',
+    closing: 'blue',
     funded: 'green',
     active: 'green',
     declined: 'red',
@@ -33,7 +34,7 @@ const SORT_OPTIONS = [
 ];
 
 function isReviewStatus(s) { return s === 'review' || s === 'pending_review'; }
-function isProcessingStatus(s) { return s === 'processing' || s === 'underwriting' || s === 'submitted'; }
+function isProcessingStatus(s) { return s === 'processing' || s === 'underwriting' || s === 'submitted' || s === 'closing'; }
 function isCompletedStatus(s) { return s === 'approved' || s === 'declined' || s === 'funded' || s === 'active'; }
 
 export default function ApplicationQueue({ selectedId, onSelect, applications = [] }) {

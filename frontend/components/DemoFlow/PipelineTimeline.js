@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo, useEffect, useRef } from 'react';
+import Icon from '@leafygreen-ui/icon';
 import { NODE_COLORS } from '../../lib/data/nodeColors';
+import { uiTokens } from '../../lib/uiTokens';
+import { spacing } from '@leafygreen-ui/tokens';
 
 export default function PipelineTimeline({
   steps,
@@ -19,7 +22,7 @@ export default function PipelineTimeline({
         const nodeId = s.focusNode || null;
         result.push({
           type: 'reason',
-          icon: s.reasoning.icon,
+          glyph: s.reasoning.glyph,
           agent: s.reasoning.agent,
           text: s.reasoning.text,
           timing: s.reasoning.timing,
@@ -62,7 +65,7 @@ export default function PipelineTimeline({
 
   if (entries.length === 0) {
     return (
-      <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-dim)', fontSize: 11, fontFamily: 'var(--font-mono)' }}>
+      <div style={{ padding: spacing[3], textAlign: 'center', color: 'var(--text-dim)', fontSize: 11, fontFamily: uiTokens.monoFont }}>
         Pipeline activity will appear here...
       </div>
     );
@@ -70,25 +73,25 @@ export default function PipelineTimeline({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <div style={{ height: 6, background: 'var(--border-dim)', borderRadius: 3, marginBottom: 6, flexShrink: 0, overflow: 'hidden' }}>
+      <div style={{ height: 6, background: 'var(--border-dim)', borderRadius: 8, marginBottom: spacing[150], flexShrink: 0, overflow: 'hidden' }}>
         <div style={{
           height: '100%',
           width: `${steps.length > 0 ? ((stepIndex + 1) / steps.length) * 100 : 0}%`,
           background: 'var(--mongo)',
-          borderRadius: 2,
+          borderRadius: 8,
           transition: 'width 400ms cubic-bezier(0.33, 1, 0.68, 1)',
         }} />
       </div>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 0 6px', borderBottom: '1px solid var(--border-dim)', marginBottom: 6, flexShrink: 0,
+        padding: `${spacing[2]}px 0 ${spacing[150]}px`, borderBottom: '1px solid var(--border-dim)', marginBottom: spacing[150], flexShrink: 0,
       }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div style={{ fontFamily: uiTokens.font, fontWeight: 700, fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           Pipeline Activity
         </div>
         <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 6px',
-          background: 'var(--bg-raised)', borderRadius: 3, color: 'var(--text-dim)',
+          fontFamily: uiTokens.monoFont, fontSize: 9, padding: `2px ${spacing[150]}px`,
+          background: 'var(--bg-raised)', borderRadius: 8, color: 'var(--text-dim)',
         }}>
           {entries.length} entries
         </span>
@@ -106,8 +109,8 @@ export default function PipelineTimeline({
                 onMouseEnter={() => onEntryHover && onEntryHover(e.nodeId)}
                 onMouseLeave={() => onEntryHover && onEntryHover(null)}
                 style={{
-                  padding: '8px 10px',
-                  borderRadius: 'var(--radius-sm)',
+                  padding: `${spacing[2]}px ${spacing[200]}px`,
+                  borderRadius: 8,
                   borderLeft: `3px solid ${e.color}`,
                   background: isHighlighted ? e.color + '14' : isLatest ? 'var(--bg-surface)' : 'var(--bg-surface)',
                   fontSize: 11,
@@ -118,11 +121,11 @@ export default function PipelineTimeline({
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontWeight: 700, fontSize: 12 }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span>{e.icon}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: spacing[1] }}>
+                    {e.glyph && <Icon glyph={e.glyph} size={12} fill={e.color} />}
                     <span style={{ color: e.color }}>{e.agent}</span>
                   </span>
-                  <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>{e.timing}</span>
+                  <span style={{ color: 'var(--text-dim)', fontFamily: uiTokens.monoFont, fontSize: 10 }}>{e.timing}</span>
                 </div>
                 <div style={{ color: 'var(--text-secondary)', lineHeight: 1.4, fontSize: 12 }}>{e.text}</div>
               </div>
@@ -137,18 +140,18 @@ export default function PipelineTimeline({
                 onMouseEnter={() => onEntryHover && onEntryHover(e.nodeId)}
                 onMouseLeave={() => onEntryHover && onEntryHover(null)}
                 style={{
-                  display: 'flex', gap: 6, padding: '5px 10px', fontSize: 12,
+                  display: 'flex', gap: spacing[150], padding: `5px ${spacing[200]}px`, fontSize: 12,
                   borderLeft: `3px solid ${e.color}33`,
-                  borderRadius: 'var(--radius-sm)',
+                  borderRadius: 8,
                   background: isHighlighted ? e.color + '0a' : 'transparent',
                   transition: 'background 150ms cubic-bezier(0.33, 1, 0.68, 1)',
                   animation: isLatest ? 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' : undefined,
                 }}
               >
-                <span style={{ fontSize: 9, marginTop: 1 }}>🗄</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, minWidth: 60, color: 'var(--mongo)' }}>{e.verb}</span>
+                <Icon glyph="Database" size={10} fill={e.color} />
+                <span style={{ fontFamily: uiTokens.monoFont, fontWeight: 600, minWidth: 60, color: 'var(--mongo)' }}>{e.verb}</span>
                 <span style={{ flex: 1, color: 'var(--text-secondary)', fontSize: 11 }}>{e.collection}</span>
-                <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>{e.latency}</span>
+                <span style={{ color: 'var(--text-dim)', fontFamily: uiTokens.monoFont, fontSize: 10 }}>{e.latency}</span>
               </div>
             );
           }
@@ -161,15 +164,15 @@ export default function PipelineTimeline({
                 onMouseEnter={() => onEntryHover && onEntryHover(e.nodeId)}
                 onMouseLeave={() => onEntryHover && onEntryHover(null)}
                 style={{
-                  display: 'flex', gap: 8, padding: '6px 10px', fontSize: 12,
+                  display: 'flex', gap: spacing[2], padding: `${spacing[150]}px ${spacing[200]}px`, fontSize: 12,
                   borderLeft: `3px solid ${e.color}`,
-                  borderRadius: 'var(--radius-sm)',
+                  borderRadius: 8,
                   background: isHighlighted ? e.color + '14' : e.color + '08',
                   transition: 'background 150ms cubic-bezier(0.33, 1, 0.68, 1)',
                   animation: isLatest ? 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' : undefined,
                 }}
               >
-                <span style={{ fontSize: 11 }}>{e.memType === 'checkpoint' ? '💾' : '🧠'}</span>
+                <Icon glyph={e.memType === 'checkpoint' ? 'Save' : 'Beaker'} size={12} fill={e.color} />
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 12, color: e.color }}>{e.title}</div>
                   <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>{e.detail}</div>

@@ -2,7 +2,9 @@
 
 import { useCallback } from 'react';
 import Badge from '@leafygreen-ui/badge';
+import Icon from '@leafygreen-ui/icon';
 import { spacing } from '@leafygreen-ui/tokens';
+import { palette } from '@leafygreen-ui/palette';
 import { SCENE_META } from '../../lib/data/demoScenes';
 import { CAPABILITIES } from '../../lib/data/capabilities';
 import { uiTokens } from '../../lib/uiTokens';
@@ -53,6 +55,8 @@ export default function SceneNavBar({
               <button
                 type="button"
                 onClick={() => onGoToScene(i)}
+                onFocus={(e) => { e.currentTarget.style.boxShadow = uiTokens.focusRing; }}
+                onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -62,15 +66,16 @@ export default function SceneNavBar({
                   border: active ? '1px solid var(--mongo)' : '1px solid transparent',
                   background: active ? 'var(--mongo-dim)' : visited ? 'var(--bg-raised)' : 'transparent',
                   color: active ? 'var(--mongo)' : visited ? 'var(--text-secondary)' : 'var(--text-dim)',
-                  fontFamily: 'var(--font-display)',
+                  fontFamily: uiTokens.font,
                   fontWeight: active ? 700 : 500,
                   fontSize: 12,
                   cursor: 'pointer',
                   transition: `background ${uiTokens.transitionFast}, color ${uiTokens.transitionFast}, border-color ${uiTokens.transitionFast}`,
                   whiteSpace: 'nowrap',
+                  outline: 'none',
                 }}
               >
-                <span style={{ fontSize: 13 }}>{s.icon}</span>
+                <Icon glyph={s.glyph} size={14} fill={active ? palette.green.dark2 : palette.gray.base} />
                 <span>{s.title}</span>
               </button>
               {i < SCENE_META.length - 1 && (
@@ -96,6 +101,8 @@ export default function SceneNavBar({
         <button
           type="button"
           onClick={cycleSpeed}
+          onFocus={(e) => { e.currentTarget.style.boxShadow = uiTokens.focusRing; }}
+          onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
           title="Cycle playback speed"
           style={{
             padding: `${spacing[50]}px ${spacing[2]}px`,
@@ -103,12 +110,13 @@ export default function SceneNavBar({
             border: '1px solid var(--border-dim)',
             background: 'var(--mongo-dim)',
             color: 'var(--mongo)',
-            fontFamily: 'var(--font-mono)',
+            fontFamily: uiTokens.monoFont,
             fontSize: 11,
             fontWeight: 700,
             cursor: 'pointer',
             minWidth: 44,
             textAlign: 'center',
+            outline: 'none',
           }}
         >
           {speed}x
@@ -117,6 +125,8 @@ export default function SceneNavBar({
         <button
           type="button"
           onClick={onStepBack}
+          onFocus={(e) => { e.currentTarget.style.boxShadow = uiTokens.focusRing; }}
+          onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
           disabled={atStart}
           style={{
             padding: `${spacing[150]}px ${spacing[300]}px`,
@@ -124,12 +134,13 @@ export default function SceneNavBar({
             border: '1px solid var(--border-base)',
             background: 'var(--bg-surface)',
             color: 'var(--text-primary)',
-            fontFamily: 'var(--font-display)',
+            fontFamily: uiTokens.font,
             fontWeight: 600,
             fontSize: 11,
             cursor: atStart ? 'default' : 'pointer',
             opacity: atStart ? 0.4 : 1,
             transition: `opacity ${uiTokens.transitionFast}`,
+            outline: 'none',
           }}
         >
           ← Back
@@ -138,34 +149,40 @@ export default function SceneNavBar({
         <button
           type="button"
           onClick={isPlaying ? onPause : onPlay}
+          onFocus={(e) => { e.currentTarget.style.boxShadow = uiTokens.focusRing; }}
+          onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
           style={{
             padding: `${spacing[150]}px ${spacing[300]}px`,
             borderRadius: 8,
             border: 'none',
             background: 'var(--mongo)',
-            color: '#ffffff',
-            fontFamily: 'var(--font-display)',
+            color: palette.white,
+            fontFamily: uiTokens.font,
             fontWeight: 700,
             fontSize: 11,
             cursor: 'pointer',
+            outline: 'none',
           }}
         >
-          {isPlaying ? '⏸ Pause' : '▶ Play'}
+          {isPlaying ? 'Pause' : 'Play'}
         </button>
 
         <button
           type="button"
           onClick={onStep}
+          onFocus={(e) => { e.currentTarget.style.boxShadow = uiTokens.focusRing; }}
+          onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
           style={{
             padding: `${spacing[150]}px ${spacing[300]}px`,
             borderRadius: 8,
             border: '1px solid var(--border-base)',
             background: 'var(--bg-surface)',
             color: 'var(--text-primary)',
-            fontFamily: 'var(--font-display)',
+            fontFamily: uiTokens.font,
             fontWeight: 600,
             fontSize: 11,
             cursor: 'pointer',
+            outline: 'none',
           }}
         >
           Step →
@@ -174,15 +191,18 @@ export default function SceneNavBar({
         <button
           type="button"
           onClick={onReset}
+          onFocus={(e) => { e.currentTarget.style.boxShadow = uiTokens.focusRing; }}
+          onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
           style={{
             padding: `${spacing[150]}px ${spacing[200]}px`,
             borderRadius: 8,
             border: 'none',
             background: 'transparent',
             color: 'var(--text-dim)',
-            fontFamily: 'var(--font-mono)',
+            fontFamily: uiTokens.monoFont,
             fontSize: 11,
             cursor: 'pointer',
+            outline: 'none',
           }}
         >
           Reset

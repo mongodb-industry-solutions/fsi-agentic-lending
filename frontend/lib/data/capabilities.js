@@ -1,7 +1,7 @@
 export const CAPABILITIES = [
   {
     id: "document",
-    icon: "📄",
+    glyph: "File",
     label: "Document Model",
     colorVar: "mongo",
     oneLiner:
@@ -23,7 +23,7 @@ export const CAPABILITIES = [
   },
   {
     id: "aggregation",
-    icon: "📊",
+    glyph: "Charts",
     label: "Aggregation Framework",
     colorVar: "agent-cyan",
     oneLiner: "Real-time risk scoring in a single pipeline execution.",
@@ -43,7 +43,7 @@ export const CAPABILITIES = [
   },
   {
     id: "graphLookup",
-    icon: "🕸",
+    glyph: "Connect",
     label: "$graphLookup",
     colorVar: "danger",
     oneLiner:
@@ -67,7 +67,7 @@ export const CAPABILITIES = [
   },
   {
     id: "changeStreams",
-    icon: "📡",
+    glyph: "Visibility",
     label: "Change Streams",
     colorVar: "success",
     oneLiner: "Turn MongoDB into a real-time event engine.",
@@ -81,11 +81,11 @@ changeStream.on("change", (event) => {
   triggerUnderwriting(event.fullDocument._id);
 });`,
     demoScene:
-      "Scene 1 & 4: Underwriting triggered on status change; Renewal Agent on payment events.",
+      "Scene 1 & 6: Underwriting triggered on status change; Servicing Agent on payment events.",
   },
   {
     id: "timeSeries",
-    icon: "⏱",
+    glyph: "TimeSeries",
     label: "Time Series Collections",
     colorVar: "voyage",
     oneLiner:
@@ -103,11 +103,11 @@ changeStream.on("change", (event) => {
   timestamp: new Date()
 })`,
     demoScene:
-      "Scene 1 & 4: 36-month payment history; rolling 90-day delinquency.",
+      "Scene 1 & 6: 36-month payment history; rolling 90-day delinquency.",
   },
   {
     id: "vectorSearch",
-    icon: "🔎",
+    glyph: "MagnifyingGlass",
     label: "Atlas Vector Search",
     colorVar: "voyage",
     oneLiner:

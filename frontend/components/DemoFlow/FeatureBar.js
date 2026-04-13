@@ -26,7 +26,7 @@ export default function FeatureBar({ activeFeatures }) {
         return (
           <FeatureBadge
             key={id}
-            icon={cap.icon}
+            glyph={cap.glyph}
             label={cap.label}
             colorVar={cap.colorVar}
             active={active}

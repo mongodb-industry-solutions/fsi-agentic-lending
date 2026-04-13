@@ -2,7 +2,7 @@
 
 import { spacing } from '@leafygreen-ui/tokens';
 import { ThinkingStrip, ActivityFeed } from './ActivityFeed';
-import { formatTime } from './statusTrackerConstants';
+import { STAGES, formatTime } from './statusTrackerConstants';
 
 export function TimelineStageCard({
   stage,
@@ -29,7 +29,7 @@ export function TimelineStageCard({
   const hasInterventions = stage.type === 'intervention';
   const isActionReq = stage.type === 'action-required';
   const isActiveAction = isActive && isActionReq && actionPaused;
-  const isComplete = activeStage >= 8; // STAGES.length - 1
+  const isComplete = activeStage >= STAGES.length - 1;
 
   let dotBg, dotBorder;
   if (isCompleted) {

@@ -11,6 +11,7 @@ class ApplicationStatus(str, Enum):
     underwriting = "underwriting"
     review = "review"
     approved = "approved"
+    closing = "closing"
     declined = "declined"
     funded = "funded"
     active = "active"

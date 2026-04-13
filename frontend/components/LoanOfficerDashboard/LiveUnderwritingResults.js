@@ -2,9 +2,9 @@ export function LiveUnderwritingResults({ data }) {
   if (!data || Object.keys(data).length === 0) return null;
 
   const hasOrigination = data.documents_verified != null || data.primary_credit_score != null;
-  const hasDecisioning = data.risk_score != null;
+  const hasUnderwriting = data.risk_score != null;
 
-  if (!hasOrigination && !hasDecisioning) return null;
+  if (!hasOrigination && !hasUnderwriting) return null;
 
   const getRiskColor = (score) => {
     if (score == null) return 'var(--text-dim)';
@@ -31,7 +31,7 @@ export function LiveUnderwritingResults({ data }) {
         Live Results
       </div>
 
-      {hasOrigination && !hasDecisioning && (
+      {hasOrigination && !hasUnderwriting && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {data.document_count != null && (
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9 }}>
@@ -57,7 +57,7 @@ export function LiveUnderwritingResults({ data }) {
         </div>
       )}
 
-      {hasDecisioning && (
+      {hasUnderwriting && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 2 }}>
             <span style={{

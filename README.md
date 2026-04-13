@@ -1,6 +1,6 @@
 # Agentic Lending Platform
 
-End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangGraph**, and **Voyage AI** work together to automate the full mortgage lifecycle — from application intake through portfolio management.
+End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangGraph**, and **Voyage AI** work together to automate the full mortgage lifecycle — from application intake through loan servicing.
 
 ---
 
@@ -12,13 +12,14 @@ End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangG
 │                                                                             │
 │   ┌──────────────┐  ┌────────────────────┐  ┌───────────────────────────┐  │
 │   │  Borrower    │  │  Loan Officer      │  │  Demo Flow               │  │
-│   │  Portal      │  │  Dashboard         │  │  (5 Scenes)              │  │
+│   │  Portal      │  │  Dashboard         │  │  (6 Scenes)              │  │
 │   │              │  │                    │  │                           │  │
 │   │ • Selection  │  │ • Queue (WebSocket)│  │ • Origination            │  │
-│   │ • Form+Valid │  │ • Activity (SSE)   │  │ • Decisioning            │  │
+│   │ • Form+Valid │  │ • Activity (SSE)   │  │ • Underwriting           │  │
 │   │ • Status(SSE)│  │ • HITL Review      │  │ • Approval               │  │
-│   │ • AI Chat    │  │ • Interventions    │  │ • Funding                │  │
-│   └──────┬───────┘  └────────┬───────────┘  │ • Management             │  │
+│   │ • AI Chat    │  │ • Interventions    │  │ • Closing                │  │
+│   │              │  │                    │  │ • Funding                │  │
+│   └──────┬───────┘  └────────┬───────────┘  │ • Servicing              │  │
 │          │                   │              └───────────────────────────┘  │
 │          └───────────┬───────┘                                             │
 │                      │  REST / SSE / WebSocket                             │
@@ -167,7 +168,7 @@ End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangG
 
 | Layer         | Technology                                                                                                           |
 | ------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Frontend      | Next.js 15 (App Router), LeafyGreen UI, Euclid Circular A                                                            |
+| Frontend      | Next.js 15 (App Router), LeafyGreen UI, Euclid Circular A, custom `uiTokens` design tokens                           |
 | Backend       | FastAPI, LangGraph, Python 3.13                                                                                      |
 | Database      | MongoDB Atlas (7 collections + 3 LangGraph infra)                                                                    |
 | AI/ML         | AWS Bedrock Claude Haiku 4 (tool_use for structured output), Voyage AI multimodal embeddings (voyage-multimodal-3.5) |
@@ -254,7 +255,7 @@ Full-featured officer workspace with real-time data flows and human-in-the-loop 
 - **Application Queue** — real-time via WebSocket + MongoDB Change Stream. Filterable by status (All / Pending Review / Processing / Completed), sortable (Newest First / Needs Attention), with amber accent on applications awaiting review and a review-count badge.
 - **Application Detail** — comprehensive view of selected application: borrower info, income summary, loan terms, property details, risk assessment (score, tier, GDS/TDS), credit reports, and document list with status badges. Compact mode for inline display during processing. Includes expandable **Risk Pipeline Visualization** showing the 7-stage MongoDB aggregation pipeline with per-stage operator and description. **Document Search** panel for semantic search across application documents via Atlas Vector Search.
 - **Live Underwriting Results** — real-time metrics overlay during processing, powered by captured `node_complete` SSE output. Shows document count, credit score, risk score with tier badge, GDS/TDS ratios, and stress test pass/fail as each pipeline stage completes.
-- **Stage Progress Bar** — 3-stage progress indicator (Origination → Decisioning → HITL) with animated transitions, elapsed durations per stage, and stage-start timestamps. Sits between the compact detail bar and the workflow canvas.
+- **Stage Progress Bar** — 4-stage progress indicator (Origination → Underwriting → Closing → HITL) with animated transitions, elapsed durations per stage, and stage-start timestamps. Sits between the compact detail bar and the workflow canvas.
 - **Agent Activity Log** — real-time SSE feed of agent actions with search filtering, color-coded by agent, auto-scroll with manual override. Compact/detailed view mode toggle, action-type badges (DATA, COMPUTE, SEARCH, DECIDE, ALERT), pause/resume stream with buffer count badge, and entry count cap display.
 - **Policy Explorer** — collapsible panel for Atlas Vector Search across lending policies (underwriting guidelines, OSFI B-20, etc.). Officers can query policy text and see relevant matches with relevance scores.
 - **Portfolio Intelligence** — collapsible panel with lazy-loaded payment trends, Early Warning System (EWS) signals, and recent portfolio events. Auto-fetches a sample loan if no specific loan is selected, with retry-on-failure.
@@ -267,7 +268,19 @@ Full-featured officer workspace with real-time data flows and human-in-the-loop 
 
 ### 3. Demo Flow
 
-5-scene scripted walkthrough with WorkflowCanvas, capability popovers, educational InfoWizard, collapsible TechRecap. Split-pane document viewer (PDF + extracted JSON). Risk score gauge + FICO ring visualizations.
+6-scene scripted walkthrough demonstrating the full lending lifecycle with a streamlined, enterprise-clarity design.
+
+- **SceneNavBar** — scene navigation pills with progress connectors, capability counter Badge (`N/7 capabilities`), single-click speed cycle button, Play/Pause/Step/Back/Reset controls.
+- **WorkflowCanvas** — animated node graph showing data flow between agents and MongoDB capabilities. Softened glow oscillations, single particle per active edge, no grid lines for a clean backdrop.
+- **AnnotationOverlay** — compact step annotation bar with progress dots, agent name + description, clickable capability badges with educational popovers, and collapsible reasoning text.
+- **PipelineDrawer** — slide-out activity log (right edge toggle, Escape to close, `aria-expanded` for accessibility) replacing the previous always-visible sidebar, freeing full-width for scene content.
+- **Origination Scene** — multi-document extraction (CRA Notice, Bank Statement, Pay Stub) with progressive field reveal, tab switcher with aggregate confidence Badges, Open Banking headline metrics, and collapsible Cross-Validation and Profile Output via ExpandableCards.
+- **Underwriting Scene** — risk ring SVG gauge, top-5 factor bars with positive/negative layout, counterfactual explainer, and consolidated Compliance & Validation ExpandableCard (7/7 pass). Fraud network visualization via `$graphLookup` with FraudGraph takeover.
+- **Approval Scene** — HITL review card with Badge-based tier indicator, Approve/Modify/Decline controls, collapsible Repayment Schedule and Regulatory Disclosures via ExpandableCards. Post-approval loan terms grid with amortization summary.
+- **Closing Scene** — Closing Timeline with workflow canvas: approval detection, closing package (TILA, RESPA), compliance checks (TILA / RESPA / OSFI), and e-sign completion before funding.
+- **Funding Scene** — disbursement timeline with 4-step document evolution overview (colored dots + field counts), collapsible full Document Evolution ExpandableCard, and double-entry accounting table.
+- **Servicing Scene** — portfolio stats grid (4-column), top-3 Early Warning System signals, live event feed (3.5s interval), and 4-step renewal intervention card. Real-time data fetched from `/portfolio/stats`.
+- **Design System** — centralized `uiTokens.js` module with surface colors, borders, shadows, and transition curves. All transitions standardized to 150ms (fast) / 220ms (medium) with `cubic-bezier(0.33, 1, 0.68, 1)`. Data visualization transitions use 400–600ms with the same easing. `@media (prefers-reduced-motion: reduce)` respected globally.
 
 ## Prerequisites
 

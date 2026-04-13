@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from 'react';
+import Icon from '@leafygreen-ui/icon';
 import { CAPABILITIES } from '../../lib/data/capabilities';
 import { colorMap, dimMap } from '../../lib/data/colorMaps';
 
@@ -48,7 +49,7 @@ export default function CapabilityPopover({ capabilityId, onClose = () => {}, st
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 20 }}>{cap.icon}</span>
+        <Icon glyph={cap.glyph} size="large" />
         <div>
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, color: accent }}>{cap.label}</div>
           <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Replaces: {cap.replaces}</div>

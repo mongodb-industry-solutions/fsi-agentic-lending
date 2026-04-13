@@ -2,6 +2,7 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import Badge from '@leafygreen-ui/badge';
 import ExpandableCard from '@leafygreen-ui/expandable-card';
+import Icon from '@leafygreen-ui/icon';
 import { spacing } from '@leafygreen-ui/tokens';
 import { ORIGINATION_STEPS } from '../engine/demoScenes';
 import { mergeCanvasState } from '../engine/canvasUtils';
@@ -10,12 +11,13 @@ import AnnotationOverlay from '../AnnotationOverlay';
 import ApplicantCard from '../panels/ApplicantCard';
 import PipelineDrawer from '../PipelineDrawer';
 import StatCard from '../../visualizations/StatCard';
+import { uiTokens } from '../../../lib/uiTokens';
 
 const DOCUMENTS = [
   {
     type: 'CRA Notice',
     label: 'CRA Notice of Assessment',
-    icon: '📄',
+    glyph: 'File',
     avgConfidence: 99.2,
     fields: [
       { field: 'Taxpayer Name', value: 'Marcus A. Delgado', confidence: 99.8 },
@@ -28,7 +30,7 @@ const DOCUMENTS = [
   {
     type: 'Bank Statement',
     label: 'Bank Statement',
-    icon: '🏦',
+    glyph: 'Building',
     avgConfidence: 98.5,
     fields: [
       { field: 'Account Holder', value: 'Marcus A. Delgado', confidence: 99.6 },
@@ -41,7 +43,7 @@ const DOCUMENTS = [
   {
     type: 'Pay Stub',
     label: 'Pay Stub',
-    icon: '💵',
+    glyph: 'CreditCard',
     avgConfidence: 99.0,
     fields: [
       { field: 'Employer', value: 'TechNova Systems Inc.', confidence: 98.8 },
@@ -95,7 +97,7 @@ function useProgressiveReveal(total, active, intervalMs = 150) {
 
 function DocumentTabSwitcher({ activeDoc, onSelect, sceneStep }) {
   return (
-    <div style={{ display: 'flex', gap: spacing[100], marginBottom: 10 }}>
+    <div style={{ display: 'flex', gap: spacing[100], marginBottom: spacing[200] }}>
       {DOCUMENTS.map((doc, i) => {
         const available = i === 0 || sceneStep >= 3;
         const isActive = activeDoc === i;
@@ -104,6 +106,8 @@ function DocumentTabSwitcher({ activeDoc, onSelect, sceneStep }) {
             key={doc.type}
             type="button"
             onClick={() => available && onSelect(i)}
+            onFocus={(e) => { e.currentTarget.style.boxShadow = uiTokens.focusRing; }}
+            onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
             style={{
               flex: 1,
               padding: `${spacing[150]}px ${spacing[200]}px`,
@@ -117,11 +121,12 @@ function DocumentTabSwitcher({ activeDoc, onSelect, sceneStep }) {
               color: isActive ? 'var(--mongo)' : 'var(--text-secondary)',
               textAlign: 'center',
               transition: '150ms cubic-bezier(0.33, 1, 0.68, 1)',
+              outline: 'none',
             }}
           >
-            <span style={{ fontSize: 13, display: 'block', marginBottom: spacing[50] }}>{doc.icon}</span>
+            <span style={{ display: 'block', marginBottom: spacing[50] }}><Icon glyph={doc.glyph} size={14} /></span>
             {doc.type}
-            {available && <Badge variant="green" style={{ marginTop: 4, display: 'block' }}>{doc.avgConfidence}%</Badge>}
+            {available && <Badge variant="green" style={{ marginTop: spacing[1], display: 'block' }}>{doc.avgConfidence}%</Badge>}
           </button>
         );
       })}
@@ -135,7 +140,7 @@ function OpenBankingCard() {
   return (
     <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--agent-cyan)', marginTop: spacing[300], animation: 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[200] }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--agent-cyan)' }}>
+        <div style={{ fontFamily: uiTokens.font, fontWeight: 700, fontSize: 12, color: 'var(--agent-cyan)' }}>
           Open Banking Data
         </div>
         <Badge variant="blue">Plaid Connected</Badge>
@@ -146,7 +151,7 @@ function OpenBankingCard() {
             <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 1 }}>
               {key.replace(/([A-Z])/g, ' $1').trim()}
             </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{OPEN_BANKING_DATA.summary[key]}</div>
+            <div style={{ fontFamily: uiTokens.monoFont, fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{OPEN_BANKING_DATA.summary[key]}</div>
           </div>
         ))}
       </div>
@@ -204,9 +209,9 @@ export default function OriginationScene({ sceneStep, currentStepData }) {
 
             {showExtraction && (
               <>
-                <div style={{ marginTop: 14, marginBottom: spacing[200], fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: spacing[150] }}>
+                <div style={{ marginTop: spacing[300], marginBottom: spacing[200], fontFamily: uiTokens.font, fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: spacing[150] }}>
                   Multi-Document Processing
-                  <span style={{ fontSize: 9, padding: `${spacing[50]}px ${spacing[150]}px`, borderRadius: 4, background: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)', fontWeight: 600 }}>voyage-multimodal-3.5</span>
+                  <span style={{ fontSize: 9, padding: `${spacing[50]}px ${spacing[150]}px`, borderRadius: 8, background: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)', fontWeight: 600 }}>voyage-multimodal-3.5</span>
                 </div>
 
                 <DocumentTabSwitcher activeDoc={activeDocIdx} onSelect={setActiveDocIdx} sceneStep={sceneStep} />
@@ -219,7 +224,7 @@ export default function OriginationScene({ sceneStep, currentStepData }) {
                         display: 'grid',
                         gridTemplateColumns: '130px 1fr',
                         gap: spacing[150],
-                        padding: `${spacing[150]}px 10px`,
+                        padding: `${spacing[150]}px ${spacing[200]}px`,
                         borderBottom: i < Math.min(visibleFieldCount, activeDoc.fields.length) - 1 ? '1px solid var(--border-dim)' : 'none',
                         fontSize: 11,
                         alignItems: 'center',
@@ -227,11 +232,11 @@ export default function OriginationScene({ sceneStep, currentStepData }) {
                       }}
                     >
                       <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>{f.field}</span>
-                      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{f.value}</span>
+                      <span style={{ fontFamily: uiTokens.monoFont, color: 'var(--text-primary)' }}>{f.value}</span>
                     </div>
                   ))}
                   {visibleFieldCount < activeDoc.fields.length && (
-                    <div style={{ padding: `${spacing[150]}px 10px`, fontSize: 11, color: 'var(--text-dim)', textAlign: 'center', animation: 'subtlePulse 1.5s infinite' }}>
+                    <div style={{ padding: `${spacing[150]}px ${spacing[200]}px`, fontSize: 11, color: 'var(--text-dim)', textAlign: 'center', animation: 'subtlePulse 1.5s infinite' }}>
                       Extracting {activeDoc.type}... {visibleFieldCount}/{activeDoc.fields.length}
                     </div>
                   )}
@@ -240,7 +245,7 @@ export default function OriginationScene({ sceneStep, currentStepData }) {
                 {visibleFieldCount >= activeDoc.fields.length && (
                   <div style={{ marginTop: spacing[300] }}>
                     <ExpandableCard title="Cross-Validation (5/5 passed)" defaultOpen={false}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[100] }}>
                         {VALIDATIONS.map((v) => (
                           <div key={v.check} style={{ display: 'flex', alignItems: 'flex-start', gap: spacing[150], padding: `${spacing[150]}px ${spacing[200]}px`, background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border-dim)', fontSize: 11 }}>
                             <span style={{ color: v.pass ? 'var(--success)' : 'var(--danger)', fontSize: 12, flexShrink: 0 }}>{v.pass ? '✓' : '✕'}</span>
@@ -264,11 +269,11 @@ export default function OriginationScene({ sceneStep, currentStepData }) {
                 <ExpandableCard title="Applicant Profile Output" defaultOpen={false}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing[200], fontSize: 11 }}>
                     <div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>APPLICANTS</div><div style={{ fontWeight: 600 }}>Marcus & Sofia Delgado</div></div>
-                    <div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>COMBINED INCOME</div><div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>$222,700</div></div>
-                    <div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>EQUIFAX</div><div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>784</div></div>
-                    <div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>GDS</div><div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>0.312</div></div>
+                    <div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>COMBINED INCOME</div><div style={{ fontFamily: uiTokens.monoFont, fontWeight: 600 }}>$222,700</div></div>
+                    <div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>EQUIFAX</div><div style={{ fontFamily: uiTokens.monoFont, fontWeight: 600 }}>784</div></div>
+                    <div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>GDS</div><div style={{ fontFamily: uiTokens.monoFont, fontWeight: 600 }}>0.312</div></div>
                     <div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>DOCUMENTS</div><div style={{ fontWeight: 600 }}>14 verified</div></div>
-                    <div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>CASH FLOW</div><div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>1.47x ratio</div></div>
+                    <div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>CASH FLOW</div><div style={{ fontFamily: uiTokens.monoFont, fontWeight: 600 }}>1.47x ratio</div></div>
                   </div>
                 </ExpandableCard>
               </div>

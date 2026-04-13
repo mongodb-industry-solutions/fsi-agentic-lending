@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from 'react';
+import Icon from '@leafygreen-ui/icon';
 import { CAPABILITIES } from '../../lib/data/capabilities';
 import { architectureContent } from '../../lib/data/narrativeContent';
 import InsightCard from '../insights/InsightCard';
@@ -46,7 +47,7 @@ function CapabilitySection({ cap }) {
     <InsightCard
       title={
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span>{cap.icon}</span>
+          {cap.glyph && <Icon glyph={cap.glyph} size={14} />}
           <span style={{ color: accent }}>{cap.label}</span>
         </span>
       }
@@ -80,7 +81,7 @@ function CapabilitySection({ cap }) {
   );
 }
 
-const agentIcons = { supervisor: '🧠', loanAppAgent: '📋', underwritingAgent: '📊', renewalAgent: '🔄' };
+const agentIcons = { supervisor: '🧠', loanAppAgent: '📋', underwritingAgent: '📊', servicingAgent: '🔄' };
 
 function AgentSection({ agentKey }) {
   const agent = architectureContent.agentDescriptions[agentKey];
@@ -108,7 +109,7 @@ function AgentSection({ agentKey }) {
                 color: colorMap[tool.colorVar] || colorMap.mongo,
                 border: `1px solid ${colorMap[tool.colorVar] || colorMap.mongo}22`,
               }}>
-                <span style={{ fontSize: 10 }}>{tool.icon}</span>
+                {tool.glyph && <Icon glyph={tool.glyph} size={10} />}
                 {tool.label}
               </span>
             ))}

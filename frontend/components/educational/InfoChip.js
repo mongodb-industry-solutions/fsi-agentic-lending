@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import Icon from '@leafygreen-ui/icon';
 import { CAPABILITIES } from '../../lib/data/capabilities';
 import { colorMap as rawColorMap, dimMap as rawDimMap } from '../../lib/data/colorMaps';
 
@@ -39,7 +40,7 @@ export default function InfoChip({ capabilityId, children, label }) {
         aria-expanded={expanded}
         aria-controls={contentId}
       >
-        <span style={{ fontSize: 11 }}>{cap.icon}</span>
+        <Icon glyph={cap.glyph} size={12} />
         {displayLabel}
         <span aria-hidden="true" style={{ fontSize: 8, transition: 'transform 0.2s', transform: expanded ? 'rotate(180deg)' : 'none' }}>▼</span>
       </button>

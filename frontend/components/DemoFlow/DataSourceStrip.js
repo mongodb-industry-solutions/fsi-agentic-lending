@@ -12,7 +12,7 @@ const SCENE_DATA_SOURCES = {
       { label: 'Application Form', icon: '📋' },
     ],
   },
-  decisioning: {
+  underwriting: {
     structured: [
       { label: 'Lending Ratios', icon: '📊' },
       { label: 'Finance Data', icon: '💹' },
@@ -33,6 +33,17 @@ const SCENE_DATA_SOURCES = {
       { label: 'Underwriting Policies', icon: '⚖️' },
     ],
   },
+  closing: {
+    structured: [
+      { label: 'Loan Agreement', icon: '📑' },
+      { label: 'Disclosure Docs', icon: '📋' },
+      { label: 'Compliance Rules', icon: '✅' },
+    ],
+    unstructured: [
+      { label: 'E-Sign Certificates', icon: '✍️' },
+      { label: 'Title Documents', icon: '🏠' },
+    ],
+  },
   funding: {
     structured: [
       { label: 'Approved Terms', icon: '✅' },
@@ -43,14 +54,14 @@ const SCENE_DATA_SOURCES = {
       { label: 'Regulatory Disclosures', icon: '📜' },
     ],
   },
-  management: {
+  servicing: {
     structured: [
       { label: 'Credit & Payments History', icon: '💳' },
       { label: 'Payment Records', icon: '📒' },
     ],
     unstructured: [
       { label: 'Published Rates/Offers', icon: '📰' },
-      { label: 'Renewal Contract', icon: '📝' },
+      { label: 'Modification Contract', icon: '📝' },
     ],
   },
 };

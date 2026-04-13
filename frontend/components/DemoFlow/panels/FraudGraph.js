@@ -6,6 +6,7 @@
  */
 import { useRef, useEffect, useState } from 'react';
 import { palette } from '@leafygreen-ui/palette';
+import { uiTokens } from '../../../lib/uiTokens';
 
 const APPLICANT = { id: 'applicant', label: 'Applicant', hop: 0, color: palette.green.base };
 const HOP_NODES = [
@@ -126,7 +127,7 @@ export default function FraudGraph({ width: widthProp, height: heightProp, hopRe
     });
 
     // Labels for applicant and hover
-    ctx.font = '11px var(--font-body)';
+    ctx.font = `11px ${uiTokens.font}`;
     ctx.textAlign = 'center';
     ctx.fillStyle = 'var(--text-primary)';
     if (hoverNode) {
@@ -172,7 +173,7 @@ export default function FraudGraph({ width: widthProp, height: heightProp, hopRe
   };
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative', background: 'var(--bg-base)', borderRadius: 'var(--radius-md)', minHeight: 200 }}>
+    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative', background: 'var(--bg-base)', borderRadius: 8, minHeight: 200 }}>
       <canvas
         ref={canvasRef}
         width={width}
@@ -184,20 +185,20 @@ export default function FraudGraph({ width: widthProp, height: heightProp, hopRe
       <div style={{ position: 'absolute', bottom: 12, left: 12, right: 12, display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 11, color: 'var(--text-secondary)' }}>
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
-          padding: '8px 16px', borderRadius: 'var(--radius-md)',
+          padding: '8px 16px', borderRadius: 8,
           background: 'var(--success-dim)', border: '1px solid var(--success)',
-          boxShadow: '0 0 12px rgba(0, 104, 74, 0.15)',
+          boxShadow: uiTokens.shadowSelected,
         }}>
           <div style={{
             width: 10, height: 10, borderRadius: '50%',
             background: 'var(--success)', boxShadow: '0 0 6px var(--success)',
           }} />
           <span style={{
-            fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14,
+            fontFamily: uiTokens.font, fontWeight: 800, fontSize: 14,
             color: 'var(--success)', letterSpacing: '0.05em',
           }}>NETWORK CLEAR</span>
           <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)',
+            fontFamily: uiTokens.monoFont, fontSize: 11, color: 'var(--text-secondary)',
           }}>2,847 entities · 0 suspicious links</span>
         </div>
       </div>

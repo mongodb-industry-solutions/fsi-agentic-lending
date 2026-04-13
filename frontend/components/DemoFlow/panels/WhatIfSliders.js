@@ -42,7 +42,7 @@ export default function WhatIfSliders() {
   }, [equifaxScore, dti]);
 
   return (
-    <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', fontSize: 12, color: 'var(--text-secondary)' }}>
+    <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
       <div style={{ fontWeight: 700, marginBottom: 10 }}>Decision factors</div>
       <div style={{ marginBottom: 8 }}>Income Stability +42 · Credit History +35 · GDS +28 · Payment Regularity +22 · Credit Utilization −12 · Hard Inquiries −8 · Cash Reserves +15</div>
 
@@ -70,7 +70,7 @@ export default function WhatIfSliders() {
         />
       </div>
 
-      <div style={{ marginTop: 12, padding: 10, background: 'var(--bg-base)', borderRadius: 'var(--radius-sm)', fontSize: 11 }}>
+      <div style={{ marginTop: 12, padding: 10, background: 'var(--bg-base)', borderRadius: 8, fontSize: 11 }}>
         <div style={{ color: 'var(--text-primary)' }}>
           Risk score: <strong>{score}/100</strong> ({tier}) · Rate: <strong>{rate}%</strong> APR
         </div>

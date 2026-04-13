@@ -1,11 +1,12 @@
 "use client";
 
+import Icon from "@leafygreen-ui/icon";
 import { colorMap, dimMap, borderMap } from "../../lib/data/colorMaps";
 
 export { colorMap, dimMap } from "../../lib/data/colorMaps";
 
 export default function FeatureBadge({
-  icon,
+  glyph,
   label,
   colorVar = "mongo",
   active = false,
@@ -22,7 +23,7 @@ export default function FeatureBadge({
     gap: small ? 4 : 6,
     padding: small ? "2px 8px" : "4px 10px",
     margin: 2,
-    borderRadius: "var(--radius-sm)",
+    borderRadius: 8,
     fontSize: small ? 10 : 11,
     fontWeight: 600,
     background: active ? bg : "var(--bg-overlay)",
@@ -40,7 +41,7 @@ export default function FeatureBadge({
 
   return (
     <Wrapper {...wrapperProps}>
-      <span style={{ fontSize: small ? 12 : 14 }}>{icon}</span>
+      {glyph && <Icon glyph={glyph} size={small ? 12 : 14} />}
       {label}
     </Wrapper>
   );

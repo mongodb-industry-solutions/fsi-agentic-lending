@@ -1,7 +1,10 @@
 "use client";
 
+import Icon from '@leafygreen-ui/icon';
 import { palette } from '@leafygreen-ui/palette';
+import { spacing } from '@leafygreen-ui/tokens';
 import { APPLICANT, DOCUMENTS } from '../../../lib/data/applicant';
+import { uiTokens } from '../../../lib/uiTokens';
 
 function docStatusForStep(stepIndex, docId) {
   if (stepIndex < 0) return 'pending';
@@ -19,19 +22,19 @@ export default function ApplicantCard({ stepIndex }) {
   return (
     <div
       style={{
-        padding: 16,
+        padding: spacing[3],
         background: 'var(--bg-surface)',
-        borderRadius: 'var(--radius-md)',
+        borderRadius: 8,
         border: '1px solid var(--border-dim)',
-        marginBottom: 16,
+        marginBottom: spacing[3],
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: spacing[3], marginBottom: spacing[300] }}>
         <div
           style={{
             width: 44,
             height: 44,
-            borderRadius: 12,
+            borderRadius: 8,
             background: `linear-gradient(135deg, ${palette.green.dark3}, ${palette.green.dark3}cc)`,
             border: '1px solid var(--mongo)',
             display: 'flex',
@@ -40,48 +43,48 @@ export default function ApplicantCard({ stepIndex }) {
             fontSize: 20,
           }}
         >
-          👤
+          <Icon glyph="Person" size={20} fill={palette.white} />
         </div>
         <div>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>
+          <div style={{ fontFamily: uiTokens.font, fontWeight: 700, fontSize: 15 }}>
             {APPLICANT.name}
           </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)' }}>
+          <div style={{ fontFamily: uiTokens.monoFont, fontSize: 11, color: 'var(--text-dim)' }}>
             {APPLICANT.id}
           </div>
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing[200] }}>
         <div>
-          <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: 3 }}>
+          <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: spacing[100] }}>
             Purchase Price
           </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--mongo)' }}>
+          <div style={{ fontFamily: uiTokens.monoFont, fontSize: 12, color: 'var(--mongo)' }}>
             {APPLICANT.purchasePrice}
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: 3 }}>
+          <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: spacing[100] }}>
             Product
           </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{APPLICANT.product}</div>
+          <div style={{ fontFamily: uiTokens.monoFont, fontSize: 12 }}>{APPLICANT.product}</div>
         </div>
         <div>
-          <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: 3 }}>
+          <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: spacing[100] }}>
             Equifax
           </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--mongo)' }}>
+          <div style={{ fontFamily: uiTokens.monoFont, fontSize: 12, color: 'var(--mongo)' }}>
             {APPLICANT.equifax}
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: 3 }}>
+          <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: spacing[100] }}>
             GDS
           </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{APPLICANT.gds}</div>
+          <div style={{ fontFamily: uiTokens.monoFont, fontSize: 12 }}>{APPLICANT.gds}</div>
         </div>
       </div>
-      <div style={{ marginTop: 12, fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 8 }}>
+      <div style={{ marginTop: spacing[3], fontFamily: uiTokens.font, fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', marginBottom: spacing[2] }}>
         Documents {DOCUMENTS.filter((d) => docStatusForStep(stepIndex, d.id) === 'verified').length}/4
       </div>
       {DOCUMENTS.map((d) => {
@@ -92,23 +95,23 @@ export default function ApplicantCard({ stepIndex }) {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 10,
-              padding: '8px 0',
+              gap: spacing[200],
+              padding: `${spacing[2]}px 0`,
               borderBottom: '1px solid var(--border-dim)',
               fontSize: 12,
             }}
           >
-            <span style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--bg-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {d.icon}
+            <span style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--bg-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon glyph={d.glyph || 'File'} size={14} />
             </span>
             <span style={{ flex: 1, fontWeight: 500 }}>{d.name}</span>
             <span
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: uiTokens.monoFont,
                 fontSize: 10,
                 fontWeight: 600,
-                padding: '2px 6px',
-                borderRadius: 4,
+                padding: `2px ${spacing[150]}px`,
+                borderRadius: 8,
                 background:
                   status === 'verified'
                     ? 'var(--success-dim)'

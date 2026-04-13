@@ -1,16 +1,17 @@
 "use client";
 
 import { useState } from 'react';
+import { uiTokens } from '../../lib/uiTokens';
 
 function CollapsibleSection({ title, defaultOpen = false, children }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div style={{ borderBottom: '1px solid var(--border-dim)' }}>
-      <button type="button" onClick={() => setOpen(!open)} style={{
+      <button type="button" onClick={() => setOpen(!open)} onFocus={(e) => { e.currentTarget.style.boxShadow = uiTokens.focusRing; }} onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }} style={{
         width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer',
-        fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12,
-        color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em',
+        fontFamily: uiTokens.font, fontWeight: 700, fontSize: 12,
+        color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em', outline: 'none',
       }}>
         {title}
         <span style={{ transform: open ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s ease', fontSize: 10, color: 'var(--text-dim)' }}>▾</span>
@@ -42,13 +43,15 @@ export default function TechRecap({ elapsedMs, activeFeatures }) {
   ];
 
   const crossLifecycle = [
-    { from: 'Origination', to: 'Decisioning', insight: 'Data created in origination improved decisioning accuracy' },
-    { from: 'Decisioning', to: 'Approval', insight: 'Risk signals from decisioning informed HITL routing' },
-    { from: 'Management', to: 'Underwriting', insight: 'Payment behavior in management feeds back to underwriting models' },
+    { from: 'Origination', to: 'Underwriting', insight: 'Data created in origination improved underwriting accuracy' },
+    { from: 'Underwriting', to: 'Approval', insight: 'Risk signals from underwriting informed HITL routing' },
+    { from: 'Approval', to: 'Closing', insight: 'Decision data drives automated document generation' },
+    { from: 'Closing', to: 'Funding', insight: 'Executed contracts trigger instant disbursement' },
+    { from: 'Servicing', to: 'Underwriting', insight: 'Payment behavior in servicing feeds back to underwriting models' },
   ];
 
   const impactNumbers = [
-    { label: 'Auto-decisioning rate', value: '70–83%' },
+    { label: 'Auto-underwriting rate', value: '70–83%' },
     { label: 'Document processing', value: 'seconds not hours' },
     { label: 'EWS coverage', value: '100% of portfolio' },
     { label: 'Cost reduction', value: 'up to 96%' },
@@ -59,13 +62,13 @@ export default function TechRecap({ elapsedMs, activeFeatures }) {
       style={{
         padding: 24,
         background: 'var(--bg-surface)',
-        borderRadius: 'var(--radius-lg)',
+        borderRadius: 8,
         border: '1px solid var(--border-dim)',
       }}
     >
       <h3
         style={{
-          fontFamily: 'var(--font-display)',
+          fontFamily: uiTokens.font,
           fontSize: 18,
           fontWeight: 700,
           marginBottom: 16,
@@ -86,7 +89,7 @@ export default function TechRecap({ elapsedMs, activeFeatures }) {
           {stats.map((s) => (
             <div key={s.label}>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>{s.label}</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700, color: s.color }}>
+              <div style={{ fontFamily: uiTokens.monoFont, fontSize: 20, fontWeight: 700, color: s.color }}>
                 {s.value}
               </div>
             </div>
@@ -100,7 +103,7 @@ export default function TechRecap({ elapsedMs, activeFeatures }) {
             <div key={t.category} style={{ display: 'flex', gap: 12, fontSize: 12, lineHeight: 1.5 }}>
               <span
                 style={{
-                  fontFamily: 'var(--font-display)',
+                  fontFamily: uiTokens.font,
                   fontWeight: 700,
                   color: 'var(--mongo)',
                   minWidth: 100,
@@ -117,12 +120,12 @@ export default function TechRecap({ elapsedMs, activeFeatures }) {
 
       <CollapsibleSection title="Cross-Lifecycle Intelligence" defaultOpen={false}>
         {/* Cross-Lifecycle Intelligence */}
-        <div style={{ padding: 16, background: 'var(--bg-base)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--mongo)', marginBottom: 16 }}>
+        <div style={{ padding: 16, background: 'var(--bg-base)', borderRadius: 8, border: '1px dashed var(--mongo)', marginBottom: 16 }}>
           {crossLifecycle.map((cl) => (
             <div key={cl.from + cl.to} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 11 }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--agent-cyan)', flexShrink: 0 }}>{cl.from}</span>
+              <span style={{ fontFamily: uiTokens.monoFont, fontWeight: 700, color: 'var(--agent-cyan)', flexShrink: 0 }}>{cl.from}</span>
               <span style={{ color: 'var(--text-dim)' }}>→</span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--voyage)', flexShrink: 0 }}>{cl.to}</span>
+              <span style={{ fontFamily: uiTokens.monoFont, fontWeight: 700, color: 'var(--voyage)', flexShrink: 0 }}>{cl.to}</span>
               <span style={{ color: 'var(--text-secondary)', flex: 1 }}>{cl.insight}</span>
             </div>
           ))}
@@ -136,9 +139,9 @@ export default function TechRecap({ elapsedMs, activeFeatures }) {
         {/* By the Numbers */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10, marginBottom: 16 }}>
           {impactNumbers.map((n) => (
-            <div key={n.label} style={{ padding: '10px 12px', background: 'var(--mongo-dim)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+            <div key={n.label} style={{ padding: '10px 12px', background: 'var(--mongo-dim)', borderRadius: 8, textAlign: 'center' }}>
               <div style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 4 }}>{n.label}</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 800, color: 'var(--mongo)' }}>{n.value}</div>
+              <div style={{ fontFamily: uiTokens.monoFont, fontSize: 14, fontWeight: 800, color: 'var(--mongo)' }}>{n.value}</div>
             </div>
           ))}
         </div>
@@ -149,7 +152,7 @@ export default function TechRecap({ elapsedMs, activeFeatures }) {
           fontSize: 14,
           color: 'var(--mongo)',
           fontWeight: 700,
-          fontFamily: 'var(--font-display)',
+          fontFamily: uiTokens.font,
           textAlign: 'center',
           padding: '12px 0',
           borderTop: '1px solid var(--border-dim)',

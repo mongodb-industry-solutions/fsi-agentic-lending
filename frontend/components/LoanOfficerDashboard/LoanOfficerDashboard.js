@@ -236,7 +236,7 @@ export default function LoanOfficerDashboard() {
                 }}>
                   {/* Mini pipeline sketch */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, marginBottom: 16 }}>
-                    {['Origination', 'Decisioning', 'HITL'].map((label, i) => (
+                    {['Origination', 'Underwriting', 'HITL'].map((label, i) => (
                       <div key={label} style={{ display: 'flex', alignItems: 'center' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                           <div style={{

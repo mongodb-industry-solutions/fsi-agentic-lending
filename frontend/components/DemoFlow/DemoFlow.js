@@ -1,15 +1,21 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import Icon from '@leafygreen-ui/icon';
+import { palette } from '@leafygreen-ui/palette';
+import { spacing } from '@leafygreen-ui/tokens';
 import { useDemoEngine } from '../../lib/hooks/useDemoEngine';
+import { SCENE_META } from '../../lib/data/demoScenes';
+import { uiTokens } from '../../lib/uiTokens';
 import SceneNavBar from './SceneNavBar';
 import TechRecap from './TechRecap';
 
 import OriginationScene from './scenes/OriginationScene';
-import DecisioningScene from './scenes/DecisioningScene';
+import UnderwritingScene from './scenes/UnderwritingScene';
 import ApprovalScene from './scenes/ApprovalScene';
+import ClosingScene from './scenes/ClosingScene';
 import FundingScene from './scenes/FundingScene';
-import ManagementScene from './scenes/ManagementScene';
+import ServicingScene from './scenes/ServicingScene';
 
 function SceneTitleCard({ sceneMeta }) {
   const [visible, setVisible] = useState(true);
@@ -36,10 +42,10 @@ function SceneTitleCard({ sceneMeta }) {
       }}
     >
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 36, marginBottom: 8 }}>{sceneMeta.icon}</div>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 28, color: 'var(--text-primary)', marginBottom: 4 }}>{sceneMeta.title}</div>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: 14, color: 'var(--text-secondary)' }}>{sceneMeta.subtitle}</div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--mongo)', marginTop: 8 }}>{sceneMeta.heroAgent}</div>
+        <div style={{ marginBottom: spacing[2] }}><Icon glyph={sceneMeta.glyph} size="xlarge" fill={palette.green.dark2} /></div>
+        <div style={{ fontFamily: uiTokens.font, fontWeight: 800, fontSize: 28, color: 'var(--text-primary)', marginBottom: spacing[1] }}>{sceneMeta.title}</div>
+        <div style={{ fontFamily: uiTokens.font, fontWeight: 500, fontSize: 14, color: 'var(--text-secondary)' }}>{sceneMeta.subtitle}</div>
+        <div style={{ fontFamily: uiTokens.monoFont, fontSize: 11, color: 'var(--mongo)', marginTop: spacing[2] }}>{sceneMeta.heroAgent}</div>
       </div>
     </div>
   );
@@ -70,7 +76,7 @@ export default function Demo() {
         );
       case 1:
         return (
-          <DecisioningScene
+          <UnderwritingScene
             sceneStep={engine.sceneStep}
             currentStepData={engine.currentStepData}
           />
@@ -88,14 +94,21 @@ export default function Demo() {
         );
       case 3:
         return (
-          <FundingScene
+          <ClosingScene
             sceneStep={engine.sceneStep}
             currentStepData={engine.currentStepData}
           />
         );
       case 4:
         return (
-          <ManagementScene
+          <FundingScene
+            sceneStep={engine.sceneStep}
+            currentStepData={engine.currentStepData}
+          />
+        );
+      case 5:
+        return (
+          <ServicingScene
             sceneStep={engine.sceneStep}
             currentStepData={engine.currentStepData}
           />
@@ -135,15 +148,15 @@ export default function Demo() {
       >
         {showTitleCard && <SceneTitleCard sceneMeta={engine.currentSceneMeta} />}
         {engine.allScenesComplete ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, position: 'relative' }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: spacing[600], position: 'relative' }}>
             <div style={{ maxWidth: 700, width: '100%' }}>
-              <div style={{ textAlign: 'center', marginBottom: 24 }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>🍃</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 28, color: 'var(--mongo)', marginBottom: 8 }}>
+              <div style={{ textAlign: 'center', marginBottom: spacing[4] }}>
+                <div style={{ marginBottom: spacing[3] }}><Icon glyph="Favorite" size="xlarge" fill={palette.green.dark2} /></div>
+                <div style={{ fontFamily: uiTokens.font, fontWeight: 800, fontSize: 28, color: 'var(--mongo)', marginBottom: spacing[2] }}>
                   Full Lifecycle Complete
                 </div>
                 <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                  Origination → Decisioning → Approval → Funding → Management
+                  Origination → Underwriting → Approval → Closing → Funding → Servicing
                   <br />
                   All on one platform. All in real-time.
                 </div>

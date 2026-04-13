@@ -3,18 +3,21 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import Badge from '@leafygreen-ui/badge';
 import ExpandableCard from '@leafygreen-ui/expandable-card';
+import Icon from '@leafygreen-ui/icon';
+import { palette } from '@leafygreen-ui/palette';
 import { FUNDING_STEPS } from '../engine/demoScenes';
 import { mergeCanvasState } from '../engine/canvasUtils';
 import WorkflowCanvas from '../WorkflowCanvas';
 import AnnotationOverlay from '../AnnotationOverlay';
 import PipelineDrawer from '../PipelineDrawer';
 import { spacing } from '@leafygreen-ui/tokens';
+import { uiTokens } from '../../../lib/uiTokens';
 
 const TIMELINE_EVENTS = [
-  { icon: '📡', label: 'Change Stream fires', detail: 'watch() detects status → "approved"', status: 'active', feature: 'Change Streams' },
-  { icon: '⚡', label: 'Funding workflow initiated', detail: 'Event-driven automation starts', status: 'active', feature: 'Change Streams' },
-  { icon: '💰', label: 'Ledger entry created', detail: '$700,000 disbursed to borrower', status: 'funded', feature: 'Document Model' },
-  { icon: '✅', label: 'Loan activated', detail: 'Live financial object in MongoDB', status: 'active', feature: 'Document Model' },
+  { glyph: 'Visibility', label: 'Change Stream fires', detail: 'watch() detects status → "closing_complete"', status: 'active', feature: 'Change Streams' },
+  { glyph: 'Activity', label: 'Funding workflow initiated', detail: 'Event-driven automation starts', status: 'active', feature: 'Change Streams' },
+  { glyph: 'CreditCard', label: 'Ledger entry created', detail: '$700,000 disbursed to borrower', status: 'funded', feature: 'Document Model' },
+  { glyph: 'Checkmark', label: 'Loan activated', detail: 'Live financial object in MongoDB', status: 'active', feature: 'Document Model' },
 ];
 
 const ACCOUNTING = [
@@ -36,7 +39,7 @@ const DOC_STAGES = [
 "documents": [{ "type": "CRA_NOA", "verified": true }]`,
   },
   {
-    label: 'Decisioning',
+    label: 'Underwriting',
     color: 'var(--tool-blue)',
     fields: `"riskScore": 72,
 "riskTier": "B+",
@@ -54,6 +57,15 @@ const DOC_STAGES = [
   "monthlyPayment": 4047
 },
 "disclosures": ["OSFI_B20", "FCAC", "PIPEDA"]`,
+  },
+  {
+    label: 'Closing',
+    color: palette.blue.dark1,
+    fields: `"contract": {
+  "type": "5yr Fixed (25yr Amort)",
+  "signatures": { "borrower": true, "lender": true }
+},
+"compliance": { "TILA": "passed", "RESPA": "passed" }`,
   },
   {
     label: 'Funding',
@@ -140,7 +152,7 @@ export default function FundingScene({ sceneStep, currentStepData }) {
 
   const visibleDocStages = DOC_STAGES.filter((_, i) => {
     if (i <= 2) return true;
-    if (i === 3) return sceneStep >= 2;
+    if (i <= 4) return sceneStep >= 2;
     return false;
   });
 
@@ -166,8 +178,8 @@ export default function FundingScene({ sceneStep, currentStepData }) {
             totalSteps={FUNDING_STEPS.length}
           />
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid var(--border-dim)', padding: spacing[400] }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: spacing[400] }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13 }}>Funding Timeline</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: spacing[200], marginBottom: spacing[400] }}>
+            <div style={{ fontFamily: uiTokens.font, fontWeight: 700, fontSize: 13 }}>Funding Timeline</div>
             <StatusBadge status={currentStatus} />
           </div>
 
@@ -180,9 +192,9 @@ export default function FundingScene({ sceneStep, currentStepData }) {
                   <div style={{ position: 'absolute', left: 0, top: 4, width: 16, height: 16, borderRadius: '50%', background: reached ? 'var(--bg-surface)' : 'var(--bg-raised)', border: `2px solid ${reached ? 'var(--mongo)' : 'var(--border-dim)'}`, zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8 }}>
                     {reached ? '✓' : ''}
                   </div>
-                  <div style={{ fontWeight: 600, fontSize: 12, marginBottom: spacing[50] }}>{event.icon} {event.label}</div>
+                  <div style={{ fontWeight: 600, fontSize: 12, marginBottom: spacing[50], display: 'flex', alignItems: 'center', gap: spacing[1] }}><Icon glyph={event.glyph} size={12} /> {event.label}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{event.detail}</div>
-                  <span style={{ fontSize: 9, color: 'var(--agent-cyan)', padding: '1px 6px', background: 'var(--bg-raised)', borderRadius: 3, marginTop: spacing[100], display: 'inline-block' }}>{event.feature}</span>
+                  <span style={{ fontSize: 9, color: 'var(--agent-cyan)', padding: `1px ${spacing[150]}px`, background: 'var(--bg-raised)', borderRadius: 8, marginTop: spacing[100], display: 'inline-block' }}>{event.feature}</span>
                 </div>
               );
             })}
@@ -190,14 +202,14 @@ export default function FundingScene({ sceneStep, currentStepData }) {
 
           {sceneStep >= 1 && (
             <>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, marginBottom: spacing[200] }}>Accounting Entries</div>
+              <div style={{ fontFamily: uiTokens.font, fontWeight: 700, fontSize: 13, marginBottom: spacing[200] }}>Accounting Entries</div>
               <div style={{ background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border-dim)', overflow: 'hidden', marginBottom: spacing[400] }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', padding: '8px 10px', borderBottom: '1px solid var(--border-dim)', textTransform: 'uppercase' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', padding: `${spacing[2]}px ${spacing[200]}px`, borderBottom: '1px solid var(--border-dim)', textTransform: 'uppercase' }}>
                   <span>Entry</span><span>Debit</span><span>Credit</span><span>Balance</span>
                 </div>
                 {ACCOUNTING.map((row) => (
-                  <div key={row.entry} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', fontSize: 11, padding: '8px 10px', borderBottom: '1px solid var(--border-dim)', fontFamily: 'var(--font-mono)' }}>
-                    <span style={{ fontFamily: 'var(--font-body)', fontWeight: 500 }}>{row.entry}</span>
+                  <div key={row.entry} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', fontSize: 11, padding: `${spacing[2]}px ${spacing[200]}px`, borderBottom: '1px solid var(--border-dim)', fontFamily: uiTokens.monoFont }}>
+                    <span style={{ fontFamily: uiTokens.font, fontWeight: 500 }}>{row.entry}</span>
                     <span style={{ color: row.type === 'debit' ? 'var(--danger)' : 'var(--text-dim)' }}>{row.debit}</span>
                     <span style={{ color: row.type === 'credit' ? 'var(--success)' : 'var(--text-dim)' }}>{row.credit}</span>
                     <span style={{ fontWeight: 600 }}>{row.balance}</span>
@@ -207,7 +219,7 @@ export default function FundingScene({ sceneStep, currentStepData }) {
             </>
           )}
 
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, marginBottom: spacing[100] }}>MongoDB Document Evolution</div>
+          <div style={{ fontFamily: uiTokens.font, fontWeight: 700, fontSize: 13, marginBottom: spacing[100] }}>MongoDB Document Evolution</div>
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: spacing[300], lineHeight: 1.6 }}>
             One document grows through each lifecycle stage — <strong style={{ color: 'var(--mongo)' }}>12 → 47 fields</strong>.
           </div>
@@ -225,13 +237,13 @@ export default function FundingScene({ sceneStep, currentStepData }) {
           <ExpandableCard title={`Document Evolution (${visibleDocStages.length} stages)`} defaultOpen={false}>
             {visibleDocStages.map((stage, i) => (
               <div key={stage.label} style={{ marginBottom: i < visibleDocStages.length - 1 ? spacing[300] : 0 }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, color: stage.color, marginBottom: spacing[100] }}>{stage.label}</div>
+                <div style={{ fontFamily: uiTokens.font, fontWeight: 700, fontSize: 11, color: stage.color, marginBottom: spacing[100] }}>{stage.label}</div>
                 <pre style={{
                   padding: spacing[200],
                   background: 'var(--bg-surface)',
                   borderRadius: 8,
                   border: '1px solid var(--border-dim)',
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: uiTokens.monoFont,
                   fontSize: 11,
                   lineHeight: 1.5,
                   overflowX: 'auto',
@@ -246,13 +258,13 @@ export default function FundingScene({ sceneStep, currentStepData }) {
           </ExpandableCard>
 
           {sceneStep >= 3 && (
-            <div style={{ marginTop: spacing[300], padding: 14, background: 'var(--mongo-dim)', borderRadius: 'var(--radius-md)', border: '1px solid var(--mongo)', textAlign: 'center' }}>
-              <div style={{ fontSize: 20, marginBottom: spacing[150] }}>🍃</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, color: 'var(--mongo)', marginBottom: spacing[100] }}>One Document. One Platform.</div>
+            <div style={{ marginTop: spacing[300], padding: spacing[300], background: 'var(--mongo-dim)', borderRadius: 8, border: '1px solid var(--mongo)', textAlign: 'center' }}>
+              <div style={{ marginBottom: spacing[150] }}><Icon glyph="Favorite" size="large" fill={palette.green.dark2} /></div>
+              <div style={{ fontFamily: uiTokens.font, fontWeight: 700, fontSize: 13, color: 'var(--mongo)', marginBottom: spacing[100] }}>One Document. One Platform.</div>
               <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: spacing[200] }}>
                 Application → Risk → Decision → Disbursement — all in a single MongoDB document. Zero data shipping.
               </div>
-              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--mongo)', fontWeight: 600 }}>
+              <div style={{ fontSize: 10, fontFamily: uiTokens.monoFont, color: 'var(--mongo)', fontWeight: 600 }}>
                 Zero schema migrations. The loan document grew from 12 fields (origination) to 47 fields (funded) — all in one collection.
               </div>
             </div>

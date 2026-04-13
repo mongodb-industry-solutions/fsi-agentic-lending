@@ -8,8 +8,8 @@ export const WORKFLOW_STAGES = [
     nodeKey: 'loan_app',
   },
   {
-    label: 'Decisioning',
-    currentScene: 'decisioning',
+    label: 'Underwriting',
+    currentScene: 'underwriting',
     activeNodes: ['supervisor', 'underwriter', 'aggregation', 'vectorSearch', 'graphLookup', 'mongoAtlas'],
     activeEdges: [['supervisor', 'underwriter'], ['underwriter', 'aggregation'], ['underwriter', 'vectorSearch'], ['underwriter', 'graphLookup']],
     pulsingNodes: ['underwriter'],
