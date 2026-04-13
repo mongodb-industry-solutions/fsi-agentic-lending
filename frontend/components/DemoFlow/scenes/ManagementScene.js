@@ -239,7 +239,7 @@ function CrossLifecycleFeedback() {
         Cross-Lifecycle Feedback Loop
       </div>
       <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 6 }}>
-        This borrower's payment pattern data will refine the Underwriting Agent's risk model for future applicants with similar profiles.
+        This borrower&apos;s payment pattern data will refine the Underwriting Agent&apos;s risk model for future applicants with similar profiles.
       </div>
       <div style={{ fontSize: 9, color: 'var(--text-dim)', fontStyle: 'italic' }}>
         Collections data → Underwriting model improvement: the gap no vendor has filled.

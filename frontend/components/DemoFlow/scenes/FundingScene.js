@@ -254,7 +254,7 @@ export default function FundingScene({ sceneStep, currentStepData }) {
 
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, marginBottom: 4 }}>MongoDB Document Evolution</div>
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.6 }}>
-            One document grows through each lifecycle stage. No ETL — just <strong style={{ color: 'var(--mongo)' }}>MongoDB's flexible document model</strong>.
+            One document grows through each lifecycle stage. No ETL — just <strong style={{ color: 'var(--mongo)' }}>MongoDB&apos;s flexible document model</strong>.
           </div>
 
           {visibleDocStages.map((stage, i) => (

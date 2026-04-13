@@ -239,3 +239,4 @@ frontend/next-env.d.ts
 # Misc
 *.pem
 .DS_Store
+CLAUDE.md

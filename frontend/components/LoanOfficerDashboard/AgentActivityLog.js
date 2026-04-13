@@ -61,6 +61,20 @@ export default function AgentActivityLog({ onEvent, applicationId }) {
     return () => source?.close();
   }, [applicationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const filtered = useMemo(() => {
+    let result = entries;
+    if (activeFilter !== 'all') {
+      result = result.filter((e) => e.category === activeFilter);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (e) => e.action.toLowerCase().includes(q) || e.agent.toLowerCase().includes(q) || e.op.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [entries, activeFilter, searchQuery]);
+
   if (!applicationId) {
     return (
       <div style={{
@@ -97,45 +111,6 @@ export default function AgentActivityLog({ onEvent, applicationId }) {
       </div>
     );
   }
-
-  const filtered = useMemo(() => {
-    let result = entries;
-    if (activeFilter !== 'all') {
-      result = result.filter((e) => e.category === activeFilter);
-    }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (e) => e.action.toLowerCase().includes(q) || e.agent.toLowerCase().includes(q) || e.op.toLowerCase().includes(q)
-      );
-    }
-    return result;
-  }, [entries, activeFilter, searchQuery]);
-
-  const costSummary = useMemo(() => {
-    let llmCalls = 0;
-    let apiCalls = 0;
-    let sysCalls = 0;
-    entries.forEach((e) => {
-      const agent = (e.agent || '').toLowerCase();
-      if (agent.includes('underwrit') || agent.includes('supervisor') || agent.includes('loan_app')) llmCalls++;
-      else if (agent.includes('hitl') || agent.includes('gate')) apiCalls++;
-      else sysCalls++;
-    });
-
-    let totalTimeMs = 0;
-    if (entries.length >= 2) {
-      const times = entries.map(e => {
-        const t = e.time;
-        return t ? new Date(`1970-01-01T${t}`).getTime() : 0;
-      }).filter(t => t > 0);
-      if (times.length >= 2) {
-        totalTimeMs = Math.max(...times) - Math.min(...times);
-      }
-    }
-
-    return { totalTimeMs, llmCalls, apiCalls, sysCalls, totalEntries: entries.length };
-  }, [entries]);
 
   return (
     <div style={{
@@ -373,43 +348,6 @@ export default function AgentActivityLog({ onEvent, applicationId }) {
         )}
       </div>
 
-      {/* Activity summary footer */}
-      {entries.length > 0 && (
-        <div style={{
-          padding: `${spacing[2]}px ${spacing[3]}px`,
-          borderTop: '1px solid var(--border-dim)',
-          background: 'var(--bg-surface)',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 6,
-        }}>
-          <div>
-            <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600 }}>Actions</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--mongo)' }}>
-              {costSummary.totalEntries}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600 }}>Total Time</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--agent-cyan)' }}>
-              {costSummary.totalTimeMs > 0
-                ? costSummary.totalTimeMs < 1000 ? `${costSummary.totalTimeMs}ms` : `${(costSummary.totalTimeMs / 1000).toFixed(1)}s`
-                : '\u2014'}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600 }}>Active</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--success)' }}>
-              {entries.length > 0 && entries[0].isLive ? 'Yes' : 'Done'}
-            </div>
-          </div>
-          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 10, fontSize: 9, color: 'var(--text-dim)' }}>
-            <span><span style={{ fontWeight: 700, color: 'var(--tool-blue)' }}>{costSummary.llmCalls}</span> LLM</span>
-            <span><span style={{ fontWeight: 700, color: 'var(--agent-cyan)' }}>{costSummary.apiCalls}</span> API/Gate</span>
-            <span><span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>{costSummary.sysCalls}</span> System</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

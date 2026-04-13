@@ -705,6 +705,8 @@ export default function LoanOfficerDashboard() {
   const snapshotReceived = useRef(false);
   const selectedAppRef = useRef(selectedApp);
   selectedAppRef.current = selectedApp;
+  const liveApplicationsRef = useRef(liveApplications);
+  liveApplicationsRef.current = liveApplications;
 
   useEffect(() => {
     snapshotReceived.current = false;
@@ -787,6 +789,9 @@ export default function LoanOfficerDashboard() {
     return () => { if (sseRef.current) { sseRef.current.close(); sseRef.current = null; } };
   }, []);
 
+  const reconnectActivitySSERef = useRef(reconnectActivitySSE);
+  reconnectActivitySSERef.current = reconnectActivitySSE;
+
   // Status-aware reset when selected app changes
   useEffect(() => {
     if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
@@ -801,7 +806,7 @@ export default function LoanOfficerDashboard() {
       return;
     }
 
-    const queueApp = liveApplications.find((a) => a.application_id === selectedApp);
+    const queueApp = liveApplicationsRef.current.find((a) => a.application_id === selectedApp);
     const status = queueApp?.status || 'submitted';
 
     if (status === 'review' || status === 'pending_review') {
@@ -811,7 +816,7 @@ export default function LoanOfficerDashboard() {
     } else if (status === 'processing' || status === 'underwriting') {
       setWorkflowPhase('executing');
       setWorkflowStage(status === 'underwriting' ? 1 : 0);
-      reconnectActivitySSE(selectedApp);
+      reconnectActivitySSERef.current(selectedApp);
     } else if (status === 'approved') {
       setWorkflowPhase('executing');
       setApproved(true);
@@ -825,7 +830,7 @@ export default function LoanOfficerDashboard() {
     } else {
       setWorkflowPhase('preview');
     }
-  }, [selectedApp, liveApplications, reconnectActivitySSE]);
+  }, [selectedApp]);
 
   // SSE-driven workflow stage progression via run-stream (starts graph + streams events)
   const startWorkflowSSE = useCallback((appId) => {

@@ -1,87 +1,81 @@
-# Next.js Frontend
+# LendFlow AI — Frontend
+
+Next.js 15 (App Router, React 19) frontend with LeafyGreen UI, real-time SSE/WebSocket feeds, and three main screens.
 
 ## Prerequisites
 
-- Node.js 22 or higher
+- Node.js 22+
 
-## Getting Started 
+## Getting Started
 
-1. Install dependencies by running:
 ```bash
 npm install
-```
-2. Start the frontend development server with:
-````bash
 npm run dev
-````
-3. The frontend will now be accessible at http://localhost:3000 by default, providing a user interface to interact with the image vector search demo.
+```
 
+Open http://localhost:3000
 
-## Understanding Next.js
+## Architecture
 
-### Routes
+```
+app/
+├── layout.js           # Root layout, LeafyGreen provider, CSS custom properties
+├── page.js             # Home page with tab navigation (Borrower / Officer / Demo)
+└── providers.js        # Client-side providers
 
-In Next.js, routes are created inside the `app` directory. Here's a breakdown of how the routing works:
+components/
+├── BorrowerPortal/     # Borrower-facing: profile selection → form → status tracker → AI chat
+├── LoanOfficerDashboard/
+│   ├── LoanOfficerDashboard.js   # Main dashboard: phase orchestration, SSE/WS, HITL flow
+│   ├── ApplicationQueue.js        # Real-time queue (WebSocket), filters, sort, review accent
+│   ├── ApplicationDetail.js       # Full/compact app detail + Risk Pipeline Visualization
+│   ├── AgentActivityLog.js        # SSE activity feed, search, color-coded by agent
+│   ├── IntentPreview.js           # Planned steps with live status overlay
+│   ├── DecisionSummary.js         # Post-decision view (timeline, audit trail, violations)
+│   └── AutonomyDial.js            # Placeholder (not active)
+├── DemoFlow/           # 5-scene scripted walkthrough
+├── Header/             # App header
+├── educational/        # ContextualBanner, InfoWizard
+├── visualizations/     # Risk gauge, FICO ring, charts
+├── DocumentViewer.js   # Split-pane PDF + JSON viewer
+└── ErrorBoundary.js    # React error boundary
 
-#### API Routes
+lib/
+├── api.js              # API helpers (apiGet, apiPost, apiSSE, apiWebSocket, apiUpload)
+├── leafygreen-tokens.js # Design token re-exports
+├── data/               # Demo scene data, applicant profiles, capabilities
+└── hooks/              # useDemoEngine, useCountUp, useScrollAnimation
+```
 
-- The `api` folder is used for creating API routes.
-- We have two example routes for demonstrating how API routes work:
+## API Communication
 
-  - **GET request to MongoDB**:  
-    [http://localhost:3000/api/mongodb](http://localhost:3000/api/mongodb)
+All HTTP requests go through the Next.js proxy at `/api/backend/*` → FastAPI backend. Use helpers from `lib/api.js`:
 
-  - **Basic test route**:  
-    [http://localhost:3000/api/test](http://localhost:3000/api/test)
+| Helper | Transport | Use Case |
+|--------|-----------|----------|
+| `apiGet(path)` | REST | Fetch data |
+| `apiPost(path, body)` | REST | Create/update |
+| `apiUpload(path, formData)` | REST | File upload |
+| `apiSSE(path, onEvent, onError)` | SSE | Status updates, agent activity, workflow streaming |
+| `apiWebSocket(path, onMessage, onError)` | WebSocket | Application queue (Change Stream) |
 
-#### Dynamic Routes
+## Real-Time Data Flows
 
-- If you create a new folder inside the `app` directory, a route will be automatically created based on the folder name.
-- For example, creating a folder called `example` will make it accessible at:
-  [http://localhost:3000/example](http://localhost:3000/example)
+- **Borrower Status**: SSE via `/applications/{id}/status` + `/applications/{id}/activity`
+- **Officer Queue**: WebSocket via `/applications/ws` (MongoDB Change Stream)
+- **Officer Workflow**: SSE via `/agent/{id}/run-stream` (starts graph + streams events for HITL detection)
+- **Officer Activity Reconnect**: SSE via `/agent/{id}/stream` (activity-only, used after HITL resume)
 
-Each route includes a `layout.js` and `page.js` to define the structure and content.
+## Styling
 
-#### Root Route
+- **LeafyGreen UI** (`@leafygreen-ui/*`) — MongoDB design system components and tokens
+- **CSS Custom Properties** — defined in root layout (`--text-primary`, `--bg-surface`, `--border-dim`, `--mongo`, `--hitl-amber`, `--success`, `--danger`, etc.)
+- **Inline styles** — intentional for this demo to keep components self-contained
+- **Fonts** — Euclid Circular A (display/body), Source Code Pro (mono)
 
-- The global root route (home page) is accessible at:
-  [http://localhost:3000](http://localhost:3000)
+## Environment Variables
 
-This page is managed by the `layout.js` and `page.js` inside the `app` directory.
-
-
-### Components
-
-Components are located outside the `app` folder, inside the `components` directory.
-
-There are two example components:
-
-1. **MongoDB Leafy Green System Design**: Demonstrates how to integrate MongoDB with your component.
-2. **Test Component**: Shows how to create a simple test component that includes both a `.jsx` file and a `.module.css` file for styling.
-
-#### CSS
-
-Each component should have its own dedicated CSS file. For styling, we recommend using CSS Modules (e.g., `component.module.css`) to scope styles locally to the component.
-
-#### Images
-
-For adding images, we use `Image` from `next/image`, which is provided by Next.js. This component optimizes images for caching and better performance.
-
-- Images should be stored in the `public` folder inside the `frontend` directory.
-- Next.js automatically handles these images, making them easily accessible.
-
-For an example, check out the `test.jsx` component.
-
-### MongoDB Connections
-
-This template includes a `lib` folder with a utility for connecting to MongoDB. 
-
-Inside the `lib` folder, you’ll find a function called `connectToDatabase`. To use it, simply import the function and pass the necessary parameters to specify which database and collection you want to connect to.
-
-The `connectToDatabase` function manages the connection and can be reused across your application for efficient MongoDB interactions.
-
-### .env.local
-
-Next.js natively supports `.env.local` files, so you don't need to install additional libraries like `dotenv`. Simply create a `.env.local` file, and Next.js will automatically detect and load it.
-
-Make sure to place the `.env.local` file inside the `frontend` folder for proper configuration.
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXT_PUBLIC_BACKEND_URL` | No | Backend URL for API proxy (default: `http://localhost:8000`) |
+| `NEXT_PUBLIC_WS_BASE` | No | WebSocket URL (default: auto-detected) |

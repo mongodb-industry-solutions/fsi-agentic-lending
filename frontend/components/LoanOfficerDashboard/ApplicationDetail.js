@@ -52,8 +52,8 @@ function RiskPipelineViz({ applicationId }) {
   }, [expanded, pipeline, loading, fetchPipeline]);
 
   const STAGE_COLORS = [
-    'var(--mongo)', 'var(--tool-blue)', 'var(--tool-blue)',
-    'var(--agent-cyan)', 'var(--agent-cyan)', 'var(--agent-cyan)', 'var(--success)',
+    ['#00684A', 'var(--mongo)'], ['#1A567E', 'var(--tool-blue)'], ['#1A567E', 'var(--tool-blue)'],
+    ['#007DAE', 'var(--agent-cyan)'], ['#007DAE', 'var(--agent-cyan)'], ['#007DAE', 'var(--agent-cyan)'], ['#00684A', 'var(--success)'],
   ];
 
   return (
@@ -90,7 +90,7 @@ function RiskPipelineViz({ applicationId }) {
                     <span style={{
                       padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700,
                       fontFamily: 'var(--font-mono)',
-                      background: `${STAGE_COLORS[i]}20`, color: STAGE_COLORS[i],
+                      background: `${STAGE_COLORS[i]?.[0]}20`, color: STAGE_COLORS[i]?.[1],
                     }}>
                       {stage.operator}
                     </span>
@@ -102,7 +102,7 @@ function RiskPipelineViz({ applicationId }) {
               </div>
               {pipeline.pipeline_description.map((stage, i) => (
                 <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 4, fontSize: 9 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', color: STAGE_COLORS[i], fontWeight: 700, minWidth: 22 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: STAGE_COLORS[i]?.[1], fontWeight: 700, minWidth: 22 }}>
                     S{stage.stage}
                   </span>
                   <span style={{ color: 'var(--text-secondary)' }}>{stage.description}</span>
@@ -139,7 +139,7 @@ export default function ApplicationDetail({ appDetail, compact = false }) {
   const {
     application_id, borrower_names, loan_amount, purchase_price, down_payment,
     product, property, income_summary, documents, credit_reports,
-    risk_score, risk_tier, gds_ratio, tds_ratio, status,
+    risk_score, risk_tier, gds_ratio, tds_ratio,
   } = appDetail;
 
   const primaryCredit = credit_reports?.[0];
@@ -230,7 +230,7 @@ export default function ApplicationDetail({ appDetail, compact = false }) {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: spacing[2] }}>
-          <MetricBox label="Primary Credit" value={primaryCredit?.score ?? 'N/A'} color={primaryCredit?.score >= 750 ? 'var(--success)' : primaryCredit?.score >= 650 ? 'var(--hitl-amber)' : 'var(--danger)'} />
+          <MetricBox label="Primary Credit" value={primaryCredit?.score ?? 'N/A'} color={primaryCredit?.score != null ? (primaryCredit.score >= 750 ? 'var(--success)' : primaryCredit.score >= 650 ? 'var(--hitl-amber)' : 'var(--danger)') : 'var(--text-dim)'} />
           <MetricBox label="Co-Applicant" value={coCredit?.score ?? 'N/A'} />
           <MetricBox label="LTV" value={purchase_price > 0 ? `${((loan_amount / purchase_price) * 100).toFixed(1)}%` : 'N/A'} />
         </div>

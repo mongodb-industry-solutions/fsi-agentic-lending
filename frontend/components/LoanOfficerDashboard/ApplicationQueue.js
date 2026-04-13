@@ -20,19 +20,6 @@ function getStatusVariant(status) {
   return map[status] || 'lightgray';
 }
 
-const STATUS_COLORS = {
-  submitted: 'var(--agent-cyan)',
-  processing: 'var(--agent-cyan)',
-  underwriting: 'var(--tool-blue)',
-  review: 'var(--hitl-amber)',
-  pending_review: 'var(--hitl-amber)',
-  approved: 'var(--success)',
-  funded: 'var(--mongo)',
-  declined: 'var(--danger)',
-  error: 'var(--danger)',
-  active: 'var(--mongo)',
-};
-
 const FILTERS = [
   { key: 'all', label: 'All' },
   { key: 'review', label: 'Pending Review' },
@@ -60,7 +47,6 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
     product: app.product || '',
     status: app.status || 'submitted',
     statusLabel: (app.status || 'submitted').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-    statusColor: STATUS_COLORS[app.status] || 'var(--text-dim)',
     score: app.risk_score ?? app.score ?? null,
     tier: app.risk_tier ?? app.tier ?? null,
     submitted: app.created_at ? new Date(app.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
