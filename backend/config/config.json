@@ -2,7 +2,7 @@
     "INDUSTRY": "Financial Services - Lending",
     "EMBEDDINGS_MODEL_NAME": "MongoDB Atlas AutoEmbed (Voyage AI voyage-4)",
     "EMBEDDINGS_MODEL_ID": "atlas-auto-embed",
-    "CHATCOMPLETIONS_MODEL_NAME": "Anthropic Claude Haiku 4 (within AWS Bedrock)",
-    "CHATCOMPLETIONS_MODEL_ID": "anthropic.claude-haiku-4-20250514-v1:0",
+    "CHATCOMPLETIONS_MODEL_NAME": "Anthropic Claude Haiku 4.5 (within AWS Bedrock)",
+    "CHATCOMPLETIONS_MODEL_ID": "anthropic.claude-haiku-4-5-20251001-v1:0",
     "_NOTE": "For deployed environments, use inference profile ARNs. Set CHATCOMPLETIONS_MODEL_ID via environment variable or helm secrets."
 }

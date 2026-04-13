@@ -4,7 +4,7 @@ import json
 import logging
 import re
 import time
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from models.schemas import ApplicationCreateRequest
 from services import application_service
@@ -24,9 +24,29 @@ def _validate_app_id(app_id: str):
 
 @router.post("/applications")
 async def create_application(req: ApplicationCreateRequest):
-    """Create a new loan application."""
+    """Create a new loan application, or reset an existing session-isolated demo app."""
+    if req.profile_id and req.demo_session_id:
+        result = application_service.upsert_demo_application(
+            profile_id=req.profile_id,
+            demo_session_id=req.demo_session_id,
+            data=req.model_dump(),
+        )
+        return result
+
     app = application_service.create_application(req.model_dump())
     return {"application_id": app["application_id"], "status": "submitted"}
+
+
+@router.post("/demo/reset")
+async def reset_demo(x_demo_reset: str = Header(default=None)):
+    """Wipe all demo-created applications and related data. Preserves seeded data.
+
+    Requires header X-Demo-Reset: confirm to prevent accidental invocation.
+    """
+    if x_demo_reset != "confirm":
+        raise HTTPException(status_code=400, detail="Missing required header: X-Demo-Reset: confirm")
+    result = application_service.reset_all_demo_data()
+    return result
 
 
 @router.get("/applications")

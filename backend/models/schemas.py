@@ -30,6 +30,8 @@ class ApplicationCreateRequest(BaseModel):
     primary_income: float
     co_applicant_income: Optional[float] = None
     annual_property_tax: float = 0
+    profile_id: Optional[str] = None
+    demo_session_id: Optional[str] = None
 
 
 class ApplicationResponse(BaseModel):

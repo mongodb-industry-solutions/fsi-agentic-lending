@@ -1,0 +1,86 @@
+# FSI Agentic Lending - Staging Environment Configuration
+# Unified pod deployment: Frontend + Backend sidecar
+# Environment: Staging
+
+# Frontend main container environment variables
+env:
+  NODE_ENV: production
+  PORT: '8080'
+  HOSTNAME: '0.0.0.0'
+  # Server-side backend URL for Next.js rewrites (internal pod communication)
+  NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
+  # WebSocket proxy port
+  WS_PROXY_PORT: '8081'
+
+# Sidecar container (backend)
+sidecarContainers:
+  # Lending Backend (port 8000)
+  - name: backend
+    image: 795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/fsi-agentic-lending-backend:latest
+    imagePullPolicy: Always
+    ports:
+      - containerPort: 8000
+        name: backend-api
+    resources:
+      requests:
+        memory: '256Mi'
+        cpu: '100m'
+      limits:
+        memory: '750Mi'
+        cpu: '350m'
+    env:
+      - name: PORT
+        value: '8000'
+      - name: HOST
+        value: '0.0.0.0'
+      - name: PYTHONUNBUFFERED
+        value: '1'
+      # AWS Configuration (IRSA - no keys needed)
+      - name: AWS_REGION
+        value: 'us-east-1'
+      - name: AWS_USE_SSO
+        value: 'false'
+      # CORS origins
+      - name: ORIGINS
+        value: 'http://localhost:8080'
+      # MongoDB Configuration (from secrets)
+      - name: MONGODB_URI
+        valueFrom:
+          secretKeyRef:
+            name: fsi-agentic-lending-secrets
+            key: MONGODB_URI
+      - name: DATABASE_NAME
+        valueFrom:
+          secretKeyRef:
+            name: fsi-agentic-lending-secrets
+            key: DATABASE_NAME
+      - name: VOYAGE_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: fsi-agentic-lending-secrets
+            key: VOYAGE_API_KEY
+      - name: CHATCOMPLETIONS_MODEL_ID
+        valueFrom:
+          secretKeyRef:
+            name: fsi-agentic-lending-secrets
+            key: CHATCOMPLETIONS_MODEL_ID
+
+# Service mesh
+mesh:
+  enabled: true
+
+# Service Account with IRSA for AWS Bedrock access
+serviceAccount:
+  enabled: true
+  irsa:
+    accountId: '275662791714'
+    roleName: 'kanopy-staging-cicd-irsa'
+
+# Kanopy security and ownership (requires web-app chart v4.30.0+)
+security:
+  dataClassification: "Internal"
+  dataDesignation:
+    - "MI"
+
+ownership:
+  driEmail: mehar.grewal@mongodb.com

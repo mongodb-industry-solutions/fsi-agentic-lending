@@ -27,6 +27,7 @@ const BORROWER_PROFILES = [
     downPayment: '175000',
     existingDebt: '1842',
     creditScore: '784',
+    seedApplicationId: 'APP-2026-00001',
   },
 ];
 

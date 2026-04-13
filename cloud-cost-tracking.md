@@ -198,10 +198,32 @@ aws bedrock list-foundation-models --region us-east-1 --by-provider cohere --out
 
 ### Create Chat Completion Profile (Required)
 
+Some newer models (e.g. Haiku 4.5) only support cross-region inference and cannot be referenced as a foundation model directly. For these, use the system-defined cross-region inference profile as the `--model-source` instead:
+
+```bash
+# List system-defined cross-region profiles to find the correct ARN
+aws bedrock list-inference-profiles --region us-east-1 --type-equals SYSTEM_DEFINED \
+  --query "inferenceProfileSummaries[?contains(inferenceProfileName, 'Haiku')].{Name:inferenceProfileName,Id:inferenceProfileId,Arn:inferenceProfileArn}" \
+  --output table
+```
+
+**For models that support on-demand inference** (e.g. Claude 3 Haiku):
+
 ```bash
 aws bedrock create-inference-profile \
   --inference-profile-name "<demo-name>-haiku" \
   --model-source '{"copyFrom":"arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"}' \
+  --tags key=Project,value=<demo-name> key=Environment,value=<environment> key=Owner,value=<owner-email> key=purpose,value=<purpose> \
+  --region us-east-1 \
+  --output json
+```
+
+**For cross-region-only models** (e.g. Claude Haiku 4.5):
+
+```bash
+aws bedrock create-inference-profile \
+  --inference-profile-name "<demo-name>-haiku" \
+  --model-source '{"copyFrom":"arn:aws:bedrock:us-east-1:<account-id>:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0"}' \
   --tags key=Project,value=<demo-name> key=Environment,value=<environment> key=Owner,value=<owner-email> key=purpose,value=<purpose> \
   --region us-east-1 \
   --output json
@@ -229,11 +251,14 @@ aws bedrock create-inference-profile \
 
 **Chat Completion**
 
-| Name | Model ID |
-|------|----------|
-| Claude 3 Haiku | `anthropic.claude-3-haiku-20240307-v1:0` |
-| Claude 3.5 Sonnet | `anthropic.claude-3-5-sonnet-20241022-v2:0` |
-| Claude 3 Sonnet | `anthropic.claude-3-sonnet-20240229-v1:0` |
+| Name | Model ID | Inference Type |
+|------|----------|----------------|
+| Claude Haiku 4.5 | `anthropic.claude-haiku-4-5-20251001-v1:0` | Cross-region only (`us.` / `global.` prefix) |
+| Claude Sonnet 4 | `anthropic.claude-sonnet-4-20250514-v1:0` | Cross-region only |
+| Claude 3.5 Haiku | `anthropic.claude-3-5-haiku-20241022-v1:0` | On-demand |
+| Claude 3 Haiku | `anthropic.claude-3-haiku-20240307-v1:0` | On-demand |
+| Claude 3.5 Sonnet | `anthropic.claude-3-5-sonnet-20241022-v2:0` | On-demand |
+| Claude 3 Sonnet | `anthropic.claude-3-sonnet-20240229-v1:0` | On-demand |
 
 **Embedding**
 
@@ -381,8 +406,7 @@ llm = ChatBedrock(model=os.getenv("CHATCOMPLETIONS_MODEL_ID", "anthropic.claude-
 
 The Python classes in this template (Pattern A) read model IDs from environment variables with fallback defaults:
 
-- `BedrockAnthropicChatCompletions` reads `CHATCOMPLETIONS_MODEL_ID` (fallback: `anthropic.claude-3-haiku-20240307-v1:0`)
-- `BedrockCohereEnglishEmbeddings` reads `EMBEDDINGS_MODEL_ID` (fallback: `cohere.embed-english-v3`)
+- `BedrockAnthropicChatCompletions` reads `CHATCOMPLETIONS_MODEL_ID` (fallback: `anthropic.claude-haiku-4-5-20251001-v1:0`)
 
 For local development, the fallback defaults use the foundation models directly. In deployed environments (staging/prod), the K8s secrets override these with inference profile ARNs for cost tracking.
 
@@ -394,3 +418,4 @@ For local development, the fallback defaults use the foundation models directly.
 - GCP `--update-labels` is also additive — existing labels are preserved
 - Bedrock inference profile tags use **lowercase** `key`/`value` (not `Key`/`Value`)
 - GCP labels only allow lowercase letters, numbers, underscores, and hyphens (no dots or `@`)
+- Newer models (Haiku 4.5, Sonnet 4, etc.) only support **cross-region inference** — use `aws bedrock list-inference-profiles --type-equals SYSTEM_DEFINED` to find the correct `us.` or `global.` prefixed profile ARN as the `--model-source` when creating application inference profiles

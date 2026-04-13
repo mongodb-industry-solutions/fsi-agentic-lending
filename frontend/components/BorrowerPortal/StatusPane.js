@@ -132,8 +132,8 @@ function StageRow({ label, state, timestamp }) {
 }
 
 export default function StatusPane({ applicationId, applicationData }) {
-  const [status, setStatus] = useState(null);
-  const [timestamps, setTimestamps] = useState({});
+  const [status, setStatus] = useState('submitted');
+  const [timestamps, setTimestamps] = useState(() => ({ submitted: new Date().toISOString() }));
   const [connected, setConnected] = useState(false);
   const sourceRef = useRef(null);
 
@@ -149,10 +149,11 @@ export default function StatusPane({ applicationId, applicationData }) {
           setStatus(data.status);
         }
 
-        if (data.timestamp && data.status) {
+        const ts = data.updated_at || data.timestamp;
+        if (ts && data.status) {
           setTimestamps((prev) => ({
             ...prev,
-            [data.status]: data.timestamp,
+            [data.status]: ts,
           }));
         }
       },

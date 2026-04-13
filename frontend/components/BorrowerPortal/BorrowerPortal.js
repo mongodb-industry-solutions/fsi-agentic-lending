@@ -1,21 +1,36 @@
 "use client";
 
-import { useState, useCallback } from 'react';
-import { spacing } from '@leafygreen-ui/tokens';
+import { useState, useCallback, useEffect } from 'react';
 import BorrowerSelection from './BorrowerSelection';
 import ApplicationForm from './ApplicationForm';
 import DocumentUpload from './DocumentUpload';
 import StatusPane from './StatusPane';
+import DocumentContext from './DocumentContext';
 import ApplicationAgent from './ApplicationAgent';
 import NotificationToast, { useToasts } from '../NotificationToast/NotificationToast';
 import ContextualBanner from '../educational/ContextualBanner';
 import { apiPost } from '../../lib/api';
+
+function getDemoSessionId() {
+  if (typeof window === 'undefined') return '';
+  let sid = sessionStorage.getItem('lendflow_demo_session');
+  if (!sid) {
+    sid = crypto.randomUUID();
+    sessionStorage.setItem('lendflow_demo_session', sid);
+  }
+  return sid;
+}
 
 export default function BorrowerPortal() {
   const [phase, setPhase] = useState('select');
   const [borrowerProfile, setBorrowerProfile] = useState(null);
   const [applicationId, setApplicationId] = useState(null);
   const { toasts, addToast, removeToast } = useToasts();
+  const [demoSessionId, setDemoSessionId] = useState('');
+
+  useEffect(() => {
+    setDemoSessionId(getDemoSessionId());
+  }, []);
 
   const handleBorrowerSelect = useCallback((profile) => {
     setBorrowerProfile(profile);
@@ -43,6 +58,8 @@ export default function BorrowerPortal() {
       primary_income: primaryIncome,
       co_applicant_income: coIncome,
       annual_property_tax: parseFloat(formData.annualPropertyTax) || 0,
+      profile_id: borrowerProfile?.id || null,
+      demo_session_id: demoSessionId || null,
     });
 
     if (!result) {
@@ -55,9 +72,8 @@ export default function BorrowerPortal() {
       setPhase('tracking');
       await apiPost(`/agent/${result.application_id}/run?autonomy_level=bounded`);
     }
-  }, [addToast]);
+  }, [addToast, borrowerProfile, demoSessionId]);
 
-  // Phase: Select borrower
   if (phase === 'select') {
     return (
       <>
@@ -67,18 +83,17 @@ export default function BorrowerPortal() {
     );
   }
 
-  // Phase: Tracking (post-submit)
   if (phase === 'tracking') {
     return (
       <div style={{ display: 'flex', height: 'calc(100vh - 52px)', background: 'var(--bg-void)' }}>
         <StatusPane applicationId={applicationId} applicationData={borrowerProfile} />
+        <DocumentContext applicationId={applicationId} />
         <ApplicationAgent applicationId={applicationId} />
         <NotificationToast toasts={toasts} onDismiss={removeToast} />
       </div>
     );
   }
 
-  // Phase: Apply (form + documents)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 52px)', background: 'var(--bg-void)' }}>
       <ContextualBanner id="borrower-speed">
@@ -86,7 +101,7 @@ export default function BorrowerPortal() {
       </ContextualBanner>
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <ApplicationForm onSubmit={handleSubmit} borrowerProfile={borrowerProfile} />
-        <DocumentUpload applicationId={applicationId} />
+        <DocumentUpload applicationId={applicationId} borrowerProfile={borrowerProfile} />
       </div>
       <NotificationToast toasts={toasts} onDismiss={removeToast} />
     </div>

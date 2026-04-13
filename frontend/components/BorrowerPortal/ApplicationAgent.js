@@ -4,10 +4,13 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import { apiPost, apiGet } from '../../lib/api';
 
-/**
- * Simple markdown-like renderer. Handles headings, bold, bullets, and line breaks.
- * Returns an array of React elements — no external markdown library needed.
- */
+const SUGGESTED_QUESTIONS = [
+  'What documents have been submitted?',
+  'What is the status of my application?',
+  'What are the next steps in the process?',
+  'Explain the mortgage stress test',
+];
+
 function renderMessageContent(text) {
   if (!text) return null;
 
@@ -18,7 +21,6 @@ function renderMessageContent(text) {
     const line = lines[i];
     const key = `line-${i}`;
 
-    // # Heading
     if (/^# (.+)/.test(line)) {
       const match = line.match(/^# (.+)/);
       elements.push(
@@ -29,7 +31,6 @@ function renderMessageContent(text) {
       continue;
     }
 
-    // ## Sub-heading
     if (/^## (.+)/.test(line)) {
       const match = line.match(/^## (.+)/);
       elements.push(
@@ -40,9 +41,8 @@ function renderMessageContent(text) {
       continue;
     }
 
-    // Bullet: - item or * item
-    if (/^[\-\*] (.+)/.test(line)) {
-      const match = line.match(/^[\-\*] (.+)/);
+    if (/^[-*] (.+)/.test(line)) {
+      const match = line.match(/^[-*] (.+)/);
       elements.push(
         <div key={key} style={{ paddingLeft: 16, position: 'relative', marginTop: 2, marginBottom: 2 }}>
           <span style={{ position: 'absolute', left: 4 }}>{'\u2022'}</span>
@@ -52,13 +52,11 @@ function renderMessageContent(text) {
       continue;
     }
 
-    // Empty line
     if (line.trim() === '') {
       elements.push(<div key={key} style={{ height: 6 }} />);
       continue;
     }
 
-    // Regular line
     elements.push(
       <div key={key} style={{ marginTop: 1, marginBottom: 1 }}>
         {renderInline(line)}
@@ -69,7 +67,6 @@ function renderMessageContent(text) {
   return elements;
 }
 
-/** Renders inline bold markers: **text** */
 function renderInline(text) {
   if (!text) return null;
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
@@ -139,6 +136,52 @@ function MessageBubble({ message }) {
   );
 }
 
+function SuggestedQuestions({ onSelect }) {
+  return (
+    <div style={{
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: spacing[2],
+      padding: `${spacing[2]}px 0`,
+    }}>
+      {SUGGESTED_QUESTIONS.map((q) => (
+        <button
+          key={q}
+          type="button"
+          onClick={() => onSelect(q)}
+          style={{
+            padding: `${spacing[1]}px ${spacing[3]}px`,
+            borderRadius: 20,
+            border: '1px solid var(--border-dim)',
+            background: 'var(--bg-surface)',
+            color: 'var(--text-secondary)',
+            fontSize: 12,
+            fontFamily: 'var(--font-display)',
+            fontWeight: 500,
+            cursor: 'pointer',
+            transition: 'border-color 150ms ease, color 150ms ease, background 150ms ease',
+            lineHeight: 1.4,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = 'var(--mongo)';
+            e.currentTarget.style.color = 'var(--mongo)';
+            e.currentTarget.style.background = 'var(--mongo-dim)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'var(--border-dim)';
+            e.currentTarget.style.color = 'var(--text-secondary)';
+            e.currentTarget.style.background = 'var(--bg-surface)';
+          }}
+          onFocus={(e) => { e.currentTarget.style.boxShadow = '0 0 0 2px var(--focus-ring, rgba(0, 124, 173, 0.4))'; }}
+          onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          {q}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 const WELCOME_MESSAGE = {
   role: 'assistant',
   content: 'Welcome! I\'m your LendFlow application assistant. I can help you with document requirements, lending policies, and track your application progress. What would you like to know?',
@@ -149,26 +192,25 @@ export default function ApplicationAgent({ applicationId }) {
   const [messages, setMessages] = useState([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(true);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const textareaRef = useRef(null);
 
-  // Load conversation history on mount
   useEffect(() => {
     if (!applicationId) return;
     apiGet(`/chat/${applicationId}/history`).then(data => {
       if (data?.messages?.length) {
         setMessages(data.messages);
+        setShowSuggestions(false);
       }
     });
   }, [applicationId]);
 
-  // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
-  // Auto-resize textarea
   const adjustTextarea = useCallback(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -182,12 +224,12 @@ export default function ApplicationAgent({ applicationId }) {
     adjustTextarea();
   }, [input, adjustTextarea]);
 
-  const sendMessage = useCallback(async () => {
-    if (!input.trim() || loading) return;
-    const userMessage = input.trim();
-    setInput('');
+  const sendMessage = useCallback(async (overrideMessage) => {
+    const userMessage = (overrideMessage || input).trim();
+    if (!userMessage || loading) return;
+    if (!overrideMessage) setInput('');
+    setShowSuggestions(false);
 
-    // Add user message optimistically
     setMessages(prev => [...prev, { role: 'user', content: userMessage, timestamp: new Date().toISOString() }]);
     setLoading(true);
 
@@ -228,6 +270,7 @@ export default function ApplicationAgent({ applicationId }) {
   const clearChat = useCallback(() => {
     setMessages([WELCOME_MESSAGE]);
     setInput('');
+    setShowSuggestions(true);
   }, []);
 
   const canSend = input.trim().length > 0 && !loading;
@@ -277,7 +320,12 @@ export default function ApplicationAgent({ applicationId }) {
             color: 'var(--text-dim)',
             cursor: 'pointer',
             fontFamily: 'var(--font-display)',
+            transition: 'border-color 150ms ease',
           }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--border-base)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-dim)'; }}
+          onFocus={(e) => { e.currentTarget.style.boxShadow = '0 0 0 2px var(--focus-ring, rgba(0, 124, 173, 0.4))'; }}
+          onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
         >
           Clear
         </button>
@@ -294,6 +342,9 @@ export default function ApplicationAgent({ applicationId }) {
         {messages.map((msg, idx) => (
           <MessageBubble key={`${msg.timestamp}-${idx}`} message={msg} />
         ))}
+        {showSuggestions && !loading && messages.length <= 1 && (
+          <SuggestedQuestions onSelect={(q) => sendMessage(q)} />
+        )}
         {loading && <TypingIndicator />}
         <div ref={messagesEndRef} />
       </div>
@@ -313,6 +364,7 @@ export default function ApplicationAgent({ applicationId }) {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Ask about your application..."
+          aria-label="Message input"
           rows={1}
           style={{
             flex: 1,
@@ -327,12 +379,13 @@ export default function ApplicationAgent({ applicationId }) {
             fontFamily: 'inherit',
             outline: 'none',
             overflow: 'hidden',
+            transition: 'border-color 150ms ease',
           }}
           onFocus={(e) => { e.target.style.borderColor = 'var(--border-base)'; }}
           onBlur={(e) => { e.target.style.borderColor = 'var(--border-dim)'; }}
         />
         <button
-          onClick={sendMessage}
+          onClick={() => sendMessage()}
           disabled={!canSend}
           style={{
             background: canSend ? 'var(--mongo)' : 'var(--border-dim)',

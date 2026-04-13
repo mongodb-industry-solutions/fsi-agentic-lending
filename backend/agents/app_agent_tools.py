@@ -110,6 +110,15 @@ def get_document_requirements(loan_type: str = "standard") -> list[dict]:
     return requirements
 
 
+def get_application_documents_summary(application_id: str) -> list[dict]:
+    """Return lightweight document inventory for an application (no embeddings or full text)."""
+    db = get_db()
+    return list(db["documents"].find(
+        {"application_id": application_id},
+        {"_id": 0, "doc_type": 1, "status": 1, "filename": 1},
+    ))
+
+
 def get_application_status_filtered(application_id: str) -> dict:
     """Get application status -- borrower-safe fields only.
 

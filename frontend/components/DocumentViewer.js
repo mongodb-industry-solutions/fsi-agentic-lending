@@ -4,10 +4,280 @@ import { useState, useEffect, useRef } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import { apiGet } from '../lib/api';
 
+const TABS = [
+  { id: 'extracted', label: 'Extracted Data' },
+  { id: 'mongodb', label: 'MongoDB Document' },
+  { id: 'embeddings', label: 'Embeddings' },
+];
+
+function TabBar({ activeTab, onTabChange }) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Document detail views"
+      style={{
+        display: 'flex',
+        borderBottom: '1px solid var(--border-dim)',
+        background: 'var(--bg-surface)',
+        flexShrink: 0,
+      }}
+    >
+      {TABS.map((tab) => {
+        const isActive = tab.id === activeTab;
+        return (
+          <button
+            key={tab.id}
+            role="tab"
+            aria-selected={isActive}
+            aria-controls={`tabpanel-${tab.id}`}
+            id={`tab-${tab.id}`}
+            type="button"
+            onClick={() => onTabChange(tab.id)}
+            style={{
+              flex: 1,
+              padding: `${spacing[2]}px ${spacing[2]}px`,
+              background: 'none',
+              border: 'none',
+              borderBottom: isActive ? '2px solid var(--mongo)' : '2px solid transparent',
+              fontFamily: 'var(--font-display)',
+              fontSize: 11,
+              fontWeight: isActive ? 700 : 500,
+              color: isActive ? 'var(--mongo)' : 'var(--text-dim)',
+              cursor: 'pointer',
+              transition: 'color 150ms ease, border-color 150ms ease',
+              whiteSpace: 'nowrap',
+            }}
+            onFocus={(e) => { e.currentTarget.style.boxShadow = '0 0 0 2px inset var(--focus-ring, rgba(0, 124, 173, 0.4))'; }}
+            onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ExtractedDataPanel({ data }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[3] }}>
+      {/* AI Attribution */}
+      <div style={{
+        background: 'var(--agent-cyan-dim)',
+        borderLeft: '3px solid var(--agent-cyan)',
+        padding: `${spacing[1]}px ${spacing[2]}px`,
+      }}>
+        <span style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 10,
+          fontWeight: 600,
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+          color: 'var(--agent-cyan)',
+        }}>
+          Extracted by Claude Haiku 4.5 · voyage-multimodal-3.5 embeddings
+        </span>
+      </div>
+
+      {/* Extracted Fields */}
+      <div>
+        <div style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 11, fontWeight: 700,
+          textTransform: 'uppercase', letterSpacing: '0.04em',
+          color: 'var(--text-dim)', marginBottom: spacing[2],
+        }}>
+          Extracted Data
+        </div>
+        <ExtractedFields data={data.structured_data} />
+      </div>
+
+      {/* AI Summary */}
+      {data.extracted_text && (
+        <div>
+          <div style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 11, fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: '0.04em',
+            color: 'var(--text-dim)', marginBottom: spacing[2],
+            display: 'flex', alignItems: 'baseline', gap: spacing[1],
+          }}>
+            <span>AI-Generated Summary</span>
+            <span style={{
+              fontWeight: 500, fontSize: 10,
+              textTransform: 'none', letterSpacing: 'normal',
+              color: 'var(--text-dim)', opacity: 0.7,
+            }}>
+              (generated during document ingestion)
+            </span>
+          </div>
+          <div style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 13, color: 'var(--text-secondary)',
+            lineHeight: 1.7, whiteSpace: 'pre-wrap',
+            background: 'var(--bg-surface)',
+            padding: spacing[3], borderRadius: 8,
+            border: '1px solid var(--border-dim)',
+          }}>
+            {data.extracted_text}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MongoDBDocumentPanel({ data }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[3] }}>
+      <div style={{
+        fontFamily: 'var(--font-display)',
+        fontSize: 11, fontWeight: 700,
+        textTransform: 'uppercase', letterSpacing: '0.04em',
+        color: 'var(--text-dim)',
+      }}>
+        Full MongoDB Document
+      </div>
+      <pre style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: 11, lineHeight: 1.6,
+        color: 'var(--text-secondary)',
+        whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+        margin: 0, padding: spacing[3],
+        background: 'var(--bg-surface)',
+        borderRadius: 8,
+        border: '1px solid var(--border-dim)',
+      }}>
+        {JSON.stringify(data, null, 2)}
+      </pre>
+    </div>
+  );
+}
+
+function EmbeddingsPanel({ data }) {
+  const embedding = data.embedding;
+  const hasEmbedding = embedding && Array.isArray(embedding) && embedding.length > 0;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[3] }}>
+      {/* Model info */}
+      <div style={{
+        background: 'var(--voyage-dim)',
+        borderLeft: '3px solid var(--voyage)',
+        padding: `${spacing[2]}px ${spacing[3]}px`,
+        borderRadius: '0 8px 8px 0',
+      }}>
+        <div style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 11, fontWeight: 700,
+          color: 'var(--voyage)', marginBottom: spacing[1],
+        }}>
+          Multimodal Embedding
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+          Generated by <strong style={{ color: 'var(--voyage)' }}>voyage-multimodal-3.5</strong> — a unified transformer embedding model for text, images, and documents.
+        </div>
+      </div>
+
+      {/* Metadata */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: spacing[2],
+      }}>
+        {[
+          { label: 'Model', value: 'voyage-multimodal-3.5' },
+          { label: 'Dimensions', value: hasEmbedding ? String(embedding.length) : 'N/A' },
+          { label: 'Input Type', value: 'document' },
+          { label: 'Status', value: hasEmbedding ? 'Generated' : 'Not available' },
+        ].map(({ label, value }) => (
+          <div key={label} style={{
+            padding: spacing[2],
+            background: 'var(--bg-surface)',
+            borderRadius: 8,
+            border: '1px solid var(--border-dim)',
+          }}>
+            <div style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 9, fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.04em',
+              color: 'var(--text-dim)', marginBottom: 2,
+            }}>
+              {label}
+            </div>
+            <div style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 12, fontWeight: 600,
+              color: 'var(--text-primary)',
+            }}>
+              {value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Vector preview */}
+      {hasEmbedding && (
+        <div>
+          <div style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 11, fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: '0.04em',
+            color: 'var(--text-dim)', marginBottom: spacing[2],
+          }}>
+            Vector Preview
+          </div>
+          <pre style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10, lineHeight: 1.6,
+            color: 'var(--text-secondary)',
+            whiteSpace: 'pre-wrap', margin: 0,
+            padding: spacing[3],
+            background: 'var(--bg-surface)',
+            borderRadius: 8,
+            border: '1px solid var(--border-dim)',
+          }}>
+{embedding.length <= 10
+  ? `[${embedding.map(v => v.toFixed(6)).join(', ')}]`
+  : `[${embedding.slice(0, 5).map(v => v.toFixed(6)).join(', ')},\n ... ${embedding.length - 10} more values ...\n ${embedding.slice(-5).map(v => v.toFixed(6)).join(', ')}]`}
+          </pre>
+        </div>
+      )}
+
+      {/* Embedded text source */}
+      {data.extracted_text && (
+        <div>
+          <div style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 11, fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: '0.04em',
+            color: 'var(--text-dim)', marginBottom: spacing[2],
+          }}>
+            Text Used for Embedding
+          </div>
+          <div style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 11, color: 'var(--text-secondary)',
+            lineHeight: 1.6, whiteSpace: 'pre-wrap',
+            background: 'var(--bg-surface)',
+            padding: spacing[3], borderRadius: 8,
+            border: '1px solid var(--border-dim)',
+            maxHeight: 200, overflowY: 'auto',
+          }}>
+            {data.extracted_text.length > 800
+              ? data.extracted_text.slice(0, 800) + '...'
+              : data.extracted_text}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DocumentViewer({ docId, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [mongoExpanded, setMongoExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState('extracted');
   const dialogRef = useRef(null);
 
   useEffect(() => { dialogRef.current?.focus(); }, []);
@@ -120,6 +390,8 @@ export default function DocumentViewer({ docId, onClose }) {
               e.currentTarget.style.background = 'var(--bg-base)';
               e.currentTarget.style.color = 'var(--text-dim)';
             }}
+            onFocus={(e) => { e.currentTarget.style.boxShadow = '0 0 0 2px var(--focus-ring, rgba(0, 124, 173, 0.4))'; }}
+            onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
           >
             ×
           </button>
@@ -154,7 +426,7 @@ export default function DocumentViewer({ docId, onClose }) {
                   textDecoration: 'none', fontFamily: 'var(--font-display)',
                 }}
               >
-                Open in new tab ↗
+                Open in new tab
               </a>
             </div>
             <object
@@ -183,14 +455,11 @@ export default function DocumentViewer({ docId, onClose }) {
                   rel="noopener noreferrer"
                   style={{
                     padding: `${spacing[1]}px ${spacing[3]}px`,
-                    borderRadius: 6,
-                    border: 'none',
-                    background: 'var(--mongo)',
-                    color: '#fff',
+                    borderRadius: 6, border: 'none',
+                    background: 'var(--mongo)', color: '#fff',
                     fontFamily: 'var(--font-display)',
                     fontWeight: 600, fontSize: 12,
-                    textDecoration: 'none',
-                    cursor: 'pointer',
+                    textDecoration: 'none', cursor: 'pointer',
                   }}
                 >
                   Download PDF
@@ -199,9 +468,16 @@ export default function DocumentViewer({ docId, onClose }) {
             </object>
           </div>
 
-          {/* Right: Single scrollable view */}
+          {/* Right: Tabbed detail pane */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-            <div style={{ flex: 1, overflowY: 'auto', padding: spacing[3] }}>
+            {!loading && data && <TabBar activeTab={activeTab} onTabChange={setActiveTab} />}
+
+            <div
+              id={`tabpanel-${activeTab}`}
+              role="tabpanel"
+              aria-labelledby={`tab-${activeTab}`}
+              style={{ flex: 1, overflowY: 'auto', padding: spacing[3] }}
+            >
               {loading ? (
                 <div style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -214,9 +490,7 @@ export default function DocumentViewer({ docId, onClose }) {
                     animation: 'spin 0.8s linear infinite',
                     marginBottom: spacing[2],
                   }} />
-                  <div style={{
-                    fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 500,
-                  }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 500 }}>
                     Loading document data...
                   </div>
                 </div>
@@ -232,139 +506,17 @@ export default function DocumentViewer({ docId, onClose }) {
                     fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700,
                     color: 'var(--danger)', marginBottom: spacing[2],
                   }}>!</div>
-                  <div style={{
-                    fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 500,
-                  }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 500 }}>
                     Failed to load document data
                   </div>
                   <div style={{ fontSize: 10, marginTop: spacing[1] }}>Is the backend running?</div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[3] }}>
-
-                  {/* 1. AI Attribution Banner */}
-                  <div style={{
-                    background: 'var(--agent-cyan-dim)',
-                    borderLeft: '3px solid var(--agent-cyan)',
-                    padding: `${spacing[1]}px ${spacing[2]}px`,
-                    width: '100%',
-                  }}>
-                    <span style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: 10,
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
-                      color: 'var(--agent-cyan)',
-                    }}>
-                      Extracted by Claude Haiku 4.5 · voyage-multimodal-3.5 embeddings
-                    </span>
-                  </div>
-
-                  {/* 2. Extracted Fields Section */}
-                  <div>
-                    <div style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: 11,
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
-                      color: 'var(--text-dim)',
-                      marginBottom: spacing[2],
-                    }}>
-                      Extracted Data
-                    </div>
-                    <ExtractedFields data={data.structured_data} />
-                  </div>
-
-                  {/* 3. AI-Generated Summary Section */}
-                  {data.extracted_text && (
-                    <div>
-                      <div style={{
-                        fontFamily: 'var(--font-display)',
-                        fontSize: 11,
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.04em',
-                        color: 'var(--text-dim)',
-                        marginBottom: spacing[2],
-                        display: 'flex',
-                        alignItems: 'baseline',
-                        gap: spacing[1],
-                      }}>
-                        <span>AI-Generated Summary</span>
-                        <span style={{
-                          fontWeight: 500,
-                          fontSize: 10,
-                          textTransform: 'none',
-                          letterSpacing: 'normal',
-                          color: 'var(--text-dim)',
-                          opacity: 0.7,
-                        }}>
-                          (generated during document ingestion)
-                        </span>
-                      </div>
-                      <div style={{
-                        fontFamily: 'var(--font-body)',
-                        fontSize: 13,
-                        color: 'var(--text-secondary)',
-                        lineHeight: 1.7,
-                        whiteSpace: 'pre-wrap',
-                        background: 'var(--bg-surface)',
-                        padding: spacing[3],
-                        borderRadius: 8,
-                        border: '1px solid var(--border-dim)',
-                      }}>
-                        {data.extracted_text}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 4. MongoDB Document Section (collapsible) */}
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => setMongoExpanded((prev) => !prev)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: 0,
-                        fontFamily: 'var(--font-display)',
-                        fontSize: 11,
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.04em',
-                        color: 'var(--text-dim)',
-                        marginBottom: mongoExpanded ? spacing[2] : 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: spacing[1],
-                      }}
-                    >
-                      <span>MongoDB Document {mongoExpanded ? '\u25BE' : '\u25B8'}</span>
-                    </button>
-                    {mongoExpanded && (
-                      <pre style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 11,
-                        lineHeight: 1.6,
-                        color: 'var(--text-secondary)',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-all',
-                        margin: 0,
-                        marginTop: spacing[2],
-                        padding: spacing[3],
-                        background: 'var(--bg-surface)',
-                        borderRadius: 8,
-                        border: '1px solid var(--border-dim)',
-                      }}>
-                        {JSON.stringify(data, null, 2)}
-                      </pre>
-                    )}
-                  </div>
-
-                </div>
+                <>
+                  {activeTab === 'extracted' && <ExtractedDataPanel data={data} />}
+                  {activeTab === 'mongodb' && <MongoDBDocumentPanel data={data} />}
+                  {activeTab === 'embeddings' && <EmbeddingsPanel data={data} />}
+                </>
               )}
             </div>
           </div>
@@ -381,11 +533,9 @@ function ExtractedFields({ data }) {
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', height: 200,
         border: '1px dashed var(--border-dim)', borderRadius: 8,
-        color: 'var(--text-dim)', background: 'var(--bg-surface)',
+        color: 'var(--text-dim)', background: '#FAFBFA',
       }}>
-        <div style={{
-          fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 500,
-        }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 500 }}>
           No structured data available
         </div>
       </div>
@@ -405,11 +555,9 @@ function ExtractedFields({ data }) {
           }}>
             <div style={{
               fontFamily: 'var(--font-display)',
-              fontSize: 10,
-              fontWeight: 700,
+              fontSize: 10, fontWeight: 700,
               color: 'var(--text-dim)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
+              textTransform: 'uppercase', letterSpacing: '0.04em',
               marginBottom: spacing[1],
             }}>
               {key.replace(/_/g, ' ')}

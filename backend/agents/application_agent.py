@@ -18,6 +18,7 @@ from agents.app_agent_tools import (
     search_policies_borrower,
     get_document_requirements,
     get_application_status_filtered,
+    get_application_documents_summary,
     get_pending_interventions,
 )
 
@@ -53,7 +54,31 @@ def _build_context(state: AppAgentState) -> str:
     app_id = state.get("application_id")
     context_parts = []
 
-    # Check for pending interventions first (highest priority)
+    # Always-on: load application info and document inventory when app_id is set
+    if app_id:
+        try:
+            app_info = get_application_status_filtered(app_id)
+            if "error" not in app_info:
+                names = ", ".join(app_info.get("borrower_names", []))
+                context_parts.append(
+                    f"APPLICATION INFO:\n"
+                    f"Borrower(s): {names}\n"
+                    f"Product: {app_info.get('product', 'N/A')}\n"
+                    f"Loan Amount: ${app_info.get('loan_amount', 0):,.0f}\n"
+                    f"Status: {app_info.get('status', 'unknown')}"
+                )
+        except Exception as e:
+            logger.warning(f"Application info lookup failed: {e}")
+
+        try:
+            doc_summary = get_application_documents_summary(app_id)
+            if doc_summary:
+                doc_list = "\n".join(f"- {d.get('doc_type', 'unknown')}: {d.get('status', 'unknown')}" for d in doc_summary)
+                context_parts.append(f"SUBMITTED DOCUMENTS ({len(doc_summary)} total):\n{doc_list}")
+        except Exception as e:
+            logger.warning(f"Document summary lookup failed: {e}")
+
+    # Check for pending interventions (highest priority)
     if app_id:
         try:
             interventions = get_pending_interventions(app_id)
