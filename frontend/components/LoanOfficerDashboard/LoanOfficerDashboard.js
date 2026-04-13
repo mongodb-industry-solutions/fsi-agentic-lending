@@ -5,6 +5,8 @@ import { spacing } from '@leafygreen-ui/tokens';
 import ApplicationQueue from './ApplicationQueue';
 import AgentActivityLog from './AgentActivityLog';
 import IntentPreview from './IntentPreview';
+import ApplicationDetail from './ApplicationDetail';
+import DecisionSummary from './DecisionSummary';
 import WorkflowCanvas from '../DemoFlow/WorkflowCanvas';
 import NotificationToast, { useToasts } from '../NotificationToast/NotificationToast';
 import { apiPost, apiGet, apiSSE, apiWebSocket } from '../../lib/api';
@@ -188,10 +190,11 @@ function ManualWorkspace({ appDetail, queueData, onApprove, onDecline, addToast 
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, marginBottom: spacing[2] }}>
             {appName}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: spacing[2] }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: spacing[2], marginBottom: spacing[2] }}>
             {[
               { label: 'Amount', value: loanAmount },
               { label: 'Product', value: product },
+              { label: 'Credit Score', value: appDetail?.credit_reports?.[0]?.score ?? 'N/A' },
             ].map((item) => (
               <div key={item.label}>
                 <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600, marginBottom: 1 }}>{item.label}</div>
@@ -199,6 +202,33 @@ function ManualWorkspace({ appDetail, queueData, onApprove, onDecline, addToast 
               </div>
             ))}
           </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: spacing[2] }}>
+            {[
+              { label: 'Risk Score', value: appDetail?.risk_score != null ? `${appDetail.risk_score}/100` : 'N/A', color: appDetail?.risk_score > 65 ? 'var(--danger)' : appDetail?.risk_score > 50 ? 'var(--hitl-amber)' : undefined },
+              { label: 'Risk Tier', value: appDetail?.risk_tier || 'N/A' },
+              { label: 'GDS', value: appDetail?.gds_ratio != null ? `${(appDetail.gds_ratio * 100).toFixed(1)}%` : 'N/A' },
+              { label: 'TDS', value: appDetail?.tds_ratio != null ? `${(appDetail.tds_ratio * 100).toFixed(1)}%` : 'N/A' },
+            ].map((item) => (
+              <div key={item.label}>
+                <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600, marginBottom: 1 }}>{item.label}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: item.color }}>{item.value || 'N/A'}</div>
+              </div>
+            ))}
+          </div>
+          {appDetail?.property && (
+            <div style={{ marginTop: spacing[2], display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: spacing[2] }}>
+              {[
+                { label: 'Property', value: appDetail.property.type || 'N/A' },
+                { label: 'Location', value: appDetail.property.city || 'N/A' },
+                { label: 'Documents', value: `${appDetail.documents?.length || 0} uploaded` },
+              ].map((item) => (
+                <div key={item.label}>
+                  <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600, marginBottom: 1 }}>{item.label}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600 }}>{item.value}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div style={{
@@ -264,7 +294,7 @@ function HITLReviewCard({ applicationId, appDetail, queueData, onApprove, onDecl
   const [showModify, setShowModify] = useState(false);
   const [fetchingContext, setFetchingContext] = useState(false);
   const [hitlContext, setHitlContext] = useState(null);
-  const [modFields, setModFields] = useState({ rate: 4.89, conditions: '', requestDocs: false });
+  const [modFields, setModFields] = useState({ rate: 4.89, conditions: '', requestDocs: false, loanAmount: '' });
 
   const app = hitlContext?.application || appDetail || {};
   const activityTrail = hitlContext?.activity_trail || [];
@@ -279,32 +309,36 @@ function HITLReviewCard({ applicationId, appDetail, queueData, onApprove, onDecl
     a.action?.includes('decision') || a.action?.includes('complete') || a.detail?.includes('recommend')
   );
 
-  const handleRequestContext = async () => {
+  const fetchContext = useCallback(async () => {
     setFetchingContext(true);
-    if (addToast) addToast({ type: 'info', title: 'Fetching Context', message: 'Retrieving HITL review package from backend...' });
     const ctx = await apiGet(`/hitl/${applicationId}/context`);
     setFetchingContext(false);
     if (ctx) {
       setHitlContext(ctx);
-      const count = (ctx.activity_trail?.length || 0) + (ctx.application?.documents?.length || 0);
-      if (addToast) addToast({ type: 'success', title: 'Context Retrieved', message: `${count} data points available for review.` });
     } else {
       if (addToast) addToast({ type: 'warning', title: 'Context Unavailable', message: 'Could not retrieve HITL context from backend.' });
     }
-  };
+  }, [applicationId, addToast]);
+
+  useEffect(() => {
+    if (applicationId) fetchContext();
+  }, [applicationId, fetchContext]);
 
   const handleModifySubmit = () => {
+    const loanAmountNum = modFields.loanAmount ? parseFloat(modFields.loanAmount.replace(/[^0-9.]/g, '')) : null;
     const details = {
       mode: 'modified',
       rate: `${modFields.rate.toFixed(3)}%`,
       conditions: modFields.conditions,
       requestDocs: modFields.requestDocs,
+      ...(loanAmountNum ? { loanAmount: loanAmountNum } : {}),
     };
     if (addToast) {
       const parts = [`Rate: ${details.rate}`];
+      if (loanAmountNum) parts.push(`Amount: $${loanAmountNum.toLocaleString()}`);
       if (modFields.conditions) parts.push(`Condition: ${modFields.conditions}`);
       if (modFields.requestDocs) parts.push('Additional docs requested');
-      addToast({ type: 'success', title: 'Approved with Modifications', message: parts.join(' · ') });
+      addToast({ type: 'info', title: 'Submitting Modifications', message: parts.join(' · ') });
     }
     onApprove(details);
   };
@@ -316,6 +350,7 @@ function HITLReviewCard({ applicationId, appDetail, queueData, onApprove, onDecl
   const modSummary = showModify ? (() => {
     const parts = [];
     if (modFields.rate !== 4.89) parts.push(`Rate adjusted to ${modFields.rate.toFixed(3)}%`);
+    if (modFields.loanAmount) parts.push(`Amount: $${modFields.loanAmount}`);
     if (modFields.conditions) parts.push(`Condition: ${modFields.conditions}`);
     if (modFields.requestDocs) parts.push('Additional docs: requested');
     return parts;
@@ -507,7 +542,7 @@ function HITLReviewCard({ applicationId, appDetail, queueData, onApprove, onDecl
             </div>
           )) : (
             <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-              Click &ldquo;Request More Context&rdquo; to load the full activity trail from the backend.
+              {fetchingContext ? 'Loading activity trail...' : 'No policy-related activity found in the trail.'}
             </div>
           )}
         </div>
@@ -554,6 +589,22 @@ function HITLReviewCard({ applicationId, appDetail, queueData, onApprove, onDecl
               style={{
                 width: '100%', padding: '5px 8px', fontSize: 10,
                 fontFamily: 'var(--font-body)',
+                background: 'var(--bg-surface)', border: '1px solid var(--border-dim)',
+                borderRadius: 6, color: 'var(--text-primary)', outline: 'none',
+              }}
+            />
+          </div>
+          <div style={{ marginBottom: spacing[2] }}>
+            <label htmlFor="hitl-loanamt" style={{ fontSize: 10, color: 'var(--text-secondary)', display: 'block', marginBottom: 3 }}>Loan Amount Override:</label>
+            <input
+              id="hitl-loanamt"
+              type="text"
+              placeholder={app.loan_amount ? `Current: $${Number(app.loan_amount).toLocaleString()}` : 'e.g., 350000'}
+              value={modFields.loanAmount}
+              onChange={(e) => setModFields((p) => ({ ...p, loanAmount: e.target.value }))}
+              style={{
+                width: '100%', padding: '5px 8px', fontSize: 10,
+                fontFamily: 'var(--font-mono)',
                 background: 'var(--bg-surface)', border: '1px solid var(--border-dim)',
                 borderRadius: 6, color: 'var(--text-primary)', outline: 'none',
               }}
@@ -611,16 +662,15 @@ function HITLReviewCard({ applicationId, appDetail, queueData, onApprove, onDecl
         }}>
           {showModify ? 'Back' : 'Modify & Approve'}
         </button>
-        <button type="button" onClick={handleRequestContext} disabled={fetchingContext || !!hitlContext} style={{
+        <button type="button" onClick={fetchContext} disabled={fetchingContext} style={{
           flex: '1 1 auto', padding: 10, borderRadius: 8,
           border: '1px solid var(--tool-blue)',
           background: fetchingContext ? 'var(--tool-blue-dim)' : 'transparent',
-          color: hitlContext ? 'var(--text-dim)' : 'var(--tool-blue)',
+          color: 'var(--tool-blue)',
           fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 11,
-          cursor: fetchingContext || hitlContext ? 'default' : 'pointer',
-          opacity: hitlContext ? 0.5 : 1,
+          cursor: fetchingContext ? 'default' : 'pointer',
         }}>
-          {fetchingContext ? 'Fetching...' : hitlContext ? 'Context Loaded' : 'Request More Context'}
+          {fetchingContext ? 'Fetching...' : 'Refresh Context'}
         </button>
         <button type="button" onClick={() => onDecline?.()} style={{
           flex: '1 1 auto', padding: 10, borderRadius: 8,
@@ -649,9 +699,13 @@ export default function LoanOfficerDashboard() {
   const { toasts, addToast, removeToast } = useToasts();
   const [liveApplications, setLiveApplications] = useState([]);
   const [selectedAppDetail, setSelectedAppDetail] = useState(null);
+  const [portfolioStats, setPortfolioStats] = useState(null);
 
   // Real-time application queue via WebSocket + MongoDB Change Stream
   const snapshotReceived = useRef(false);
+  const selectedAppRef = useRef(selectedApp);
+  selectedAppRef.current = selectedApp;
+
   useEffect(() => {
     snapshotReceived.current = false;
     const ws = apiWebSocket('/applications/ws', {
@@ -671,12 +725,24 @@ export default function LoanOfficerDashboard() {
               }
               return [app, ...prev];
             });
+            if (app.application_id === selectedAppRef.current) {
+              apiGet(`/applications/${app.application_id}`).then((detail) => {
+                if (detail) setSelectedAppDetail(detail);
+              });
+            }
           }
         }
       },
     });
 
     return () => ws.close();
+  }, []);
+
+  // Fetch portfolio stats on mount
+  useEffect(() => {
+    apiGet('/portfolio/stats').then((data) => {
+      if (data) setPortfolioStats(data);
+    }).catch(() => {});
   }, []);
 
   // Fetch selected application detail from backend
@@ -690,26 +756,38 @@ export default function LoanOfficerDashboard() {
     });
   }, [selectedApp]);
 
-  // Dashboard stats derived from real data
+  // Dashboard stats derived from real data + portfolio stats
   const dashboardStats = useMemo(() => {
     const pendingCount = liveApplications.filter(
       (a) => ['review', 'pending_review'].includes(a.status)
     ).length;
     const approvedCount = liveApplications.filter((a) => a.status === 'approved').length;
-    return [
+    const stats = [
       { label: 'Applications', value: String(liveApplications.length), color: 'var(--mongo)' },
       { label: 'Processing', value: String(liveApplications.filter((a) => a.status === 'processing' || a.status === 'underwriting').length), color: 'var(--agent-cyan)' },
       { label: 'Approved', value: String(approvedCount), color: 'var(--success)' },
       { label: 'Pending Reviews', value: String(pendingCount), color: 'var(--hitl-amber)' },
     ];
-  }, [liveApplications]);
+    if (portfolioStats) {
+      if (portfolioStats.total_portfolio_value) {
+        stats.push({ label: 'Portfolio Value', value: `$${(portfolioStats.total_portfolio_value / 1_000_000).toFixed(1)}M`, color: 'var(--mongo)' });
+      }
+      if (portfolioStats.active_loans != null) {
+        stats.push({ label: 'Active Loans', value: String(portfolioStats.active_loans), color: 'var(--tool-blue)' });
+      }
+      if (portfolioStats.delinquency_rate != null) {
+        stats.push({ label: 'Delinquency', value: `${(portfolioStats.delinquency_rate * 100).toFixed(1)}%`, color: portfolioStats.delinquency_rate > 0.05 ? 'var(--danger)' : 'var(--success)' });
+      }
+    }
+    return stats;
+  }, [liveApplications, portfolioStats]);
 
   // Clean up SSE on unmount
   useEffect(() => {
     return () => { if (sseRef.current) { sseRef.current.close(); sseRef.current = null; } };
   }, []);
 
-  // Reset when selected app changes
+  // Status-aware reset when selected app changes
   useEffect(() => {
     if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
     setWorkflowStage(0);
@@ -723,10 +801,33 @@ export default function LoanOfficerDashboard() {
       return;
     }
 
-    setWorkflowPhase('preview');
-  }, [selectedApp]);
+    const queueApp = liveApplications.find((a) => a.application_id === selectedApp);
+    const status = queueApp?.status || 'submitted';
 
-  // SSE-driven workflow stage progression
+    if (status === 'review' || status === 'pending_review') {
+      setWorkflowPhase('executing');
+      setWorkflowStage(2);
+      setHitlReached(true);
+    } else if (status === 'processing' || status === 'underwriting') {
+      setWorkflowPhase('executing');
+      setWorkflowStage(status === 'underwriting' ? 1 : 0);
+      reconnectActivitySSE(selectedApp);
+    } else if (status === 'approved') {
+      setWorkflowPhase('executing');
+      setApproved(true);
+      setApprovalDetails({ mode: 'auto' });
+    } else if (status === 'declined') {
+      setWorkflowPhase('executing');
+      setApproved(true);
+      setApprovalDetails({ mode: 'declined' });
+    } else if (status === 'error') {
+      setWorkflowPhase('preview');
+    } else {
+      setWorkflowPhase('preview');
+    }
+  }, [selectedApp, liveApplications, reconnectActivitySSE]);
+
+  // SSE-driven workflow stage progression via run-stream (starts graph + streams events)
   const startWorkflowSSE = useCallback((appId) => {
     if (sseRef.current) sseRef.current.close();
 
@@ -736,9 +837,9 @@ export default function LoanOfficerDashboard() {
     setWorkflowPhase('executing');
 
     const source = apiSSE(
-      `/agent/${appId}/stream`,
+      `/agent/${appId}/run-stream?autonomy_level=bounded`,
       (event) => {
-        if (event.type === 'agent_step' || event.type === 'node_start') {
+        if (event.type === 'node_start') {
           const agentName = event.agent || event.name || '';
           const stageIdx = NODE_TO_STAGE[agentName];
           if (stageIdx !== undefined) {
@@ -746,13 +847,21 @@ export default function LoanOfficerDashboard() {
           }
         }
 
-        if (event.type === 'node_complete' && event.agent === 'hitl_gate') {
-          setHitlReached(true);
-          addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
+        if (event.type === 'node_complete') {
+          const agentName = event.agent || '';
+          const stageIdx = NODE_TO_STAGE[agentName];
+          if (stageIdx !== undefined) {
+            setWorkflowStage(stageIdx);
+          }
+          if (agentName === 'hitl_gate') {
+            setHitlReached(true);
+            addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
+          }
         }
 
         if (event.type === 'hitl_waiting') {
           setHitlReached(true);
+          setWorkflowStage(2);
           addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
         }
 
@@ -767,10 +876,38 @@ export default function LoanOfficerDashboard() {
     sseRef.current = source;
   }, [addToast]);
 
+  // Reconnect to activity stream for apps already processing (no graph start)
+  const reconnectActivitySSE = useCallback((appId) => {
+    if (sseRef.current) sseRef.current.close();
+
+    const source = apiSSE(
+      `/agent/${appId}/stream`,
+      (event) => {
+        if (event.type === 'agent_step') {
+          const agentName = event.agent || '';
+          const stageIdx = NODE_TO_STAGE[agentName];
+          if (stageIdx !== undefined) {
+            setWorkflowStage(stageIdx);
+          }
+          if (agentName === 'hitl_gate' && event.action === 'interrupt') {
+            setHitlReached(true);
+            addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
+          }
+        }
+        if (event.type === 'complete') {
+          setApproved(true);
+          setApprovalDetails({ mode: 'auto' });
+          addToast({ type: 'success', title: 'Pipeline Complete', message: `Agent pipeline completed for ${appId}.` });
+        }
+      }
+    );
+
+    sseRef.current = source;
+  }, [addToast]);
+
   const handleProceed = useCallback((settings) => {
     if (!selectedApp) return;
     setPlanSettings(settings || null);
-    apiPost(`/agent/${selectedApp}/run?autonomy_level=bounded`);
     startWorkflowSSE(selectedApp);
     addToast({ type: 'info', title: 'Workflow Started', message: `Processing ${selectedApp} with bounded autonomy.` });
   }, [selectedApp, addToast, startWorkflowSSE]);
@@ -784,19 +921,37 @@ export default function LoanOfficerDashboard() {
   const appName = getAppDisplayName(selectedAppDetail, selectedAppData);
 
   const handleApprove = useCallback(async (details) => {
+    if (!selectedApp) return;
+
+    if (details?.mode === 'modified') {
+      addToast({ type: 'info', title: 'Modifications Applied', message: 'Agent re-running underwriting with updated terms.' });
+      await apiPost(`/hitl/${selectedApp}/decision`, {
+        action: 'modify_and_continue',
+        officer_notes: details.conditions || 'Modified terms',
+        conditions: details.conditions ? [details.conditions] : [],
+        overrides: {
+          ...(details.rate ? { rate: parseFloat(details.rate) } : {}),
+          ...(details.loanAmount ? { loan_amount: details.loanAmount } : {}),
+        },
+      });
+      setHitlReached(false);
+      setApproved(false);
+      setApprovalDetails(null);
+      reconnectActivitySSE(selectedApp);
+      return;
+    }
+
     setApproved(true);
     setApprovalDetails(details || { mode: 'recommended' });
     const rate = details?.rate || '';
     const suffix = details?.conditions ? ` · Conditions: ${details.conditions}` : '';
     addToast({ type: 'success', title: 'Loan Approved', message: `${rate ? `@ ${rate} ` : ''}for ${appName}.${suffix}` });
 
-    if (selectedApp) {
-      await apiPost(`/hitl/${selectedApp}/decision`, {
-        action: 'approve',
-        officer_notes: details?.conditions || 'Approved after manual review',
-      });
-    }
-  }, [addToast, selectedApp, appName]);
+    await apiPost(`/hitl/${selectedApp}/decision`, {
+      action: 'approve',
+      officer_notes: details?.conditions || 'Approved after manual review',
+    });
+  }, [addToast, selectedApp, appName, reconnectActivitySSE]);
 
   const handleDecline = useCallback(async () => {
     setApproved(true);
@@ -811,15 +966,30 @@ export default function LoanOfficerDashboard() {
     }
   }, [addToast, selectedApp, appName]);
 
-  const handleAgentEvent = useCallback(() => {}, []);
+  const handleAgentEvent = useCallback((entry) => {
+    if (!entry) return;
+    const agentName = entry.agent || '';
+    const stageIdx = NODE_TO_STAGE[agentName.toLowerCase().includes('underwrit') ? 'underwriter'
+      : agentName.toLowerCase().includes('loan_app') ? 'loan_app'
+      : agentName.toLowerCase().includes('hitl') ? 'hitl_gate' : ''];
+    if (stageIdx !== undefined) {
+      setWorkflowStage(stageIdx);
+    }
+    if (entry.agent === 'hitl_gate' && entry.action === 'interrupt') {
+      setHitlReached(true);
+    }
+  }, []);
 
   const currentWorkflow = WORKFLOW_STAGES[workflowStage] || WORKFLOW_STAGES[WORKFLOW_STAGES.length - 1];
+
+  const selectedAppStatus = selectedAppData?.status;
 
   const statusBadge = () => {
     if (!selectedApp) return null;
     if (approved && approvalDetails?.mode === 'declined') return { label: 'Declined', bg: 'var(--danger-dim)', color: 'var(--danger)' };
     if (approved) return { label: 'Approved', bg: 'var(--success-dim)', color: 'var(--success)' };
     if (hitlReached) return { label: 'Awaiting Review', bg: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)' };
+    if (selectedAppStatus === 'error') return { label: 'Error', bg: 'var(--danger-dim)', color: 'var(--danger)' };
     if (workflowPhase === 'preview') return { label: 'Plan Ready', bg: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' };
     if (workflowPhase === 'manual') return { label: 'Manual Mode', bg: 'var(--bg-raised)', color: 'var(--text-secondary)' };
     if (workflowPhase === 'executing') return { label: `Processing: ${currentWorkflow.label}`, bg: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' };
@@ -833,7 +1003,7 @@ export default function LoanOfficerDashboard() {
       {/* Stats bar */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
+        gridTemplateColumns: `repeat(${Math.min(dashboardStats.length, 7)}, 1fr)`,
         gap: spacing[3],
         padding: `12px ${spacing[5]}px`,
         borderBottom: '1px solid var(--border-dim)',
@@ -882,10 +1052,22 @@ export default function LoanOfficerDashboard() {
             )}
           </div>
 
+          {/* Compact detail bar during executing/HITL */}
+          {selectedApp && selectedAppDetail && (workflowPhase === 'executing' || hitlReached) && (
+            <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-base)' }}>
+              <ApplicationDetail appDetail={selectedAppDetail} compact />
+            </div>
+          )}
+
           {/* Intent Preview (pre-action) */}
           {selectedApp && workflowPhase === 'preview' && (
-            <div style={{ padding: spacing[3], borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '50vh' }}>
-              <IntentPreview applicationId={selectedApp} onProceed={handleProceed} onManual={handleManual} />
+            <div style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '60vh' }}>
+              {selectedAppDetail && (
+                <ApplicationDetail appDetail={selectedAppDetail} />
+              )}
+              <div style={{ padding: spacing[3] }}>
+                <IntentPreview applicationId={selectedApp} onProceed={handleProceed} onManual={handleManual} />
+              </div>
             </div>
           )}
 
@@ -967,37 +1149,16 @@ export default function LoanOfficerDashboard() {
             </div>
           )}
 
-          {/* Approved / Declined card */}
+          {/* Decision Summary (replaces minimal approved/declined card) */}
           {selectedApp && approved && (
-            <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)', background: 'var(--bg-base)', textAlign: 'center' }}>
-              <div style={{
-                padding: spacing[3],
-                background: approvalDetails?.mode === 'declined' ? 'var(--danger-dim)' : 'var(--success-dim)',
-                borderRadius: 8,
-                border: `1px solid ${approvalDetails?.mode === 'declined' ? 'var(--danger)' : 'var(--success)'}`,
-              }}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: '50%',
-                  border: `2px solid ${approvalDetails?.mode === 'declined' ? 'var(--danger)' : 'var(--success)'}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  margin: '0 auto 4px',
-                  fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 800,
-                  color: approvalDetails?.mode === 'declined' ? 'var(--danger)' : 'var(--success)',
-                }}>
-                  {approvalDetails?.mode === 'declined' ? '\u2715' : '\u2713'}
-                </div>
-                <div style={{
-                  fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16,
-                  color: approvalDetails?.mode === 'declined' ? 'var(--danger)' : 'var(--success)',
-                }}>
-                  {approvalDetails?.mode === 'declined' ? 'DECLINED' : 'LOAN APPROVED'}
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
-                  {appName} — {selectedAppDetail?.product || selectedAppData?.product || ''}
-                  {approvalDetails?.rate && ` @ ${approvalDetails.rate}`}
-                  {approvalDetails?.conditions && <><br/>Conditions: {approvalDetails.conditions}</>}
-                </div>
-              </div>
+            <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '55vh' }}>
+              <DecisionSummary
+                applicationId={selectedApp}
+                appDetail={selectedAppDetail}
+                approvalDetails={approvalDetails}
+                appName={appName}
+                onClose={() => setSelectedApp(null)}
+              />
             </div>
           )}
         </div>

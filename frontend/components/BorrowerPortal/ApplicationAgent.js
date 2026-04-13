@@ -6,12 +6,42 @@ import { apiPost, apiGet } from '../../lib/api';
 
 const API_BASE = '/api/backend';
 
-const SUGGESTED_QUESTIONS = [
-  'What documents have been submitted?',
-  'What is the status of my application?',
-  'What are the next steps in the process?',
-  'Explain the mortgage stress test',
-];
+const STATUS_SUGGESTIONS = {
+  submitted: [
+    'What documents were submitted with my application?',
+    'How long does the verification process take?',
+  ],
+  processing: [
+    'What documents were submitted?',
+    'How long will verification take?',
+    'What happens during document verification?',
+  ],
+  underwriting: [
+    'What is the mortgage stress test?',
+    'How is my risk score calculated?',
+    'What are the GDS and TDS ratios?',
+  ],
+  review: [
+    'What does officer review mean?',
+    'How long does officer review take?',
+    'Can I provide additional documents?',
+  ],
+  approved: [
+    'What are the next steps after approval?',
+    'When is my first payment due?',
+    'What was my final interest rate?',
+  ],
+  declined: [
+    'Why was my application declined?',
+    'Can I reapply with changes?',
+    'What can I do to improve my application?',
+  ],
+  default: [
+    'What is the status of my application?',
+    'What are the next steps in the process?',
+    'Explain the mortgage stress test',
+  ],
+};
 
 function renderMessageContent(text) {
   if (!text) return null;
@@ -205,13 +235,13 @@ function MessageBubble({ message }) {
   );
 }
 
-function SuggestedQuestions({ onSelect }) {
+function SuggestedQuestions({ onSelect, questions }) {
   return (
     <div style={{
       display: 'flex', flexWrap: 'wrap',
       gap: spacing[2], padding: `${spacing[2]}px 0`,
     }}>
-      {SUGGESTED_QUESTIONS.map((q) => (
+      {questions.map((q) => (
         <button
           key={q}
           type="button"
@@ -319,18 +349,19 @@ function InterventionCard({ intervention, onResolve, resolving }) {
   );
 }
 
-const WELCOME_MESSAGE = {
-  role: 'assistant',
-  content: 'Welcome! I\'m your LendFlow application assistant. I can help you with document requirements, lending policies, and track your application progress. What would you like to know?',
-  timestamp: new Date().toISOString(),
-};
+function createWelcomeMessage() {
+  return {
+    role: 'assistant',
+    content: 'Welcome! I\'m your LendFlow application assistant. I can help you with document requirements, lending policies, and track your application progress. What would you like to know?',
+    timestamp: new Date().toISOString(),
+  };
+}
 
-export default function ApplicationAgent({ applicationId }) {
-  const [messages, setMessages] = useState([WELCOME_MESSAGE]);
+export default function ApplicationAgent({ applicationId, applicationStatus }) {
+  const [messages, setMessages] = useState(() => [createWelcomeMessage()]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(true);
   const [interventions, setInterventions] = useState([]);
   const [resolvingId, setResolvingId] = useState(null);
   const messagesEndRef = useRef(null);
@@ -343,7 +374,6 @@ export default function ApplicationAgent({ applicationId }) {
     apiGet(`/chat/${applicationId}/history`).then(data => {
       if (data?.messages?.length) {
         setMessages(data.messages);
-        setShowSuggestions(false);
       }
     });
   }, [applicationId]);
@@ -398,7 +428,6 @@ export default function ApplicationAgent({ applicationId }) {
     const userMessage = (overrideMessage || input).trim();
     if (!userMessage || loading) return;
     if (!overrideMessage) setInput('');
-    setShowSuggestions(false);
 
     setMessages(prev => [...prev, { role: 'user', content: userMessage, timestamp: new Date().toISOString() }]);
     setLoading(true);
@@ -506,10 +535,9 @@ export default function ApplicationAgent({ applicationId }) {
 
   const clearChat = useCallback(() => {
     if (abortRef.current) abortRef.current.abort();
-    setMessages([WELCOME_MESSAGE]);
+    setMessages([createWelcomeMessage()]);
     setInput('');
     setStreamingContent('');
-    setShowSuggestions(true);
     setLoading(false);
   }, []);
 
@@ -579,8 +607,11 @@ export default function ApplicationAgent({ applicationId }) {
             ))}
           </div>
         )}
-        {showSuggestions && !loading && messages.length <= 1 && interventions.length === 0 && (
-          <SuggestedQuestions onSelect={(q) => sendMessage(q)} />
+        {!loading && messages.length > 0 && messages[messages.length - 1].role === 'assistant' && (
+          <SuggestedQuestions
+            onSelect={(q) => sendMessage(q)}
+            questions={STATUS_SUGGESTIONS[applicationStatus] || STATUS_SUGGESTIONS.default}
+          />
         )}
         {loading && streamingContent && (
           <StreamingBubble content={streamingContent} />

@@ -4,12 +4,12 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import BorrowerSelection from './BorrowerSelection';
 import ApplicationForm from './ApplicationForm';
 import DocumentUpload from './DocumentUpload';
-import StatusPane from './StatusPane';
+import StatusTracker from './StatusTracker';
 import DocumentContext from './DocumentContext';
 import ApplicationAgent from './ApplicationAgent';
 import NotificationToast, { useToasts } from '../NotificationToast/NotificationToast';
 import ContextualBanner from '../educational/ContextualBanner';
-import { apiPost } from '../../lib/api';
+import { apiPost, apiSSE } from '../../lib/api';
 
 function getDemoSessionId() {
   if (typeof window === 'undefined') return '';
@@ -124,10 +124,23 @@ export default function BorrowerPortal() {
   const { toasts, addToast, removeToast } = useToasts();
   const [demoSessionId, setDemoSessionId] = useState('');
   const [submitStep, setSubmitStep] = useState(0);
+  const [applicationStatus, setApplicationStatus] = useState('submitted');
+  const statusSourceRef = useRef(null);
 
   useEffect(() => {
     setDemoSessionId(getDemoSessionId());
   }, []);
+
+  useEffect(() => {
+    if (!applicationId) return;
+    const source = apiSSE(
+      `/applications/${applicationId}/status`,
+      (data) => { if (data.status) setApplicationStatus(data.status); },
+      () => {}
+    );
+    statusSourceRef.current = source;
+    return () => { if (statusSourceRef.current) statusSourceRef.current.close(); };
+  }, [applicationId]);
 
   const handleBorrowerSelect = useCallback((profile) => {
     setBorrowerProfile(profile);
@@ -210,9 +223,9 @@ export default function BorrowerPortal() {
   if (phase === 'tracking') {
     return (
       <div style={{ display: 'flex', height: 'calc(100vh - 52px)', background: 'var(--bg-void)' }}>
-        <StatusPane applicationId={applicationId} applicationData={borrowerProfile} />
+        <StatusTracker applicationId={applicationId} applicationData={borrowerProfile} />
         <DocumentContext applicationId={applicationId} />
-        <ApplicationAgent applicationId={applicationId} />
+        <ApplicationAgent applicationId={applicationId} applicationStatus={applicationStatus} />
         <NotificationToast toasts={toasts} onDismiss={removeToast} />
       </div>
     );

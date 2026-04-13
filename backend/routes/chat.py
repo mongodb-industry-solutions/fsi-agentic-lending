@@ -10,8 +10,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from db.mdb import get_db
-from agents.application_agent import chat as agent_chat, chat_stream as agent_chat_stream
-from agents.app_agent_prompts import SAFETY_PATTERNS
+from agents.application_agent import chat as agent_chat, chat_stream as agent_chat_stream, _safety_filter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
@@ -95,7 +94,6 @@ async def send_message(application_id: str, req: ChatMessageRequest):
 @router.post("/chat/{application_id}/message/stream")
 async def send_message_stream(application_id: str, req: ChatMessageRequest):
     """Stream a response from the application agent token by token via SSE."""
-    import re
     db = get_db()
 
     from pymongo import ReturnDocument
@@ -141,19 +139,7 @@ async def send_message_stream(application_id: str, req: ChatMessageRequest):
         await task
 
         full_response = "".join(accumulated)
-
-        # Apply safety filter to the full assembled response
-        filtered = full_response
-        for pattern in SAFETY_PATTERNS:
-            if re.search(pattern, filtered, re.IGNORECASE):
-                filtered = (
-                    "I can help you with information about your application process, "
-                    "document requirements, and general lending policies. "
-                    "What would you like to know?"
-                )
-                break
-        if "internal_context" in filtered.lower():
-            filtered = "I can help you with your application. What would you like to know?"
+        filtered = _safety_filter(full_response)
 
         now = datetime.now(timezone.utc)
 

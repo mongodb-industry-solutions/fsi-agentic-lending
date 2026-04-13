@@ -85,6 +85,26 @@ function ActiveCard({ profile, onClick }) {
         <DetailRow label="Co-Applicant" value={profile.coApplicantName} />
       </div>
 
+      {/* Key stats strip */}
+      <div style={{
+        display: 'flex', gap: spacing[3],
+        marginTop: spacing[3], paddingTop: spacing[3],
+        borderTop: '1px solid var(--border-dim)',
+      }}>
+        <StatBadge
+          label="Combined Income"
+          value={`$${(Number(profile.annualIncome) + Number(profile.coApplicantIncome)).toLocaleString('en-US')}`}
+        />
+        <StatBadge
+          label="LTV"
+          value={`${Math.round(((Number(profile.loanAmount) - Number(profile.downPayment)) / Number(profile.loanAmount)) * 100)}%`}
+        />
+        <StatBadge
+          label="Credit Score"
+          value={profile.creditScore}
+        />
+      </div>
+
       {/* Select indicator */}
       <div style={{
         marginTop: spacing[4],
@@ -99,6 +119,25 @@ function ActiveCard({ profile, onClick }) {
         Select Profile
       </div>
     </button>
+  );
+}
+
+function StatBadge({ label, value }) {
+  return (
+    <div style={{ flex: 1, textAlign: 'center' }}>
+      <div style={{
+        fontSize: 8, fontWeight: 700, textTransform: 'uppercase',
+        letterSpacing: '0.05em', color: 'var(--text-dim)', marginBottom: 2,
+      }}>
+        {label}
+      </div>
+      <div style={{
+        fontFamily: 'var(--font-mono)', fontSize: 13,
+        fontWeight: 700, color: 'var(--mongo)',
+      }}>
+        {value}
+      </div>
+    </div>
   );
 }
 
@@ -127,26 +166,60 @@ function DetailRow({ label, value, mono = false }) {
   );
 }
 
-function PlaceholderCard() {
+const DEMO_STEPS = [
+  { icon: '1', label: 'Document Verification', desc: 'AI verifies tax notices, bank statements, and pay stubs — resolving issues automatically' },
+  { icon: '2', label: 'Credit & Income Analysis', desc: 'Automated credit pulls, income reconciliation, and discrepancy resolution' },
+  { icon: '3', label: 'Underwriting', desc: 'Risk scoring, GDS/TDS calculation, OSFI B-20 stress test, and AI-driven corrections' },
+  { icon: '4', label: 'Officer Review', desc: 'Human-in-the-loop review of AI decisions with full intervention history' },
+];
+
+function DemoFlowCard() {
   return (
     <div style={{
       flex: 1,
       minWidth: 260,
+      maxWidth: 420,
       padding: spacing[5],
       borderRadius: 8,
-      border: '2px dashed var(--border-dim)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: 240,
+      border: '1px solid var(--border-dim)',
+      background: 'var(--bg-surface)',
     }}>
       <div style={{
-        fontFamily: 'var(--font-display)',
-        fontWeight: 600,
-        fontSize: 13,
-        color: 'var(--text-dim)',
+        fontFamily: 'var(--font-display)', fontWeight: 700,
+        fontSize: 14, color: 'var(--text-primary)', marginBottom: 4,
       }}>
-        Coming Soon
+        What this demo covers
+      </div>
+      <div style={{
+        fontSize: 11, color: 'var(--text-secondary)',
+        lineHeight: 1.5, marginBottom: spacing[4],
+      }}>
+        A complete AI-assisted mortgage application powered by MongoDB and multi-agent AI.
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[3] }}>
+        {DEMO_STEPS.map((step) => (
+          <div key={step.icon} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <div style={{
+              width: 22, height: 22, borderRadius: '50%',
+              background: 'var(--mongo-dim)', color: 'var(--mongo)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 1,
+            }}>
+              {step.icon}
+            </div>
+            <div>
+              <div style={{
+                fontFamily: 'var(--font-display)', fontWeight: 600,
+                fontSize: 12, color: 'var(--text-primary)', marginBottom: 1,
+              }}>
+                {step.label}
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>
+                {step.desc}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -194,8 +267,7 @@ export default function BorrowerSelection({ onSelect }) {
         {BORROWER_PROFILES.map((profile) => (
           <ActiveCard key={profile.id} profile={profile} onClick={onSelect} />
         ))}
-        <PlaceholderCard />
-        <PlaceholderCard />
+        <DemoFlowCard />
       </div>
     </div>
   );

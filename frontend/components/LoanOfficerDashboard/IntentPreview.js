@@ -75,18 +75,28 @@ export default function IntentPreview({ applicationId, onProceed, onManual }) {
     if (!applicationId) return;
     apiGet(`/applications/${applicationId}`).then((app) => {
       if (app) {
-        setLivePlan([
-          { label: 'Document Verification', tool: 'voyage-multimodal-3.5', est: '~480ms', status: app.status === 'submitted' ? 'pending' : 'complete' },
-          { label: 'Credit Bureau Pull', tool: 'Equifax API', est: '~120ms', status: app.credit_reports?.length > 0 ? 'complete' : 'pending' },
-          { label: 'Risk Scoring', tool: 'db.riskScores.aggregate()', est: '~18ms', status: app.status === 'underwriting' || app.status === 'review' ? 'complete' : 'pending' },
-          { label: 'Policy Compliance', tool: 'Atlas Vector Search', est: '~12ms', status: app.status === 'review' ? 'complete' : 'pending' },
-          { label: 'Decision', tool: 'LangGraph interrupt()', est: '—', status: app.status === 'approved' || app.status === 'declined' ? 'complete' : 'pending' },
-        ]);
+        const s = app.status || 'submitted';
+        const hasDocs = s !== 'submitted';
+        const hasCredit = app.credit_reports?.length > 0;
+        const hasRisk = s === 'underwriting' || s === 'review' || s === 'approved' || s === 'declined';
+        const hasPolicy = s === 'review' || s === 'approved' || s === 'declined';
+        const statusMap = {
+          docVerify: hasDocs ? 'complete' : 'pending',
+          creditPull: hasCredit ? 'complete' : 'pending',
+          bankingEnrich: hasDocs ? 'complete' : 'pending',
+          riskScore: hasRisk ? 'complete' : 'pending',
+          policyRag: hasPolicy ? 'complete' : 'pending',
+          fraudScan: hasPolicy ? 'complete' : 'pending',
+        };
+        setLivePlan(statusMap);
       }
     });
   }, [applicationId]);
 
-  const planSteps = livePlan || PLAN_STEPS;
+  const planSteps = PLAN_STEPS.map((step) => ({
+    ...step,
+    status: livePlan?.[step.id] || null,
+  }));
 
   const [settings, setSettings] = useState(() => {
     const s = {};

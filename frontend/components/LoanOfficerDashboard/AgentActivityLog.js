@@ -113,24 +113,28 @@ export default function AgentActivityLog({ onEvent, applicationId }) {
   }, [entries, activeFilter, searchQuery]);
 
   const costSummary = useMemo(() => {
-    let totalTokens = 0;
-    let totalLatencyMs = 0;
     let llmCalls = 0;
     let apiCalls = 0;
     let sysCalls = 0;
     entries.forEach((e) => {
-      if (e.details) {
-        totalTokens += e.details.tokens || 0;
-        const model = e.details.model || '';
-        if (model.startsWith('gpt') || model.startsWith('voyage')) llmCalls++;
-        else if (model.includes('API')) apiCalls++;
-        else sysCalls++;
-      }
-      const ms = parseInt(e.latency, 10);
-      if (!isNaN(ms)) totalLatencyMs += ms;
+      const agent = (e.agent || '').toLowerCase();
+      if (agent.includes('underwrit') || agent.includes('supervisor') || agent.includes('loan_app')) llmCalls++;
+      else if (agent.includes('hitl') || agent.includes('gate')) apiCalls++;
+      else sysCalls++;
     });
-    const costUsd = (totalTokens / 1_000_000) * 8.5;
-    return { totalTokens, totalLatencyMs, costUsd, llmCalls, apiCalls, sysCalls };
+
+    let totalTimeMs = 0;
+    if (entries.length >= 2) {
+      const times = entries.map(e => {
+        const t = e.time;
+        return t ? new Date(`1970-01-01T${t}`).getTime() : 0;
+      }).filter(t => t > 0);
+      if (times.length >= 2) {
+        totalTimeMs = Math.max(...times) - Math.min(...times);
+      }
+    }
+
+    return { totalTimeMs, llmCalls, apiCalls, sysCalls, totalEntries: entries.length };
   }, [entries]);
 
   return (
@@ -369,7 +373,7 @@ export default function AgentActivityLog({ onEvent, applicationId }) {
         )}
       </div>
 
-      {/* Cost summary footer */}
+      {/* Activity summary footer */}
       {entries.length > 0 && (
         <div style={{
           padding: `${spacing[2]}px ${spacing[3]}px`,
@@ -380,26 +384,28 @@ export default function AgentActivityLog({ onEvent, applicationId }) {
           gap: 6,
         }}>
           <div>
-            <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600 }}>Tokens</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--voyage)' }}>
-              {costSummary.totalTokens.toLocaleString('en-US')}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600 }}>Est. Cost</div>
+            <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600 }}>Actions</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--mongo)' }}>
-              ${costSummary.costUsd.toFixed(4)}
+              {costSummary.totalEntries}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600 }}>Latency</div>
+            <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600 }}>Total Time</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--agent-cyan)' }}>
-              {costSummary.totalLatencyMs}ms
+              {costSummary.totalTimeMs > 0
+                ? costSummary.totalTimeMs < 1000 ? `${costSummary.totalTimeMs}ms` : `${(costSummary.totalTimeMs / 1000).toFixed(1)}s`
+                : '\u2014'}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600 }}>Active</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--success)' }}>
+              {entries.length > 0 && entries[0].isLive ? 'Yes' : 'Done'}
             </div>
           </div>
           <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 10, fontSize: 9, color: 'var(--text-dim)' }}>
             <span><span style={{ fontWeight: 700, color: 'var(--tool-blue)' }}>{costSummary.llmCalls}</span> LLM</span>
-            <span><span style={{ fontWeight: 700, color: 'var(--agent-cyan)' }}>{costSummary.apiCalls}</span> API</span>
+            <span><span style={{ fontWeight: 700, color: 'var(--agent-cyan)' }}>{costSummary.apiCalls}</span> API/Gate</span>
             <span><span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>{costSummary.sysCalls}</span> System</span>
           </div>
         </div>

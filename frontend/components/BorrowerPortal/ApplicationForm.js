@@ -71,7 +71,7 @@ function EditableSection({ title, children }) {
   );
 }
 
-function Field({ label, value, onChange, type = 'text', span2 = false, readOnly = false }) {
+function Field({ label, value, onChange, type = 'text', span2 = false, readOnly = false, error }) {
   const fieldId = `field-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-$/, '')}`;
   return (
     <div style={{ gridColumn: span2 ? 'span 2' : undefined }}>
@@ -83,6 +83,8 @@ function Field({ label, value, onChange, type = 'text', span2 = false, readOnly 
         disabled={readOnly}
         type={type}
         sizeVariant="small"
+        state={error ? 'error' : 'none'}
+        errorMessage={error || undefined}
       />
     </div>
   );
@@ -97,12 +99,27 @@ function formatCurrency(value) {
 export default function ApplicationForm({ onSubmit, borrowerProfile }) {
   const [form, setForm] = useState(borrowerProfile || {});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     if (borrowerProfile) setForm(borrowerProfile);
   }, [borrowerProfile]);
 
-  const handleSubmit = async () => {
+  const validate = () => {
+    const errs = {};
+    const purchasePrice = parseFloat(form.loanAmount);
+    const downPayment = parseFloat(form.downPayment);
+    if (!purchasePrice || purchasePrice <= 0) errs.loanAmount = 'Purchase price is required';
+    if (isNaN(downPayment) || downPayment < 0) errs.downPayment = 'Down payment is required';
+    else if (purchasePrice && downPayment >= purchasePrice) errs.downPayment = 'Must be less than purchase price';
+    return errs;
+  };
+
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    const errs = validate();
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
     setIsSubmitting(true);
     try {
       await onSubmit(form);
@@ -111,7 +128,10 @@ export default function ApplicationForm({ onSubmit, borrowerProfile }) {
     }
   };
 
-  const update = (field) => (value) => setForm((prev) => ({ ...prev, [field]: value }));
+  const update = (field) => (value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors((prev) => { const next = { ...prev }; delete next[field]; return next; });
+  };
 
   const debtRatio = useMemo(() => {
     const purchasePrice = parseFloat(form.loanAmount || 0);
@@ -139,7 +159,7 @@ export default function ApplicationForm({ onSubmit, borrowerProfile }) {
   }, [form.loanAmount, form.downPayment, form.annualIncome, form.coApplicantIncome, form.existingDebt, form.annualPropertyTax]);
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: `${spacing[5]}px ${spacing[6]}px` }}>
+    <form onSubmit={handleFormSubmit} style={{ flex: 1, overflowY: 'auto', padding: `${spacing[5]}px ${spacing[6]}px` }}>
       <div style={{
         fontFamily: 'var(--font-display)', fontWeight: 800,
         fontSize: 20, marginBottom: 4, color: 'var(--text-primary)',
@@ -191,8 +211,8 @@ export default function ApplicationForm({ onSubmit, borrowerProfile }) {
 
       {/* Editable: Loan Details */}
       <EditableSection title="Loan Parameters">
-        <Field label="Purchase Price ($)" value={form.loanAmount} onChange={update('loanAmount')} />
-        <Field label="Down Payment ($)" value={form.downPayment} onChange={update('downPayment')} />
+        <Field label="Purchase Price ($)" value={form.loanAmount} onChange={update('loanAmount')} error={errors.loanAmount} />
+        <Field label="Down Payment ($)" value={form.downPayment} onChange={update('downPayment')} error={errors.downPayment} />
         <Field label="Purpose" value={form.loanPurpose} onChange={update('loanPurpose')} />
         <Field label="Property Type" value={form.propertyType} onChange={update('propertyType')} />
         <Field label="Product Type" value={form.productType} onChange={update('productType')} />
@@ -243,8 +263,7 @@ export default function ApplicationForm({ onSubmit, borrowerProfile }) {
       </EditableSection>
 
       <button
-        type="button"
-        onClick={handleSubmit}
+        type="submit"
         disabled={isSubmitting}
         style={{
           width: '100%', padding: 14,
@@ -274,6 +293,6 @@ export default function ApplicationForm({ onSubmit, borrowerProfile }) {
           Submit Application
         </span>
       </button>
-    </div>
+    </form>
   );
 }

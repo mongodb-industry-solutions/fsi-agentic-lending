@@ -58,6 +58,32 @@ def loan_app_node(state: LendFlowState, **kwargs) -> dict:
     if co_score is not None:
         log_agent_activity(app_id, "loan_app_agent", "credit_pull", f"Co-applicant credit score: {co_score}")
 
+    if not credit_pulled:
+        log_agent_activity(app_id, "loan_app_agent", "credit_gap", "No credit reports found — creating intervention")
+        try:
+            db = get_db()
+            db["interventions"].insert_one({
+                "application_id": app_id,
+                "type": "credit_data_unavailable",
+                "status": "pending",
+                "internal_context": {
+                    "source_node": "loan_app_agent",
+                    "risk_flag": "no_credit_data",
+                    "severity": "advisory",
+                },
+                "borrower_context": {
+                    "summary": "We were unable to retrieve credit bureau data for your application.",
+                    "action_required": "This may delay processing. Please ensure your SIN and personal details are accurate, or contact your credit bureau to confirm your file is accessible.",
+                    "document_types_accepted": ["credit_report"],
+                },
+                "resolution": None,
+                "created_at": datetime.now(timezone.utc),
+                "resolved_at": None,
+            })
+            log_agent_activity(app_id, "loan_app_agent", "intervention", "Created credit_data_unavailable intervention")
+        except Exception as e:
+            logger.warning(f"Failed to create credit data intervention: {e}")
+
     # Get application summary
     app_summary = get_application_summary(app_id)
 

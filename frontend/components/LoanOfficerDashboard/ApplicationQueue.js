@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from 'react';
 import Badge from '@leafygreen-ui/badge';
 import { spacing } from '@leafygreen-ui/tokens';
 
@@ -32,8 +33,27 @@ const STATUS_COLORS = {
   active: 'var(--mongo)',
 };
 
+const FILTERS = [
+  { key: 'all', label: 'All' },
+  { key: 'review', label: 'Pending Review' },
+  { key: 'processing', label: 'Processing' },
+  { key: 'completed', label: 'Completed' },
+];
+
+const SORT_OPTIONS = [
+  { key: 'newest', label: 'Newest First' },
+  { key: 'attention', label: 'Needs Attention' },
+];
+
+function isReviewStatus(s) { return s === 'review' || s === 'pending_review'; }
+function isProcessingStatus(s) { return s === 'processing' || s === 'underwriting' || s === 'submitted'; }
+function isCompletedStatus(s) { return s === 'approved' || s === 'declined' || s === 'funded' || s === 'active'; }
+
 export default function ApplicationQueue({ selectedId, onSelect, applications = [] }) {
-  const formatted = applications.map(app => ({
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('newest');
+
+  const formatted = useMemo(() => applications.map(app => ({
     id: app.application_id || app.id,
     name: app.borrower_names?.join(' & ') || app.name || 'Unknown',
     amount: typeof app.loan_amount === 'number' ? `$${app.loan_amount.toLocaleString('en-US')}` : (app.amount || ''),
@@ -44,7 +64,29 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
     score: app.risk_score ?? app.score ?? null,
     tier: app.risk_tier ?? app.tier ?? null,
     submitted: app.created_at ? new Date(app.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
-  }));
+    createdAt: app.created_at ? new Date(app.created_at).getTime() : 0,
+  })), [applications]);
+
+  const reviewCount = useMemo(() => formatted.filter((a) => isReviewStatus(a.status)).length, [formatted]);
+
+  const filteredSorted = useMemo(() => {
+    let list = formatted;
+    if (activeFilter === 'review') list = list.filter((a) => isReviewStatus(a.status));
+    else if (activeFilter === 'processing') list = list.filter((a) => isProcessingStatus(a.status));
+    else if (activeFilter === 'completed') list = list.filter((a) => isCompletedStatus(a.status));
+
+    if (sortBy === 'attention') {
+      list = [...list].sort((a, b) => {
+        const aPri = isReviewStatus(a.status) ? 0 : isProcessingStatus(a.status) ? 1 : 2;
+        const bPri = isReviewStatus(b.status) ? 0 : isProcessingStatus(b.status) ? 1 : 2;
+        if (aPri !== bPri) return aPri - bPri;
+        return (a.score ?? 999) - (b.score ?? 999);
+      });
+    } else {
+      list = [...list].sort((a, b) => b.createdAt - a.createdAt);
+    }
+    return list;
+  }, [formatted, activeFilter, sortBy]);
 
   return (
     <div style={{
@@ -63,7 +105,7 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
           Application Queue
         </div>
         <div style={{ fontSize: 10, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
-          {formatted.length} application{formatted.length !== 1 ? 's' : ''} · {formatted.filter((a) => a.status === 'review' || a.status === 'pending_review').length} pending review
+          {formatted.length} application{formatted.length !== 1 ? 's' : ''}
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
             padding: '2px 6px', borderRadius: 8,
@@ -74,10 +116,54 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
             Change Streams
           </span>
         </div>
+
+        {/* Filter chips */}
+        <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
+          {FILTERS.map((f) => {
+            const isActive = activeFilter === f.key;
+            const count = f.key === 'review' ? reviewCount : null;
+            return (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setActiveFilter(f.key)}
+                style={{
+                  all: 'unset', cursor: 'pointer',
+                  padding: '3px 8px', borderRadius: 10,
+                  fontSize: 9, fontWeight: 600,
+                  background: isActive ? (f.key === 'review' ? 'var(--hitl-amber-dim)' : 'var(--mongo-dim)') : 'var(--bg-raised)',
+                  color: isActive ? (f.key === 'review' ? 'var(--hitl-amber)' : 'var(--mongo)') : 'var(--text-dim)',
+                  border: `1px solid ${isActive ? (f.key === 'review' ? 'var(--hitl-amber)' : 'var(--mongo)') : 'var(--border-dim)'}`,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {f.label}{count != null ? ` (${count})` : ''}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Sort toggle */}
+        <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+          {SORT_OPTIONS.map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => setSortBy(s.key)}
+              style={{
+                all: 'unset', cursor: 'pointer',
+                fontSize: 9, color: sortBy === s.key ? 'var(--mongo)' : 'var(--text-dim)',
+                fontWeight: sortBy === s.key ? 700 : 400,
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        {formatted.length === 0 && (
+        {filteredSorted.length === 0 && (
           <div style={{
             margin: spacing[3], padding: spacing[4], textAlign: 'center',
             border: '2px dashed var(--border-dim)', borderRadius: 8,
@@ -92,15 +178,16 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
               color: 'var(--text-dim)', opacity: 0.5,
             }}>0</div>
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>
-              No applications yet
+              {activeFilter === 'all' ? 'No applications yet' : 'No matching applications'}
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-              Submit one from the Borrower Portal.
+              {activeFilter === 'all' ? 'Submit one from the Borrower Portal.' : 'Try a different filter.'}
             </div>
           </div>
         )}
-        {formatted.map((app) => {
+        {filteredSorted.map((app) => {
           const isSelected = app.id === selectedId;
+          const needsReview = isReviewStatus(app.status);
           return (
             <button
               key={app.id}
@@ -112,7 +199,8 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
                 width: '100%',
                 padding: '10px 16px',
                 borderBottom: '1px solid var(--border-dim)',
-                background: isSelected ? 'var(--mongo-dim)' : 'transparent',
+                borderLeft: needsReview ? '3px solid var(--hitl-amber)' : '3px solid transparent',
+                background: isSelected ? 'var(--mongo-dim)' : needsReview ? 'rgba(255, 180, 0, 0.04)' : 'transparent',
                 cursor: 'pointer',
                 boxSizing: 'border-box',
                 transition: 'background 0.15s',

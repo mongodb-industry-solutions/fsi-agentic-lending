@@ -67,6 +67,31 @@ def underwriter_node(state: LendFlowState, **kwargs) -> dict:
     # Calculate GDS/TDS ratios
     if combined_income <= 0:
         log_agent_activity(app_id, "underwriter", "error", "Combined gross income is zero or missing — cannot calculate ratios")
+        try:
+            db = get_db()
+            db["interventions"].insert_one({
+                "application_id": app_id,
+                "type": "income_data_required",
+                "status": "pending",
+                "internal_context": {
+                    "source_node": "underwriter",
+                    "risk_flag": "zero_income",
+                    "severity": "blocking",
+                    "combined_income": combined_income,
+                },
+                "borrower_context": {
+                    "summary": "We could not verify your income information.",
+                    "action_required": "Please ensure your employment letter, pay stubs, and tax notices are uploaded and contain accurate income figures.",
+                    "document_types_accepted": ["employment_letter", "paystubs", "income_tax"],
+                },
+                "resolution": None,
+                "created_at": datetime.now(timezone.utc),
+                "resolved_at": None,
+            })
+            log_agent_activity(app_id, "underwriter", "intervention", "Created income_data_required intervention")
+        except Exception as e:
+            logger.warning(f"Failed to create income intervention: {e}")
+        update_application_status(app_id, "declined", "Declined: income data is zero or missing")
         return {
             "gds_ratio": None,
             "tds_ratio": None,
@@ -159,6 +184,29 @@ def underwriter_node(state: LendFlowState, **kwargs) -> dict:
 
     if primary_score is None:
         log_agent_activity(app_id, "underwriter", "error", "Primary credit score unavailable — cannot underwrite")
+        try:
+            db = get_db()
+            db["interventions"].insert_one({
+                "application_id": app_id,
+                "type": "credit_score_required",
+                "status": "pending",
+                "internal_context": {
+                    "source_node": "underwriter",
+                    "risk_flag": "missing_primary_credit",
+                    "severity": "blocking",
+                },
+                "borrower_context": {
+                    "summary": "We were unable to retrieve your credit score from the credit bureau.",
+                    "action_required": "Please verify that your credit bureau authorization is on file and that your personal information (name, SIN, address) matches your credit bureau records exactly.",
+                    "document_types_accepted": ["credit_report"],
+                },
+                "resolution": None,
+                "created_at": datetime.now(timezone.utc),
+                "resolved_at": None,
+            })
+            log_agent_activity(app_id, "underwriter", "intervention", "Created credit_score_required intervention")
+        except Exception as e:
+            logger.warning(f"Failed to create credit score intervention: {e}")
         update_application_status(app_id, "declined", "Declined: primary credit score unavailable")
         return {
             "risk_score": 100.0,
@@ -249,6 +297,34 @@ Risk Tier: {risk_tier}
         decision = "decline"
         decision_reasoning = f"OSFI B-20 stress test failure: Stress GDS {stress_gds:.1%} (limit 39%), Stress TDS {stress_tds:.1%} (limit 44%)"
         log_agent_activity(app_id, "underwriter", "decision", decision_reasoning)
+        try:
+            db = get_db()
+            db["interventions"].insert_one({
+                "application_id": app_id,
+                "type": "stress_test_failure",
+                "status": "pending",
+                "internal_context": {
+                    "source_node": "underwriter",
+                    "risk_flag": "osfi_b20_failure",
+                    "severity": "blocking",
+                    "stress_gds": round(stress_gds, 4),
+                    "stress_tds": round(stress_tds, 4),
+                    "stress_rate": round(stress_rate, 4),
+                    "gds_limit": 0.39,
+                    "tds_limit": 0.44,
+                },
+                "borrower_context": {
+                    "summary": f"Your application did not pass the OSFI B-20 mortgage stress test at the qualifying rate of {stress_rate:.2%}.",
+                    "action_required": "The stress test ensures you can afford payments if rates rise. You may improve your result by increasing your down payment, reducing existing debts, or choosing a less expensive property.",
+                    "document_types_accepted": [],
+                },
+                "resolution": None,
+                "created_at": datetime.now(timezone.utc),
+                "resolved_at": None,
+            })
+            log_agent_activity(app_id, "underwriter", "intervention", "Created stress_test_failure intervention")
+        except Exception as e:
+            logger.warning(f"Failed to create stress test intervention: {e}")
         update_application_status(app_id, "declined", decision_reasoning)
         return {
             "gds_ratio": round(gds, 4),
