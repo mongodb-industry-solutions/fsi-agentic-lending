@@ -4,7 +4,16 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { apiPost, apiGet } from '../../lib/api';
 import { API_BASE, createWelcomeMessage } from './chatConstants';
 
-export function useApplicationChat(applicationId) {
+const STATUS_CHANGE_MESSAGES = {
+  processing: 'Your documents are now being verified by our AI agents.',
+  underwriting: 'Document verification complete \u2014 underwriting has begun.',
+  review: 'Your application is now under officer review.',
+  approved: '\u2705 Your application has been approved!',
+  declined: 'Your application decision is ready.',
+  closing: 'Your application is moving to the closing stage.',
+};
+
+export function useApplicationChat(applicationId, applicationStatus) {
   const [messages, setMessages] = useState(() => [createWelcomeMessage()]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,6 +27,7 @@ export function useApplicationChat(applicationId) {
   const abortRef = useRef(null);
   const toolsRef = useRef([]);
   const citationsRef = useRef([]);
+  const uiComponentsRef = useRef([]);
 
   useEffect(() => {
     if (!applicationId) return;
@@ -64,6 +74,21 @@ export function useApplicationChat(applicationId) {
     setResolvingId(null);
   }, [applicationId]);
 
+  // Proactive system messages on status changes
+  const prevStatusRef = useRef(null);
+  useEffect(() => {
+    if (!applicationId) return;
+    if (prevStatusRef.current && prevStatusRef.current !== applicationStatus) {
+      const msg = STATUS_CHANGE_MESSAGES[applicationStatus];
+      if (msg) {
+        setMessages(prev => [...prev, {
+          role: 'system', content: msg, timestamp: new Date().toISOString(),
+        }]);
+      }
+    }
+    prevStatusRef.current = applicationStatus;
+  }, [applicationStatus, applicationId]);
+
   // Abort any in-flight streaming fetch on unmount
   useEffect(() => {
     return () => {
@@ -98,6 +123,7 @@ export function useApplicationChat(applicationId) {
     setActiveTools([]);
     toolsRef.current = [];
     citationsRef.current = [];
+    uiComponentsRef.current = [];
 
     if (applicationId) {
       try {
@@ -134,6 +160,13 @@ export function useApplicationChat(applicationId) {
               if (payload.type === 'tool_call') {
                 toolsRef.current = [...toolsRef.current, payload];
                 setActiveTools([...toolsRef.current]);
+              } else if (payload.type === 'ui_component') {
+                uiComponentsRef.current = [...uiComponentsRef.current, {
+                  component: payload.component,
+                  data: payload.data,
+                  id: payload.id,
+                  status: payload.status || 'ready',
+                }];
               } else if (payload.type === 'token') {
                 accumulated += payload.content;
                 setStreamingContent(accumulated);
@@ -148,6 +181,7 @@ export function useApplicationChat(applicationId) {
                   timestamp: payload.timestamp,
                   toolsMeta: toolsRef.current.length > 0 ? toolsRef.current : undefined,
                   citations: citationsRef.current.length > 0 ? citationsRef.current : undefined,
+                  uiComponents: uiComponentsRef.current.length > 0 ? uiComponentsRef.current : undefined,
                 }]);
                 setStreamingContent('');
                 setActiveTools([]);
@@ -163,6 +197,7 @@ export function useApplicationChat(applicationId) {
             timestamp: new Date().toISOString(),
             toolsMeta: toolsRef.current.length > 0 ? toolsRef.current : undefined,
             citations: citationsRef.current.length > 0 ? citationsRef.current : undefined,
+            uiComponents: uiComponentsRef.current.length > 0 ? uiComponentsRef.current : undefined,
           }]);
         }
       } catch (err) {

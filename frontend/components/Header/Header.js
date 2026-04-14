@@ -73,34 +73,26 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: spacing[3] }}>
-        <div
-          style={{
-            width: 30,
-            height: 30,
-            borderRadius: "var(--radius-sm)",
-            background: `linear-gradient(135deg, ${palette.green.dark1} 0%, ${palette.green.base} 100%)`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontFamily: "var(--font-display)",
-            fontWeight: 800,
-            fontSize: 15,
-            color: "#fff",
-            position: "relative",
-            overflow: "hidden",
-          }}
+        <svg
+          width="28"
+          height="28"
+          viewBox="0 0 256 549"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-label="MongoDB"
+          role="img"
+          style={{ flexShrink: 0 }}
         >
-          L
-          <span
-            style={{
-              position: "absolute",
-              inset: 0,
-              background:
-                "linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.25) 50%, transparent 70%)",
-              animation: "logoShine 4s infinite",
-            }}
+          <path
+            d="M175.622 61.108C152.612 33.807 132.797 6.078 128.749.32a1.03 1.03 0 0 0-1.497 0c-4.048 5.758-23.863 33.487-46.873 60.788C-1.588 155.473-5.14 232.443 22.46 306.678c15.097 40.602 40.244 76.294 73.6 104.399 2.206 1.858 3.578 4.545 3.997 7.32l5.157 74.603h46.573l5.157-74.603c.42-2.775 1.791-5.462 3.997-7.32 33.357-28.105 58.503-63.797 73.6-104.399C262.14 232.443 258.588 155.473 175.622 61.108z"
+            fill={palette.green.base}
           />
-        </div>
+          <path
+            d="M137.092 468.251l-8.376-1.168s1.169-48.728-16.012-52.262c-11.514-11.859 1.683-503.39 48.728 0-3.348 7.404-15.876 12.449-19.31 22.126-3.434 9.677-5.03 31.304-5.03 31.304z"
+            fill="#fff"
+            fillOpacity="0.25"
+          />
+        </svg>
         <span
           style={{
             fontFamily: "var(--font-display)",
@@ -164,6 +156,26 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
       </nav>
 
       <div style={{ display: "flex", alignItems: "center", gap: spacing[3] }}>
+        {!compact && (
+          <div
+            aria-hidden="true"
+            style={{
+              padding: `${spacing[1]}px ${spacing[3]}px`,
+              borderRadius: "var(--radius-xl)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(255,255,255,0.06)",
+              fontFamily: "var(--font-display)",
+              fontSize: 10,
+              fontWeight: 500,
+              color: "rgba(255,255,255,0.5)",
+              letterSpacing: 0.2,
+              whiteSpace: "nowrap",
+              userSelect: "none",
+            }}
+          >
+            Built on <span style={{ color: palette.green.base, fontWeight: 600 }}>MongoDB Atlas</span>
+          </div>
+        )}
         {hasSession && (
           <button
             type="button"

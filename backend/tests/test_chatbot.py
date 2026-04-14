@@ -50,7 +50,7 @@ class TestBuildContext:
     @patch("agents.chatbot.agent.get_pending_interventions", return_value=[])
     @patch("agents.chatbot.agent.search_policies_borrower", return_value=[{"title": "Policy A", "content": "GDS must be < 39%", "section": "3.1"}])
     def test_policy_keywords_trigger_search(self, mock_search, *_):
-        ctx, meta = _build_context(self._make_state("What documents do I need?"))
+        ctx, meta, _ui = _build_context(self._make_state("What documents do I need?"))
         assert any(m["tool"] == "policy_search" for m in meta)
         mock_search.assert_called_once()
 
@@ -58,12 +58,12 @@ class TestBuildContext:
     @patch("agents.chatbot.agent.get_application_documents_summary", return_value=[])
     @patch("agents.chatbot.agent.get_pending_interventions", return_value=[])
     def test_status_keywords_trigger_lookup(self, *_):
-        ctx, meta = _build_context(self._make_state("What is my status?"))
+        ctx, meta, _ui = _build_context(self._make_state("What is my status?"))
         assert "STATUS" in ctx.upper()
 
     @patch("agents.chatbot.agent.get_application_status_filtered", return_value={"error": "not found"})
     @patch("agents.chatbot.agent.get_application_documents_summary", return_value=[])
     @patch("agents.chatbot.agent.get_pending_interventions", return_value=[])
     def test_no_crash_on_missing_app(self, *_):
-        ctx, meta = _build_context(self._make_state("hello"))
+        ctx, meta, _ui = _build_context(self._make_state("hello"))
         assert isinstance(ctx, str)

@@ -240,3 +240,4 @@ frontend/next-env.d.ts
 *.pem
 .DS_Store
 CLAUDE.md
+/backend/.next

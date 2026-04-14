@@ -1,14 +1,72 @@
 "use client";
 
 import { spacing } from '@leafygreen-ui/tokens';
-import { getContextualSuggestions } from './chatConstants';
+import { getContextualSuggestions, getVisibleQuickActions } from './chatConstants';
 import { MessageBubble, StreamingBubble, TypingIndicator, ContextGathering } from './ChatBubbles';
 import { InterventionCard } from './InterventionCard';
 import { SuggestedQuestions } from './SuggestedQuestions';
 import { useApplicationChat } from './useApplicationChat';
 import { useEffect, useRef } from 'react';
+import { formatCurrency } from './generative/utils';
 
-export default function ApplicationAgent({ applicationId, applicationStatus, onToolActivity }) {
+function ContextStrip({ applicationId, applicationStatus, borrowerProfile, loading }) {
+  if (!applicationId) return null;
+  const name = borrowerProfile?.firstName
+    ? `${borrowerProfile.firstName} ${borrowerProfile.lastName || ''}`
+    : null;
+  const loanAmount = borrowerProfile?.loanAmount
+    ? formatCurrency(parseFloat(borrowerProfile.loanAmount) - parseFloat(borrowerProfile.downPayment || 0))
+    : null;
+
+  const statusColors = {
+    submitted: 'var(--text-dim)',
+    processing: 'var(--agent-cyan)',
+    underwriting: 'var(--voyage)',
+    review: 'var(--hitl-amber)',
+    approved: 'var(--success)',
+    declined: 'var(--danger)',
+    closing: 'var(--success)',
+  };
+  const statusColor = statusColors[applicationStatus] || 'var(--text-dim)';
+
+  return (
+    <div style={{
+      padding: '4px 16px',
+      borderBottom: '1px solid var(--border-dim)',
+      display: 'flex', alignItems: 'center', gap: 8,
+      fontSize: 10, color: 'var(--text-dim)',
+      background: 'var(--bg-surface)',
+      flexShrink: 0,
+    }}>
+      {/* Pulsing dot */}
+      <div style={{
+        width: 6, height: 6, borderRadius: '50%',
+        background: loading ? 'var(--agent-cyan)' : statusColor,
+        animation: loading ? 'pulse 1.5s infinite' : 'none',
+        flexShrink: 0,
+      }} />
+      {name && <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{name}</span>}
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9 }}>
+        {applicationId.length > 16 ? applicationId.slice(0, 16) + '...' : applicationId}
+      </span>
+      {loanAmount && (
+        <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}>
+          <span style={{ fontSize: 7, color: 'var(--text-dim)', fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>Mortgage</span>
+          {loanAmount}
+        </span>
+      )}
+      <span style={{
+        fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
+        background: `${statusColor}18`, color: statusColor,
+        textTransform: 'uppercase', fontFamily: 'var(--font-display)',
+      }}>
+        {applicationStatus || 'pending'}
+      </span>
+    </div>
+  );
+}
+
+export default function ApplicationAgent({ applicationId, applicationStatus, onToolActivity, borrowerProfile }) {
   const {
     messages,
     input, setInput,
@@ -23,7 +81,7 @@ export default function ApplicationAgent({ applicationId, applicationStatus, onT
     clearChat,
     resolveIntervention,
     canSend,
-  } = useApplicationChat(applicationId);
+  } = useApplicationChat(applicationId, applicationStatus);
 
   // Report tool activity to parent for TechnologyTheatre
   const toolHistoryRef = useRef([]);
@@ -56,19 +114,28 @@ export default function ApplicationAgent({ applicationId, applicationStatus, onT
       {/* Header */}
       <div style={{
         padding: `${spacing[3]}px ${spacing[4]}px`,
-        borderBottom: '1px solid var(--border-dim)',
+        borderBottom: applicationId ? 'none' : '1px solid var(--border-dim)',
         display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', flexShrink: 0,
       }}>
-        <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{
-            fontFamily: 'var(--font-display)', fontWeight: 700,
-            fontSize: 14, color: 'var(--text-primary)',
+            width: 24, height: 24, borderRadius: '50%',
+            background: 'var(--mongo)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
-            LendFlow Assistant
+            <span style={{ fontSize: 10, color: '#fff', fontWeight: 800, fontFamily: 'var(--font-display)' }}>AI</span>
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>
-            AI-powered application support
+          <div>
+            <div style={{
+              fontFamily: 'var(--font-display)', fontWeight: 700,
+              fontSize: 14, color: 'var(--text-primary)',
+            }}>
+              LendFlow Assistant
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>
+              AI-powered application support
+            </div>
           </div>
         </div>
         <button
@@ -90,6 +157,14 @@ export default function ApplicationAgent({ applicationId, applicationStatus, onT
           Clear
         </button>
       </div>
+
+      {/* Context Strip */}
+      <ContextStrip
+        applicationId={applicationId}
+        applicationStatus={applicationStatus}
+        borrowerProfile={borrowerProfile}
+        loading={loading}
+      />
 
       {/* Messages area */}
       <div style={{
@@ -131,6 +206,41 @@ export default function ApplicationAgent({ applicationId, applicationStatus, onT
         {loading && !streamingContent && activeTools.length === 0 && <TypingIndicator />}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Quick Actions */}
+      {applicationId && !loading && (
+        <div style={{
+          padding: `4px ${spacing[4]}px 0`,
+          display: 'flex', gap: 4, flexWrap: 'wrap', flexShrink: 0,
+        }}>
+          {getVisibleQuickActions(applicationStatus).map(qa => (
+            <button
+              key={qa.label} type="button"
+              onClick={() => sendMessage(qa.message)}
+              style={{
+                padding: '3px 8px', borderRadius: 12, fontSize: 9, fontWeight: 600,
+                fontFamily: 'var(--font-display)', cursor: 'pointer',
+                border: '1px solid var(--border-dim)', background: 'var(--bg-surface)',
+                color: 'var(--text-secondary)', transition: 'all 150ms ease',
+                display: 'flex', alignItems: 'center', gap: 3,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--mongo)';
+                e.currentTarget.style.color = 'var(--mongo)';
+                e.currentTarget.style.background = 'var(--mongo-dim)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-dim)';
+                e.currentTarget.style.color = 'var(--text-secondary)';
+                e.currentTarget.style.background = 'var(--bg-surface)';
+              }}
+            >
+              <span style={{ fontSize: 11 }}>{qa.icon}</span>
+              {qa.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Input area */}
       <div style={{

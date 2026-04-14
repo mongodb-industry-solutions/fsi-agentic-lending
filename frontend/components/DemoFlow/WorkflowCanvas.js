@@ -203,6 +203,18 @@ function drawCylinder(ctx, x, y, w, h) {
   ctx.closePath();
 }
 
+function drawShapePath(ctx, nodeType, cx, cy, hw, hh) {
+  if (nodeType === NODE_TYPES.gate) {
+    drawDiamond(ctx, cx, cy, hw + 3, hh + 3);
+  } else if (nodeType === NODE_TYPES.storage) {
+    drawCylinder(ctx, cx - hw, cy - hh, hw * 2, hh * 2);
+  } else if (nodeType === NODE_TYPES.tool) {
+    drawPill(ctx, cx - hw, cy - hh, hw * 2, hh * 2);
+  } else {
+    ctx.roundRect(cx - hw, cy - hh, hw * 2, hh * 2, 10);
+  }
+}
+
 function hitTest(mx, my, nodePositions) {
   for (const [id, pos] of Object.entries(nodePositions)) {
     const n = NODES[id];
@@ -216,6 +228,33 @@ function hitTest(mx, my, nodePositions) {
   return null;
 }
 
+const NODE_TECH = {
+  supervisor: 'LangGraph Orchestrator',
+  appAgent: 'LangGraph Agent Node',
+  underwriter: 'LangGraph Agent Node',
+  creditAPI: 'Experian API (Simulated)',
+  voyageEmbed: 'Voyage AI Multimodal',
+  vectorSearch: 'Atlas Vector Search',
+  graphLookup: 'MongoDB $graphLookup',
+  aggregation: 'MongoDB Agg Pipeline',
+  hitlGate: 'LangGraph interrupt()',
+  checkpoint: 'MongoDBSaver Checkpoint',
+  memory: 'LangGraph MemoryStore',
+  mongoAtlas: 'MongoDB Atlas',
+  changeStream: 'MongoDB Change Streams',
+  timeSeries: 'MongoDB Time Series',
+  decision: 'LangGraph State Machine',
+  closingEngine: 'Document Generation',
+  eSign: 'Digital Signature Service',
+  fundingEngine: 'Payment Disbursement',
+  ledger: 'MongoDB Transactions',
+  servicingAgent: 'LangGraph Agent Node',
+  modificationOffer: 'Modification Generator',
+};
+
+// Pipeline nodes downstream of HITL gate (excludes infrastructure nodes like changeStream/timeSeries)
+const DOWNSTREAM_OF_HITL = new Set(['closingEngine', 'eSign', 'fundingEngine', 'ledger', 'servicingAgent', 'modificationOffer', 'decision']);
+
 export default function WorkflowCanvas({
   activeNodes = [],
   activeEdges = [],
@@ -225,6 +264,12 @@ export default function WorkflowCanvas({
   onNodeHover = null,
   onNodeClick = null,
   highlightNode = null,
+  // Canvas elevation props
+  liveAgentOutput = null, // Reserved: stored in stateRef for future data annotations on nodes
+  hitlActive = false,
+  hitlStartTime = null,
+  hitlResolution = null,
+  hitlResolutionTime = null,
 }) {
   const canvasRef = useRef(null);
   const redrawRef = useRef(null);
@@ -244,6 +289,11 @@ export default function WorkflowCanvas({
   state.activeSet = new Set(activeNodes);
   state.edgeSet = new Set(activeEdges.map((e) => `${e[0]}>${e[1]}`));
   state.pulseSet = new Set(pulsingNodes);
+  state.hitlActive = hitlActive;
+  state.hitlStartTime = hitlStartTime;
+  state.hitlResolution = hitlResolution;
+  state.hitlResolutionTime = hitlResolutionTime;
+  state.liveAgentOutput = liveAgentOutput;
   state.completedSet = new Set(completedNodes);
   state.sceneRelevantSet = currentScene && RELEVANT_NODES[currentScene]
     ? new Set(RELEVANT_NODES[currentScene])
@@ -251,9 +301,6 @@ export default function WorkflowCanvas({
   state.highlightNode = highlightNode;
 
   const nowRef = useRef(Date.now());
-  activeNodes.forEach((id) => {
-    if (!state.nodeEntryTimes[id]) state.nodeEntryTimes[id] = Date.now();
-  });
 
   const handleMouseMove = useCallback((e) => {
     const canvas = canvasRef.current;
@@ -293,6 +340,8 @@ export default function WorkflowCanvas({
     let W, H, animId;
     let theme = {};
 
+    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     const readTheme = () => {
       const s = getComputedStyle(canvas);
       theme = {
@@ -318,6 +367,11 @@ export default function WorkflowCanvas({
       readTheme();
       if (redrawRef.current) redrawRef.current();
     };
+
+    // Record entry times for newly active nodes (inside effect, not render)
+    state.activeSet.forEach((id) => {
+      if (!state.nodeEntryTimes[id]) state.nodeEntryTimes[id] = Date.now();
+    });
 
     let needsAnimation = false;
     const scheduleRedraw = () => {
@@ -399,6 +453,8 @@ export default function WorkflowCanvas({
           ctx.globalAlpha = 0.5;
         } else if (isHighlightEdge && isActive) {
           ctx.globalAlpha = 1;
+        } else {
+          ctx.globalAlpha = 1;
         }
 
         ctx.beginPath();
@@ -452,19 +508,52 @@ export default function WorkflowCanvas({
 
         // Flow particles on active non-completed edges
         if (isActive && !bothCompleted && ctx.globalAlpha > 0.3) {
-          needsAnimation = true;
-          const particleCount = 1;
-          for (let p = 0; p < particleCount; p++) {
-            const offset = 0;
-            const t = ((now % 1400) / 1400 + offset) % 1;
-            const pt = quadPoint(pa.x, pa.y, mx, my, pb.x, pb.y, t);
+          const sourceColor = NODES[a].color;
+          // HITL deceleration: particles slow to stop over 500ms
+          const decelFactor = state.hitlActive && state.hitlStartTime
+            ? Math.max(0, 1 - ((now - state.hitlStartTime) / 500))
+            : 1;
+
+          if (prefersReducedMotion || decelFactor <= 0) {
+            // Reduced motion / frozen: single static dot at midpoint
+            const pt = quadPoint(pa.x, pa.y, mx, my, pb.x, pb.y, 0.5);
             ctx.beginPath();
             ctx.arc(pt.x, pt.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = NODES[a].color;
-            const savedAlpha = ctx.globalAlpha;
-            ctx.globalAlpha = 0.8;
+            ctx.fillStyle = sourceColor;
+            ctx.globalAlpha = 0.5;
             ctx.fill();
-            ctx.globalAlpha = savedAlpha;
+            ctx.globalAlpha = 1;
+          } else {
+            needsAnimation = true;
+            const period = 1400;
+            const particleCount = 3;
+            for (let p = 0; p < particleCount; p++) {
+              const rawT = ((now * decelFactor % period) / period + p / particleCount) % 1;
+              // Trail positions (2 trailing dots)
+              for (let trail = 1; trail >= 0; trail--) {
+                const tt = ((rawT - trail * 0.035) + 1) % 1;
+                const trailPt = quadPoint(pa.x, pa.y, mx, my, pb.x, pb.y, tt);
+                ctx.beginPath();
+                ctx.arc(trailPt.x, trailPt.y, 1.8 - trail * 0.5, 0, Math.PI * 2);
+                ctx.fillStyle = sourceColor;
+                ctx.globalAlpha = trail === 1 ? 0.12 : 0.3;
+                ctx.fill();
+              }
+              // Lead particle
+              const leadPt = quadPoint(pa.x, pa.y, mx, my, pb.x, pb.y, rawT);
+              ctx.beginPath();
+              ctx.arc(leadPt.x, leadPt.y, 2.5, 0, Math.PI * 2);
+              ctx.fillStyle = sourceColor;
+              ctx.globalAlpha = 0.8;
+              ctx.fill();
+              // White core
+              ctx.beginPath();
+              ctx.arc(leadPt.x, leadPt.y, 1, 0, Math.PI * 2);
+              ctx.fillStyle = '#ffffff';
+              ctx.globalAlpha = 0.9;
+              ctx.fill();
+            }
+            ctx.globalAlpha = 1;
           }
         }
 
@@ -480,6 +569,67 @@ export default function WorkflowCanvas({
 
         ctx.globalAlpha = 1;
       });
+
+      // HITL barrier line and waiting state
+      if (state.hitlActive && state.hitlStartTime && nodePositions.hitlGate) {
+        const gatePos = nodePositions.hitlGate;
+        const hitlElapsed = now - state.hitlStartTime;
+        const barrierProgress = prefersReducedMotion ? 1 : Math.min(hitlElapsed / 400, 1);
+        const extent = barrierProgress * H * 0.45;
+
+        const needsBarrierAnim = hitlElapsed < 400;
+        const needsPulseAnim = barrierProgress >= 1 && !prefersReducedMotion;
+        needsAnimation = needsAnimation || needsBarrierAnim || needsPulseAnim;
+
+        // Vertical dashed barrier line
+        ctx.save();
+        ctx.setLineDash([8, 6]);
+        ctx.strokeStyle = '#d9770688';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(gatePos.x, gatePos.y - extent);
+        ctx.lineTo(gatePos.x, gatePos.y + extent);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Concentric amber rings on gate (waiting state)
+        if (barrierProgress >= 1) {
+          const pulseT = prefersReducedMotion ? 0 : Math.sin(now / 1000) * 0.05;
+          const gateN = NODES.hitlGate;
+          const ghw = gateN.w / 2;
+          const ghh = gateN.h / 2;
+          for (let ring = 0; ring < 2; ring++) {
+            const ringScale = ring === 0 ? 1.4 + pulseT : 1.8 + pulseT;
+            ctx.beginPath();
+            drawShapePath(ctx, NODE_TYPES.gate, gatePos.x, gatePos.y, ghw * ringScale, ghh * ringScale);
+            ctx.strokeStyle = '#d97706';
+            ctx.globalAlpha = ring === 0 ? 0.08 : 0.04;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+        }
+        ctx.restore();
+      }
+
+      // HITL resolution animation
+      if (state.hitlResolution && state.hitlResolutionTime && nodePositions.hitlGate) {
+        const gatePos = nodePositions.hitlGate;
+        const resolveColor = state.hitlResolution === 'approved' ? '#059669' : '#DB3030';
+        const resolveSince = now - state.hitlResolutionTime;
+        if (resolveSince >= 0 && resolveSince < 600) {
+          needsAnimation = true;
+          const t = resolveSince / 600;
+          const radius = t * 180;
+          ctx.beginPath();
+          ctx.arc(gatePos.x, gatePos.y, radius, 0, Math.PI * 2);
+          ctx.strokeStyle = resolveColor;
+          ctx.globalAlpha = 0.25 * (1 - t);
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      }
 
       // Draw all nodes
       Object.keys(nodePositions).forEach((id) => {
@@ -502,7 +652,10 @@ export default function WorkflowCanvas({
         if (isPulsing || ((isActive || isCompleted) && entryAge < 300)) needsAnimation = true;
 
         // Determine opacity tier
-        if (isActive || isPulsing) {
+        const isDownstreamOfHitl = state.hitlActive && DOWNSTREAM_OF_HITL.has(id);
+        if (isDownstreamOfHitl) {
+          ctx.globalAlpha = 0.12;
+        } else if (isActive || isPulsing) {
           ctx.globalAlpha = 1;
         } else if (isCompleted) {
           ctx.globalAlpha = 0.65;
@@ -515,27 +668,26 @@ export default function WorkflowCanvas({
         const scale = isAtlas ? 1.1 : entryScale;
         const hw = (n.w * scale) / 2;
         const hh = (n.h * scale) / 2;
+        const nodeType = n.type;
 
-        // Glow for active/pulsing/hovered
-        if ((isActive || isPulsing || isHovered || isHighlighted) && !isCompleted) {
-          ctx.shadowColor = n.color + (isPulsing ? '66' : '33');
-          ctx.shadowBlur = isPulsing
-            ? 16 + Math.sin(now / 300) * 2
-            : isHovered || isHighlighted ? 12 : 8;
+        // Layered glow (replaces shadowBlur for consistency across DPR)
+        if ((isActive || isPulsing || isHovered || isHighlighted) && !isCompleted && !isDownstreamOfHitl) {
+          const pulseScale = isPulsing && !prefersReducedMotion ? 1 + Math.sin(now / 600) * 0.02 : 1;
+          // Outer halo
+          ctx.beginPath();
+          drawShapePath(ctx, nodeType, pos.x, pos.y, hw * 1.15 * pulseScale, hh * 1.15 * pulseScale);
+          ctx.fillStyle = n.color + (isPulsing ? '0c' : '08');
+          ctx.fill();
+          // Inner glow
+          ctx.beginPath();
+          drawShapePath(ctx, nodeType, pos.x, pos.y, hw * 1.06, hh * 1.06);
+          ctx.fillStyle = n.color + (isPulsing ? '18' : '10');
+          ctx.fill();
         }
 
         // Draw shape
         ctx.beginPath();
-        const nodeType = n.type;
-        if (nodeType === NODE_TYPES.gate) {
-          drawDiamond(ctx, pos.x, pos.y, hw + 3, hh + 3);
-        } else if (nodeType === NODE_TYPES.storage) {
-          drawCylinder(ctx, pos.x - hw, pos.y - hh, hw * 2, hh * 2);
-        } else if (nodeType === NODE_TYPES.tool) {
-          drawPill(ctx, pos.x - hw, pos.y - hh, hw * 2, hh * 2);
-        } else {
-          ctx.roundRect(pos.x - hw, pos.y - hh, hw * 2, hh * 2, 10);
-        }
+        drawShapePath(ctx, nodeType, pos.x, pos.y, hw, hh);
 
         // Fill
         if (isCompleted) {
@@ -580,9 +732,6 @@ export default function WorkflowCanvas({
           ctx.setLineDash([]);
         }
 
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
-
         // Labels
         const showAbbr = (isActive || isPulsing || isCompleted || isSceneRelevant);
         if (nodeType === NODE_TYPES.agent && showAbbr) {
@@ -597,11 +746,19 @@ export default function WorkflowCanvas({
           ctx.fillText(n.label, pos.x, pos.y + 9);
         } else {
           ctx.font = `600 ${showAbbr ? 8.5 : 7.5}px "Euclid Circular A", Manrope, sans-serif`;
-          ctx.fillStyle = (isActive || isPulsing) ? theme.textActive : theme.textInactive;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          const label = showAbbr ? n.abbr + ' ' + n.label : n.label;
-          ctx.fillText(label, pos.x, pos.y);
+          // HITL gate label override when awaiting
+          if (id === 'hitlGate' && state.hitlActive) {
+            ctx.fillStyle = '#d97706';
+            ctx.font = '700 8px "Euclid Circular A", Manrope, sans-serif';
+            ctx.fillText('AWAITING', pos.x, pos.y - 4);
+            ctx.fillText('OFFICER', pos.x, pos.y + 7);
+          } else {
+            ctx.fillStyle = (isActive || isPulsing) ? theme.textActive : theme.textInactive;
+            const label = showAbbr ? n.abbr + ' ' + n.label : n.label;
+            ctx.fillText(label, pos.x, pos.y);
+          }
         }
 
         // Status badge
@@ -639,30 +796,69 @@ export default function WorkflowCanvas({
         ctx.globalAlpha = 1;
       });
 
-      // Hover tooltip
+      // Rich hover tooltip
       if (state.hoveredNode && nodePositions[state.hoveredNode]) {
         const hId = state.hoveredNode;
         const hNode = NODES[hId];
         const hPos = nodePositions[hId];
-        const isActive = state.activeSet.has(hId);
-        const isCompleted = state.completedSet.has(hId);
-        const status = state.pulseSet.has(hId) ? 'RUNNING' : isCompleted ? 'DONE' : isActive ? 'ACTIVE' : 'IDLE';
-        const tooltipText = `${hNode.label}  ·  ${status}`;
+        const isHActive = state.activeSet.has(hId);
+        const isHCompleted = state.completedSet.has(hId);
+        const isHPulsing = state.pulseSet.has(hId);
+        const statusText = isHPulsing ? 'RUNNING' : isHCompleted ? 'DONE' : isHActive ? 'ACTIVE' : 'IDLE';
+        const statusColor = isHPulsing ? hNode.color : isHCompleted ? '#059669' : isHActive ? '#0891b2' : '#94a3b8';
+        const techText = NODE_TECH[hId] || '';
+        const entryT = state.nodeEntryTimes[hId];
+        const elapsedText = (isHActive || isHPulsing) && entryT ? `${((now - entryT) / 1000).toFixed(1)}s elapsed` : '';
 
-        ctx.font = '600 9px "Euclid Circular A", Manrope, sans-serif';
-        const tw = ctx.measureText(tooltipText).width + 14;
-        const tx = Math.max(2, Math.min(hPos.x - tw / 2, W - tw - 2));
-        const ty = hPos.y - (hNode.h / 2) - 22;
+        const tooltipW = 160;
+        const tooltipH = techText ? (elapsedText ? 56 : 46) : 28;
+        const tx = Math.max(2, Math.min(hPos.x - tooltipW / 2, W - tooltipW - 2));
+        const ty = Math.max(2, hPos.y - (hNode.h / 2) - tooltipH - 8);
 
-        ctx.fillStyle = theme.textActive + 'ee';
+        // Background
+        ctx.fillStyle = 'rgba(0, 30, 43, 0.90)';
         ctx.beginPath();
-        ctx.roundRect(tx, ty, tw, 18, 5);
+        ctx.roundRect(tx, ty, tooltipW, tooltipH, 6);
         ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
 
-        ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'center';
+        ctx.textAlign = 'left';
+        let lineY = ty + 12;
+
+        // Line 1: Label
+        ctx.font = '700 10px "Euclid Circular A", Manrope, sans-serif';
+        ctx.fillStyle = hNode.color;
         ctx.textBaseline = 'middle';
-        ctx.fillText(tooltipText, tx + tw / 2, ty + 9);
+        ctx.fillText(hNode.label, tx + 8, lineY);
+        lineY += 13;
+
+        // Line 2: Technology
+        if (techText) {
+          ctx.font = '500 7.5px "Source Code Pro", monospace';
+          ctx.fillStyle = '#94a3b8';
+          ctx.fillText(techText, tx + 8, lineY);
+          lineY += 12;
+        }
+
+        // Line 3: Status dot + text
+        ctx.beginPath();
+        ctx.arc(tx + 12, lineY, 3, 0, Math.PI * 2);
+        ctx.fillStyle = statusColor;
+        ctx.fill();
+        ctx.font = '600 7.5px "Euclid Circular A", Manrope, sans-serif';
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillText(statusText, tx + 18, lineY);
+
+        // Line 4: Elapsed
+        if (elapsedText) {
+          ctx.font = '500 7px "Source Code Pro", monospace';
+          ctx.fillStyle = '#64748b';
+          ctx.fillText(elapsedText, tx + tooltipW - ctx.measureText(elapsedText).width - 8, lineY);
+        }
+
+        ctx.textAlign = 'center';
       }
 
       if (needsAnimation) {
@@ -683,7 +879,7 @@ export default function WorkflowCanvas({
       canvas.removeEventListener('mouseleave', handleMouseLeave);
       cancelAnimationFrame(animId);
     };
-  }, [activeNodes, activeEdges, pulsingNodes, completedNodes, currentScene, highlightNode, handleMouseMove, handleClick, handleMouseLeave]);
+  }, [activeNodes, activeEdges, pulsingNodes, completedNodes, currentScene, highlightNode, hitlActive, hitlStartTime, hitlResolution, hitlResolutionTime, handleMouseMove, handleClick, handleMouseLeave]);
 
   return <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />;
 }

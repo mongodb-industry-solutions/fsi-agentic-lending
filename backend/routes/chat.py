@@ -141,6 +141,10 @@ async def send_message_stream(application_id: str, req: ChatMessageRequest):
                     if tool.get("citations"):
                         citations.extend(tool["citations"])
                 continue
+            if isinstance(item, dict) and item.get("type") == "ui_components":
+                for comp in item["components"]:
+                    yield f"data: {json.dumps({'type': 'ui_component', **comp})}\n\n"
+                continue
             if isinstance(item, str):
                 accumulated.append(item)
                 if not safety_tripped:

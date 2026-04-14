@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import ApplicationQueue from './ApplicationQueue';
 import AgentActivityLog from './AgentActivityLog';
@@ -89,15 +89,30 @@ function AgentRailHeader({ agentStats, elapsedSeconds, hitlReached, applicationI
   );
 }
 
+const AGENT_TO_NODE = {
+  supervisor: 'supervisor',
+  loan_app_agent: 'appAgent',
+  loan_app: 'appAgent',
+  underwriter: 'underwriter',
+  hitl_gate: 'hitlGate',
+};
+
 export default function LoanOfficerDashboard({ active = true }) {
   const { toasts, addToast, removeToast } = useToasts();
   const [lastCorrelatedEvent, setLastCorrelatedEvent] = useState(null);
   const [agentStats, setAgentStats] = useState({ totalReceived: 0 });
+  const [canvasHighlightNode, setCanvasHighlightNode] = useState(null);
+  const highlightTimerRef = useRef(null);
+
+  // Cleanup highlight timer on unmount
+  useEffect(() => () => {
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+  }, []);
 
   const {
     selectedApp, setSelectedApp,
     workflowPhase, workflowStage,
-    hitlReached, approved,
+    hitlReached, hitlStartTime, hitlResolutionTime, approved,
     planSettings,
     approvalDetails,
     liveAgentOutput,
@@ -248,6 +263,12 @@ export default function LoanOfficerDashboard({ active = true }) {
                   activeEdges={workflowPhase === 'preview' ? [] : currentWorkflow.activeEdges}
                   pulsingNodes={workflowPhase === 'preview' ? [] : hitlReached ? ['hitlGate'] : currentWorkflow.pulsingNodes}
                   currentScene={workflowPhase === 'preview' ? 'origination' : currentWorkflow.currentScene}
+                  highlightNode={canvasHighlightNode}
+                  liveAgentOutput={liveAgentOutput}
+                  hitlActive={hitlReached && !approved}
+                  hitlStartTime={hitlStartTime}
+                  hitlResolution={approved && hitlReached ? (approvalDetails?.mode === 'declined' ? 'declined' : 'approved') : null}
+                  hitlResolutionTime={hitlResolutionTime}
                 />
 
                 {workflowPhase === 'executing' && (
@@ -407,6 +428,14 @@ export default function LoanOfficerDashboard({ active = true }) {
             onEvent={(entry) => {
               handleAgentEvent(entry);
               setLastCorrelatedEvent({ ...entry, _correlationTs: Date.now() });
+              // Canvas highlight sync
+              const agentName = (entry.agent || '').toLowerCase();
+              const nodeId = AGENT_TO_NODE[agentName] || (agentName.includes('underwrit') ? 'underwriter' : agentName.includes('loan_app') ? 'appAgent' : agentName.includes('hitl') ? 'hitlGate' : null);
+              if (nodeId) {
+                setCanvasHighlightNode(nodeId);
+                if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+                highlightTimerRef.current = setTimeout(() => setCanvasHighlightNode(null), 1500);
+              }
             }}
             applicationId={selectedApp}
             onStatsChange={setAgentStats}

@@ -10,6 +10,8 @@ This is a conversational agent (not a pipeline). It:
 import re
 import json
 import logging
+import time
+import uuid
 from typing import TypedDict, Optional
 
 from agents.llm import get_llm
@@ -20,6 +22,11 @@ from agents.chatbot.tools import (
     get_application_status_filtered,
     get_application_documents_summary,
     get_pending_interventions,
+    get_affordability_data,
+    get_document_checklist_data,
+    get_application_strength_data,
+    get_rate_comparison_data,
+    get_closing_timeline_data,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,22 +40,128 @@ class AppAgentState(TypedDict):
     response: Optional[str]
 
 
-def _build_context(state: AppAgentState) -> tuple[str, list[dict]]:
+def _timed_call(fn, *args, **kwargs):
+    """Call a function and return (result, elapsed_ms)."""
+    t0 = time.monotonic()
+    result = fn(*args, **kwargs)
+    elapsed = round((time.monotonic() - t0) * 1000)
+    return result, elapsed
+
+
+# ---------------------------------------------------------------------------
+# Generative UI component detection
+# ---------------------------------------------------------------------------
+
+UI_TRIGGERS = {
+    "affordability_calculator": [
+        "afford", "payment", "monthly", "what can i", "budget",
+        "calculator", "how much can", "mortgage payment",
+    ],
+    "rate_comparison": [
+        "compare rate", "rate options", "fixed vs variable",
+        "best rate", "what rates", "available rates",
+        "rate comparison", "mortgage rates",
+    ],
+    "payment_schedule": [
+        "amortization", "schedule", "payment breakdown",
+        "principal", "interest split", "payment plan",
+    ],
+    "application_strength": [
+        "how strong is my application", "application strength",
+        "how does my application look", "chances of approval",
+        "my application look",
+    ],
+    "scenario_comparison": [
+        "what if i put", "what if i increase",
+        "compare down payment", "alternative scenario",
+        "what if i change", "different down payment",
+    ],
+    "document_checklist": [
+        "document", "checklist", "what do i need",
+        "missing document", "required document",
+    ],
+    "closing_timeline": [
+        "closing", "next steps after approval", "signing",
+        "funding", "after approval", "closing process",
+    ],
+}
+
+# Components that should only trigger in specific statuses
+UI_STATUS_GATES = {
+    "application_strength": lambda s: s in ("underwriting", "review", "approved", "declined", "closing"),
+    "closing_timeline": lambda s: s in ("approved", "closing"),
+}
+
+
+def _detect_ui_components(user_msg: str, app_id: str, app_status: str = None) -> list[dict]:
+    """Detect which generative UI components to render based on user message.
+
+    Returns list of {component, data, id, status} dicts.
+    """
+    lower = user_msg.lower()
+    components = []
+
+    for component_name, keywords in UI_TRIGGERS.items():
+        if not any(kw in lower for kw in keywords):
+            continue
+
+        # Check status gate
+        gate = UI_STATUS_GATES.get(component_name)
+        if gate and not gate(app_status):
+            continue
+
+        comp_id = f"{component_name[:4]}-{uuid.uuid4().hex[:8]}"
+        data = {}
+
+        try:
+            if component_name == "affordability_calculator" and app_id:
+                data = get_affordability_data(app_id)
+            elif component_name == "document_checklist" and app_id:
+                data = get_document_checklist_data(app_id)
+            elif component_name == "application_strength" and app_id:
+                data = get_application_strength_data(app_id)
+            elif component_name == "rate_comparison":
+                data = get_rate_comparison_data(app_id)
+            elif component_name == "closing_timeline" and app_id:
+                data = get_closing_timeline_data(app_id)
+            elif component_name == "scenario_comparison" and app_id:
+                data = get_affordability_data(app_id)  # reuse loan params
+            elif component_name == "payment_schedule" and app_id:
+                data = get_affordability_data(app_id)  # reuse loan params
+        except Exception as e:
+            logger.warning(f"UI component data fetch failed for {component_name}: {e}")
+            continue
+
+        if data:
+            components.append({
+                "component": component_name,
+                "data": data,
+                "id": comp_id,
+                "status": "ready",
+            })
+
+    return components
+
+
+def _build_context(state: AppAgentState) -> tuple[str, list[dict], list[dict]]:
     """Build context string from available tools based on user message.
 
     Returns:
-        Tuple of (context_string, tool_metadata) where tool_metadata is a list
-        of dicts describing which tools were called and what they found.
+        Tuple of (context_string, tool_metadata, ui_components) where
+        tool_metadata describes which tools were called and ui_components
+        lists generative UI payloads to render inline.
     """
     user_msg = state["user_message"].lower()
     app_id = state.get("application_id")
     context_parts = []
     tool_metadata = []
+    app_status = None
 
     if app_id:
         try:
-            app_info = get_application_status_filtered(app_id)
+            app_info, elapsed = _timed_call(get_application_status_filtered, app_id)
             if "error" not in app_info:
+                app_status = app_info.get("status")
                 names = ", ".join(app_info.get("borrower_names", []))
                 context_parts.append(
                     f"APPLICATION INFO:\n"
@@ -61,12 +174,13 @@ def _build_context(state: AppAgentState) -> tuple[str, list[dict]]:
                     "tool": "application_status",
                     "label": "Checking application status",
                     "found": 1,
+                    "elapsed_ms": elapsed,
                 })
         except Exception as e:
             logger.warning(f"Application info lookup failed: {e}")
 
         try:
-            doc_summary = get_application_documents_summary(app_id)
+            doc_summary, elapsed = _timed_call(get_application_documents_summary, app_id)
             if doc_summary:
                 doc_list = "\n".join(f"- {d.get('doc_type', 'unknown')}: {d.get('status', 'unknown')}" for d in doc_summary)
                 context_parts.append(f"SUBMITTED DOCUMENTS ({len(doc_summary)} total):\n{doc_list}")
@@ -74,13 +188,14 @@ def _build_context(state: AppAgentState) -> tuple[str, list[dict]]:
                     "tool": "document_inventory",
                     "label": "Reviewing submitted documents",
                     "found": len(doc_summary),
+                    "elapsed_ms": elapsed,
                 })
         except Exception as e:
             logger.warning(f"Document summary lookup failed: {e}")
 
     if app_id:
         try:
-            interventions = get_pending_interventions(app_id)
+            interventions, elapsed = _timed_call(get_pending_interventions, app_id)
             if interventions:
                 context_parts.append(
                     f"PENDING ACTION ITEMS:\n{json.dumps(interventions, default=str, indent=2)}"
@@ -89,6 +204,7 @@ def _build_context(state: AppAgentState) -> tuple[str, list[dict]]:
                     "tool": "interventions",
                     "label": "Checking pending action items",
                     "found": len(interventions),
+                    "elapsed_ms": elapsed,
                 })
         except Exception as e:
             logger.warning(f"Intervention lookup failed: {e}")
@@ -101,7 +217,7 @@ def _build_context(state: AppAgentState) -> tuple[str, list[dict]]:
     citations = []
     if any(kw in user_msg for kw in policy_keywords):
         try:
-            policies = search_policies_borrower(state["user_message"], limit=3)
+            policies, elapsed = _timed_call(search_policies_borrower, state["user_message"], limit=3)
             if policies:
                 policy_text = "\n".join(
                     [
@@ -122,17 +238,25 @@ def _build_context(state: AppAgentState) -> tuple[str, list[dict]]:
                     "tool": "policy_search",
                     "label": "Searching lending policies",
                     "found": len(policies),
+                    "elapsed_ms": elapsed,
                     "citations": citations,
                 })
         except Exception as e:
             logger.warning(f"Policy search failed: {e}")
 
+    # Detect generative UI components to render inline (computed early so we can
+    # skip redundant text context when a richer visual is being shown)
+    ui_components = _detect_ui_components(state["user_message"], app_id, app_status)
+    ui_component_names = {c["component"] for c in ui_components}
+
     doc_keywords = [
         "document", "upload", "file", "paper", "proof",
         "need to provide", "what do i need", "checklist",
     ]
-    if any(kw in user_msg for kw in doc_keywords):
-        reqs = get_document_requirements()
+    # Skip text-based document requirements when the visual checklist component
+    # is already being rendered — the checklist is data-identical and richer
+    if any(kw in user_msg for kw in doc_keywords) and "document_checklist" not in ui_component_names:
+        reqs, elapsed = _timed_call(get_document_requirements)
         req_text = "\n".join(
             [
                 f"- {r['label']}: {r['description']} "
@@ -145,6 +269,7 @@ def _build_context(state: AppAgentState) -> tuple[str, list[dict]]:
             "tool": "document_requirements",
             "label": "Loading document requirements",
             "found": len(reqs),
+            "elapsed_ms": elapsed,
         })
 
     status_keywords = [
@@ -153,7 +278,7 @@ def _build_context(state: AppAgentState) -> tuple[str, list[dict]]:
     ]
     if app_id and any(kw in user_msg for kw in status_keywords):
         try:
-            status = get_application_status_filtered(app_id)
+            status, _elapsed = _timed_call(get_application_status_filtered, app_id)
             if "error" not in status:
                 context_parts.append(
                     f"APPLICATION STATUS:\n{json.dumps(status, default=str, indent=2)}"
@@ -161,8 +286,28 @@ def _build_context(state: AppAgentState) -> tuple[str, list[dict]]:
         except Exception as e:
             logger.warning(f"Status lookup failed: {e}")
 
+    # Tell the LLM which visual components are being rendered alongside its text
+    # so it can write complementary (not duplicative) responses
+    if ui_components:
+        comp_descriptions = {
+            "affordability_calculator": "An interactive affordability calculator with sliders for rate, term, and down payment. The user can adjust values and see GDS/TDS ratios update live. DO NOT list payment amounts or ratios — the calculator shows those. Instead explain concepts, suggest what to adjust, and provide context.",
+            "document_checklist": "A visual document checklist showing status (verified/processing/missing) for each document. DO NOT re-list documents — the checklist shows them. Instead explain WHY key documents matter and what happens if one is missing.",
+            "application_strength": "A qualitative application strength card showing factors like Down Payment, Debt Ratios, Employment, and Credit History with ratings. DO NOT state ratings — the card shows them. Instead explain what drives each factor and how the borrower can improve.",
+            "rate_comparison": "A rate comparison card showing Fixed 3yr, Fixed 5yr, and Variable options with monthly payments and stress test rates. DO NOT repeat rates or payments — the card shows them. Instead explain the trade-offs between fixed vs variable and why one might be recommended.",
+            "payment_schedule": "An amortization table showing monthly/annual payment breakdown (principal vs interest). DO NOT repeat payment figures — the table shows them. Instead explain how amortization works and what the split means for the borrower.",
+            "scenario_comparison": "A side-by-side scenario comparison showing current vs alternative down payment. DO NOT repeat the numbers — the card shows them. Instead explain the trade-off and what the borrower should consider.",
+            "closing_timeline": "A closing timeline showing the 4 steps after approval: Rate Lock, Doc Prep, Signing, Funding. DO NOT re-list steps — the timeline shows them. Instead explain what the borrower needs to do at each step and any time-sensitive actions.",
+        }
+        shown = [comp_descriptions.get(c["component"], c["component"]) for c in ui_components]
+        context_parts.append(
+            "VISUAL COMPONENTS BEING SHOWN:\n"
+            "The following interactive visual components are being displayed alongside your text response. "
+            "Keep your text BRIEF and COMPLEMENTARY — the visuals handle the data, you handle the explanation.\n"
+            + "\n".join(f"- {s}" for s in shown)
+        )
+
     context_str = "\n\n".join(context_parts) if context_parts else ""
-    return context_str, tool_metadata
+    return context_str, tool_metadata, ui_components
 
 
 def safety_filter(response: str) -> str:
@@ -190,8 +335,9 @@ def _prepare_llm_messages(application_id, user_message, history):
     """Shared logic for building the LLM messages list (used by both chat and chat_stream).
 
     Returns:
-        Tuple of (messages, tool_metadata) where tool_metadata describes
-        which tools were consulted during context building.
+        Tuple of (messages, tool_metadata, ui_components) where tool_metadata
+        describes which tools were consulted and ui_components lists generative
+        UI payloads for inline rendering.
     """
     state = AppAgentState(
         messages=history or [],
@@ -200,7 +346,7 @@ def _prepare_llm_messages(application_id, user_message, history):
         response=None,
     )
 
-    context, tool_metadata = _build_context(state)
+    context, tool_metadata, ui_components = _build_context(state)
 
     user_prompt = user_message
     if context:
@@ -209,7 +355,12 @@ def _prepare_llm_messages(application_id, user_message, history):
             f"[CONTEXT FOR ASSISTANT -- do not repeat verbatim to user]\n{context}"
         )
 
-    recent_history = (history or [])[-20:]
+    # Use last 10 user/assistant exchanges (skip system status notifications injected
+    # by the frontend). 10 turns balances context quality with token budget — the
+    # per-message context injection (app info, docs, policies, UI component descriptions)
+    # is already substantial, so a shorter history window keeps total prompt size manageable.
+    filtered_history = [m for m in (history or []) if m.get("role") in ("user", "assistant")]
+    recent_history = filtered_history[-10:]
     messages = []
     for msg in recent_history:
         role = msg.get("role", "user")
@@ -224,7 +375,7 @@ def _prepare_llm_messages(application_id, user_message, history):
     else:
         messages.append({"role": "user", "content": user_prompt})
 
-    return messages, tool_metadata
+    return messages, tool_metadata, ui_components
 
 
 def chat_stream(
@@ -234,14 +385,17 @@ def chat_stream(
 ):
     """Stream the agent response token-by-token.
 
-    Yields dicts: first a list of tool_call events, then text chunks,
-    then a final done event.
+    Yields dicts: first tool_call events, then ui_component events,
+    then text chunks, then a final done event.
     """
     llm = get_llm()
-    messages, tool_metadata = _prepare_llm_messages(application_id, user_message, history)
+    messages, tool_metadata, ui_components = _prepare_llm_messages(application_id, user_message, history)
 
     if tool_metadata:
         yield {"type": "tool_calls", "tools": tool_metadata}
+
+    if ui_components:
+        yield {"type": "ui_components", "components": ui_components}
 
     try:
         for chunk in llm.stream_messages(
@@ -270,7 +424,7 @@ def chat(
         The agent's response string, safety-filtered.
     """
     llm = get_llm()
-    messages, _tool_metadata = _prepare_llm_messages(application_id, user_message, history)
+    messages, _tool_metadata, _ui_components = _prepare_llm_messages(application_id, user_message, history)
 
     try:
         response = llm.predict_messages(

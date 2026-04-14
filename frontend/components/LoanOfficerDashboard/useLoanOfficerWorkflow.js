@@ -9,6 +9,8 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
   const [workflowPhase, setWorkflowPhase] = useState('idle');
   const [workflowStage, setWorkflowStage] = useState(0);
   const [hitlReached, setHitlReached] = useState(false);
+  const [hitlStartTime, setHitlStartTime] = useState(null);
+  const [hitlResolutionTime, setHitlResolutionTime] = useState(null);
   const [approved, setApproved] = useState(false);
   const [planSettings, setPlanSettings] = useState(null);
   const [approvalDetails, setApprovalDetails] = useState(null);
@@ -176,6 +178,35 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     return () => { if (sseRef.current) { sseRef.current.close(); sseRef.current = null; } };
   }, []);
 
+  // Reconnect to activity stream for apps already processing
+  const reconnectActivitySSE = useCallback((appId) => {
+    if (sseRef.current) sseRef.current.close();
+
+    const source = apiSSE(
+      `/agent/${appId}/stream`,
+      (event) => {
+        if (event.type === 'agent_step') {
+          const agentName = event.agent || '';
+          const stageIdx = NODE_TO_STAGE[agentName];
+          if (stageIdx !== undefined) {
+            setWorkflowStage(stageIdx);
+          }
+          if (agentName === 'hitl_gate' && event.action === 'interrupt') {
+            setHitlReached(true); setHitlStartTime(Date.now());
+            addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
+          }
+        }
+        if (event.type === 'complete') {
+          setApproved(true); setHitlResolutionTime(Date.now());
+          setApprovalDetails({ mode: 'auto' });
+          addToast({ type: 'success', title: 'Pipeline Complete', message: `Agent pipeline completed for ${appId}.` });
+        }
+      }
+    );
+
+    sseRef.current = source;
+  }, [addToast]);
+
   const reconnectActivitySSERef = useRef(reconnectActivitySSE);
   reconnectActivitySSERef.current = reconnectActivitySSE;
 
@@ -183,7 +214,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
   useEffect(() => {
     if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
     setWorkflowStage(0);
-    setHitlReached(false);
+    setHitlReached(false); setHitlStartTime(null); setHitlResolutionTime(null);
     setApproved(false);
     setPlanSettings(null);
     setApprovalDetails(null);
@@ -201,22 +232,22 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     if (status === 'review' || status === 'pending_review') {
       setWorkflowPhase('executing');
       setWorkflowStage(2);
-      setHitlReached(true);
+      setHitlReached(true); setHitlStartTime(Date.now());
     } else if (status === 'processing' || status === 'underwriting') {
       setWorkflowPhase('executing');
       setWorkflowStage(status === 'underwriting' ? 1 : 0);
       reconnectActivitySSERef.current(selectedApp);
     } else if (status === 'approved' || status === 'closing') {
       setWorkflowPhase('executing');
-      setApproved(true);
+      setApproved(true); setHitlResolutionTime(Date.now());
       setApprovalDetails({ mode: 'auto' });
     } else if (status === 'funded' || status === 'active') {
       setWorkflowPhase('executing');
-      setApproved(true);
+      setApproved(true); setHitlResolutionTime(Date.now());
       setApprovalDetails({ mode: 'auto' });
     } else if (status === 'declined') {
       setWorkflowPhase('executing');
-      setApproved(true);
+      setApproved(true); setHitlResolutionTime(Date.now());
       setApprovalDetails({ mode: 'declined' });
     } else if (status === 'error') {
       setWorkflowPhase('preview');
@@ -246,7 +277,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     if (sseRef.current) sseRef.current.close();
 
     setWorkflowStage(0);
-    setHitlReached(false);
+    setHitlReached(false); setHitlStartTime(null); setHitlResolutionTime(null);
     setApproved(false);
     setWorkflowPhase('executing');
     setLiveAgentOutput({});
@@ -285,20 +316,20 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
           }
 
           if (agentName === 'hitl_gate') {
-            setHitlReached(true);
+            setHitlReached(true); setHitlStartTime(Date.now());
             addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
           }
         }
 
         if (event.type === 'hitl_waiting') {
-          setHitlReached(true);
+          setHitlReached(true); setHitlStartTime(Date.now());
           setWorkflowStage(2);
           stageTimestampsRef.current[2] = stageTimestampsRef.current[2] || Date.now();
           addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
         }
 
         if (event.type === 'complete') {
-          setApproved(true);
+          setApproved(true); setHitlResolutionTime(Date.now());
           setApprovalDetails({ mode: 'auto' });
           addToast({ type: 'success', title: 'Pipeline Complete', message: `Agent pipeline completed for ${appId}.` });
         }
@@ -307,35 +338,6 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
 
     sseRef.current = source;
   }, [addToast]);
-
-  // Reconnect to activity stream for apps already processing
-  function reconnectActivitySSE(appId) {
-    if (sseRef.current) sseRef.current.close();
-
-    const source = apiSSE(
-      `/agent/${appId}/stream`,
-      (event) => {
-        if (event.type === 'agent_step') {
-          const agentName = event.agent || '';
-          const stageIdx = NODE_TO_STAGE[agentName];
-          if (stageIdx !== undefined) {
-            setWorkflowStage(stageIdx);
-          }
-          if (agentName === 'hitl_gate' && event.action === 'interrupt') {
-            setHitlReached(true);
-            addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
-          }
-        }
-        if (event.type === 'complete') {
-          setApproved(true);
-          setApprovalDetails({ mode: 'auto' });
-          addToast({ type: 'success', title: 'Pipeline Complete', message: `Agent pipeline completed for ${appId}.` });
-        }
-      }
-    );
-
-    sseRef.current = source;
-  }
 
   const handleProceed = useCallback((settings) => {
     if (!selectedApp) return;
@@ -369,10 +371,10 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
         },
       });
       if (modResult) {
-        setHitlReached(false);
+        setHitlReached(false); setHitlStartTime(null); setHitlResolutionTime(null);
         setApproved(false);
         setApprovalDetails(null);
-        reconnectActivitySSE(selectedApp);
+        reconnectActivitySSERef.current(selectedApp);
         addToast({ type: 'info', title: 'Modifications Applied', message: 'Agent re-running underwriting with updated terms.' });
       } else {
         addToast({ type: 'error', title: 'Modification Failed', message: 'Could not apply modified terms. Please try again.' });
@@ -390,7 +392,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     });
 
     if (result) {
-      setApproved(true);
+      setApproved(true); setHitlResolutionTime(Date.now());
       setApprovalDetails(details || { mode: 'recommended' });
       addToast({ type: 'success', title: 'Loan Approved', message: `${rate ? `@ ${rate} ` : ''}for ${appName}.${suffix}` });
     } else {
@@ -411,7 +413,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       });
 
       if (result) {
-        setApproved(true);
+        setApproved(true); setHitlResolutionTime(Date.now());
         setApprovalDetails({ mode: 'declined' });
         addToast({ type: 'warning', title: 'Application Declined', message: `${appName} — declined after manual review.` });
       } else {
@@ -430,7 +432,8 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       setWorkflowStage(stageIdx);
     }
     if (entry.agent === 'hitl_gate' && entry.action === 'interrupt') {
-      setHitlReached(true);
+      // setHitlReached is idempotent — OK to call multiple times
+      setHitlReached(true); setHitlStartTime((prev) => prev || Date.now());
     }
   }, []);
 
@@ -440,6 +443,8 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     workflowPhase,
     workflowStage,
     hitlReached,
+    hitlStartTime,
+    hitlResolutionTime,
     approved,
     planSettings,
     setPlanSettings,

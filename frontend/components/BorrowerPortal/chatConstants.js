@@ -66,6 +66,26 @@ export function getContextualSuggestions(status, localInterventions) {
   return unique.slice(0, 4);
 }
 
+// Quick action pills shown above the chat input. Each can optionally specify
+// a minStatus — the action is hidden until the application reaches that stage.
+export const QUICK_ACTIONS = [
+  { label: 'Calculator', icon: '\uD83D\uDCCA', message: 'Show me an affordability calculator for my application' },
+  { label: 'Documents', icon: '\uD83D\uDCCB', message: 'Show me a checklist of my required documents' },
+  { label: 'My Application', icon: '\uD83D\uDCDD', message: 'How strong is my application looking?', minStatus: 'underwriting' },
+  { label: 'Rates', icon: '\uD83D\uDCC8', message: 'Compare the available rate options for me' },
+];
+
+const STATUS_ORDER = ['submitted', 'processing', 'underwriting', 'review', 'approved', 'declined', 'closing'];
+
+export function getVisibleQuickActions(status) {
+  const statusIdx = STATUS_ORDER.indexOf(status);
+  return QUICK_ACTIONS.filter(qa => {
+    if (!qa.minStatus) return true;
+    const minIdx = STATUS_ORDER.indexOf(qa.minStatus);
+    return statusIdx >= minIdx;
+  });
+}
+
 export function createWelcomeMessage() {
   return {
     role: 'assistant',

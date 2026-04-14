@@ -480,6 +480,7 @@ export default function BorrowerPortal() {
             applicationId={applicationId}
             applicationStatus={applicationStatus}
             onToolActivity={handleToolActivity}
+            borrowerProfile={borrowerProfile}
           />
         </div>
 

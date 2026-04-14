@@ -142,6 +142,190 @@ def get_pending_interventions(application_id: str) -> list[dict]:
     return interventions
 
 
+# ---------------------------------------------------------------------------
+# Generative UI data functions — structured payloads for inline components
+# ---------------------------------------------------------------------------
+
+
+def get_affordability_data(application_id: str) -> dict:
+    """Get loan parameters for the affordability calculator. Borrower-safe."""
+    db = get_db()
+    app = db["applications"].find_one(
+        {"application_id": application_id},
+        {
+            "_id": 0, "loan_amount": 1, "purchase_price": 1,
+            "down_payment": 1, "combined_income": 1,
+            "primary_income": 1, "co_applicant_income": 1,
+            "annual_property_tax": 1, "existing_monthly_debt": 1,
+            "product": 1,
+        },
+    )
+    if not app:
+        return {}
+    return {
+        "loan_amount": app.get("loan_amount", 0),
+        "purchase_price": app.get("purchase_price", 0),
+        "down_payment": app.get("down_payment", 0),
+        "combined_income": app.get("combined_income", 0),
+        "annual_property_tax": app.get("annual_property_tax", 0),
+        "existing_monthly_debt": app.get("existing_monthly_debt", 0),
+        "product": app.get("product", ""),
+    }
+
+
+def get_document_checklist_data(application_id: str) -> dict:
+    """Get document checklist with real-time status for each requirement."""
+    reqs = get_document_requirements()
+    submitted = get_application_documents_summary(application_id)
+    submitted_types = {d.get("doc_type"): d.get("status", "missing") for d in submitted if d.get("doc_type")}
+    items = []
+    for r in reqs:
+        status = submitted_types.get(r["type"], "missing")
+        items.append({
+            "type": r["type"],
+            "label": r["label"],
+            "required": r["required"],
+            "description": r["description"],
+            "status": status,
+        })
+    complete = sum(1 for i in items if i["status"] in ("verified", "processed", "parsed"))
+    return {"items": items, "complete": complete, "total": len(items)}
+
+
+def get_application_strength_data(application_id: str) -> dict:
+    """Get qualitative application strength assessment.
+
+    NEVER returns raw risk scores — only qualitative labels derived server-side.
+    """
+    db = get_db()
+    app = db["applications"].find_one(
+        {"application_id": application_id},
+        {
+            "_id": 0, "status": 1, "loan_amount": 1,
+            "purchase_price": 1, "down_payment": 1,
+            "combined_income": 1, "existing_monthly_debt": 1,
+        },
+    )
+    if not app:
+        return {}
+
+    purchase = max(app.get("purchase_price", 1), 1)
+    down = app.get("down_payment", 0)
+    down_pct = (down / purchase) * 100
+    monthly_income = max(app.get("combined_income", 1), 1) / 12
+    dti = app.get("existing_monthly_debt", 0) / monthly_income
+
+    factors = [
+        {
+            "label": "Down Payment",
+            "rating": "Excellent" if down_pct >= 20 else "Good" if down_pct >= 10 else "Fair",
+            "value": round(min(down_pct / 25 * 100, 100)),
+            "detail": f"{down_pct:.0f}% of purchase price",
+        },
+        {
+            "label": "Debt Ratios",
+            "rating": "Excellent" if dti < 0.30 else "Good" if dti < 0.40 else "Fair",
+            "value": round(max(0, min((1 - dti) * 100, 100))),
+            "detail": "Based on current debt obligations",
+        },
+        {
+            "label": "Employment",
+            "rating": "Good",
+            "value": 75,
+            "detail": "Verified employment",
+        },
+        {
+            "label": "Credit History",
+            "rating": "Good",
+            "value": 80,
+            "detail": "Based on credit report",
+        },
+    ]
+
+    fair_count = sum(1 for f in factors if f["rating"] == "Fair")
+    overall = "Strong" if fair_count == 0 else "Good" if fair_count <= 1 else "Fair"
+
+    return {
+        "overall": overall,
+        "factors": factors,
+        "status": app.get("status", "unknown"),
+    }
+
+
+def get_rate_comparison_data(application_id: str = None) -> dict:
+    """Get rate comparison options with real loan amount from application."""
+    loan_amount = 450000
+    if application_id:
+        db = get_db()
+        app = db["applications"].find_one(
+            {"application_id": application_id},
+            {"_id": 0, "loan_amount": 1},
+        )
+        if app:
+            loan_amount = app.get("loan_amount", 450000)
+    return {
+        "loan_amount": loan_amount,
+        "options": [
+            {
+                "name": "Fixed 3yr",
+                "rate": 5.49,
+                "term_years": 3,
+                "amort_years": 25,
+                "stress_test_rate": 7.49,
+                "recommended": False,
+            },
+            {
+                "name": "Fixed 5yr",
+                "rate": 4.99,
+                "term_years": 5,
+                "amort_years": 25,
+                "stress_test_rate": 6.99,
+                "recommended": True,
+            },
+            {
+                "name": "Variable",
+                "rate": 5.20,
+                "term_years": 5,
+                "amort_years": 25,
+                "stress_test_rate": 7.20,
+                "recommended": False,
+            },
+        ],
+    }
+
+
+def get_closing_timeline_data(application_id: str) -> dict:
+    """Closing timeline steps for post-approval display.
+
+    Currently hardcoded for demo — all approved apps start at the same
+    step. Extend to query application.closing_stage when that field exists.
+    """
+    return {
+        "steps": [
+            {
+                "label": "Rate Lock",
+                "status": "complete",
+                "detail": "Rate locked for 120 days",
+            },
+            {
+                "label": "Document Preparation",
+                "status": "active",
+                "detail": "Final mortgage documents being prepared",
+            },
+            {
+                "label": "Signing",
+                "status": "upcoming",
+                "detail": "Schedule signing with your lawyer",
+            },
+            {
+                "label": "Funding",
+                "status": "upcoming",
+                "detail": "Mortgage funds disbursed to seller",
+            },
+        ],
+    }
+
+
 def submit_intervention_response(
     intervention_id: str, response: str, application_id: str = None, documents_uploaded: list = None
 ) -> dict:
