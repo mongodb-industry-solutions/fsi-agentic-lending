@@ -433,6 +433,28 @@ input[type="range"]::-moz-range-thumb {
   to { opacity: 1; transform: scale(1); }
 }
 
+/* ===================== TECHNOLOGY THEATRE PANELS ===================== */
+
+@keyframes eventSlideIn {
+  from { opacity: 0; transform: translateY(-8px); max-height: 0; }
+  to   { opacity: 1; transform: translateY(0); max-height: 60px; }
+}
+
+@keyframes fieldHighlight {
+  from { background-color: rgba(0, 104, 74, 0.12); }
+  to   { background-color: transparent; }
+}
+
+@keyframes toolActive {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(0, 104, 74, 0.10); }
+  50%      { box-shadow: 0 0 0 3px rgba(0, 104, 74, 0.10), 0 0 12px rgba(0, 104, 74, 0.18); }
+}
+
+@keyframes refreshSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 /* ===================== REDUCED MOTION ===================== */
 @media (prefers-reduced-motion: reduce) {
   *,

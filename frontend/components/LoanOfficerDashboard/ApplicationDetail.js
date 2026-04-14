@@ -5,6 +5,7 @@ import { spacing } from '@leafygreen-ui/tokens';
 import Badge from '@leafygreen-ui/badge';
 import { apiGet, apiPost } from '../../lib/api';
 import { formatCurrency, getRiskColor } from './utils';
+import PipelineExplorer from './PipelineExplorer';
 
 function MetricBox({ label, value, color, mono = true }) {
   return (
@@ -22,104 +23,6 @@ function MetricBox({ label, value, color, mono = true }) {
   );
 }
 
-function RiskPipelineViz({ applicationId }) {
-  const [pipeline, setPipeline] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-
-  const fetchPipeline = useCallback(async () => {
-    if (pipeline || loading) return;
-    setLoading(true);
-    const data = await apiGet(`/applications/${applicationId}/risk-pipeline`);
-    setLoading(false);
-    if (data) setPipeline(data);
-  }, [applicationId, pipeline, loading]);
-
-  useEffect(() => {
-    if (expanded && !pipeline && !loading) fetchPipeline();
-  }, [expanded, pipeline, loading, fetchPipeline]);
-
-  const STAGE_COLORS = [
-    ['#00684A', 'var(--mongo)'], ['#1A567E', 'var(--tool-blue)'], ['#1A567E', 'var(--tool-blue)'],
-    ['#007DAE', 'var(--agent-cyan)'], ['#007DAE', 'var(--agent-cyan)'], ['#007DAE', 'var(--agent-cyan)'], ['#00684A', 'var(--success)'],
-  ];
-
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        style={{
-          width: '100%', padding: '8px 10px',
-          background: 'var(--bg-raised)', border: '1px solid var(--border-dim)',
-          borderRadius: expanded ? '6px 6px 0 0' : 6,
-          cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          fontSize: 10, fontWeight: 600, color: 'var(--mongo)', fontFamily: 'var(--font-display)',
-        }}
-      >
-        <span>Risk Aggregation Pipeline</span>
-        <span style={{
-          transform: expanded ? 'rotate(180deg)' : 'rotate(0)',
-          transition: 'transform 0.2s', display: 'inline-block',
-        }}>{'\u25BE'}</span>
-      </button>
-      {expanded && (
-        <div style={{
-          padding: '10px 12px', background: 'var(--bg-raised)',
-          border: '1px solid var(--border-dim)', borderTop: 'none',
-          borderRadius: '0 0 6px 6px',
-        }}>
-          {loading && <div style={{ fontSize: 10, color: 'var(--text-dim)', padding: 8 }}>Loading pipeline stages...</div>}
-          {pipeline?.pipeline_description && (
-            <>
-              <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                {pipeline.pipeline_description.map((stage, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{
-                      padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700,
-                      fontFamily: 'var(--font-mono)',
-                      background: `${STAGE_COLORS[i]?.[0]}20`, color: STAGE_COLORS[i]?.[1],
-                    }}>
-                      {stage.operator}
-                    </span>
-                    {i < pipeline.pipeline_description.length - 1 && (
-                      <span style={{ color: 'var(--text-dim)', fontSize: 9 }}>{'\u2192'}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-              {pipeline.pipeline_description.map((stage, i) => (
-                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 4, fontSize: 9 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', color: STAGE_COLORS[i]?.[1], fontWeight: 700, minWidth: 22 }}>
-                    S{stage.stage}
-                  </span>
-                  <span style={{ color: 'var(--text-secondary)' }}>{stage.description}</span>
-                </div>
-              ))}
-              {pipeline.risk_score != null && (
-                <div style={{
-                  marginTop: 8, padding: '6px 8px', background: 'var(--bg-surface)',
-                  borderRadius: 6, border: '1px solid var(--border-dim)',
-                  display: 'flex', gap: spacing[3], flexWrap: 'wrap',
-                }}>
-                  <MetricBox label="Risk Score" value={`${pipeline.risk_score}/100`} color={getRiskColor(pipeline.risk_score)} />
-                  <MetricBox label="Risk Tier" value={pipeline.risk_tier} color={getRiskColor(pipeline.risk_score)} />
-                  <MetricBox label="LTV" value={pipeline.ltv != null ? `${pipeline.ltv.toFixed(1)}%` : 'N/A'} />
-                  <MetricBox label="Primary Credit" value={pipeline.primary_credit_score} />
-                </div>
-              )}
-            </>
-          )}
-          {!loading && !pipeline && (
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', padding: 8 }}>
-              Pipeline data not available for this application.
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function DocumentSearch({ applicationId }) {
   const [query, setQuery] = useState('');
@@ -333,7 +236,7 @@ export default function ApplicationDetail({ appDetail, compact = false }) {
 
       {/* Risk Pipeline */}
       {application_id && (
-        <RiskPipelineViz applicationId={application_id} />
+        <PipelineExplorer applicationId={application_id} />
       )}
 
       {/* Documents */}

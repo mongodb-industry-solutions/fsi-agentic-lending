@@ -8,6 +8,7 @@ import DocumentUpload from './DocumentUpload';
 import StatusTracker from './StatusTracker';
 import DocumentContext from './DocumentContext';
 import ApplicationAgent from './ApplicationAgent';
+import TechnologyTheatre from './TechnologyTheatre';
 import NotificationToast, {
   useToasts,
 } from '../NotificationToast/NotificationToast';
@@ -280,6 +281,12 @@ export default function BorrowerPortal() {
     setDemoSessionId(getDemoSessionId());
   }, []);
 
+  // Tool activity state lifted from ApplicationAgent for TechnologyTheatre
+  const [toolActivity, setToolActivity] = useState({ active: [], history: [] });
+  const handleToolActivity = useCallback((active, completed) => {
+    setToolActivity({ active: active || [], history: completed || [] });
+  }, []);
+
   // Persist key state to sessionStorage for page refresh resilience
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -455,19 +462,32 @@ export default function BorrowerPortal() {
       <div
         style={{
           display: 'flex',
+          flexDirection: 'column',
           height: 'calc(100vh - 52px)',
           background: 'var(--bg-void)',
         }}
       >
-        <StatusTracker
+        {/* Upper zone: existing 3-column layout */}
+        <div style={{ flex: 1, display: 'flex', minHeight: 280, overflow: 'hidden' }}>
+          <StatusTracker
+            applicationId={applicationId}
+            applicationData={borrowerProfile}
+          />
+          <DocumentContext applicationId={applicationId} />
+          <ApplicationAgent
+            applicationId={applicationId}
+            applicationStatus={applicationStatus}
+            onToolActivity={handleToolActivity}
+          />
+        </div>
+
+        {/* Lower zone: Technology Theatre */}
+        <TechnologyTheatre
           applicationId={applicationId}
-          applicationData={borrowerProfile}
+          activeTools={toolActivity.active}
+          toolHistory={toolActivity.history}
         />
-        <DocumentContext applicationId={applicationId} />
-        <ApplicationAgent
-          applicationId={applicationId}
-          applicationStatus={applicationStatus}
-        />
+
         <NotificationToast toasts={toasts} onDismiss={removeToast} />
       </div>
     );

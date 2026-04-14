@@ -6,8 +6,9 @@ import { MessageBubble, StreamingBubble, TypingIndicator, ContextGathering } fro
 import { InterventionCard } from './InterventionCard';
 import { SuggestedQuestions } from './SuggestedQuestions';
 import { useApplicationChat } from './useApplicationChat';
+import { useEffect, useRef } from 'react';
 
-export default function ApplicationAgent({ applicationId, applicationStatus }) {
+export default function ApplicationAgent({ applicationId, applicationStatus, onToolActivity }) {
   const {
     messages,
     input, setInput,
@@ -23,6 +24,22 @@ export default function ApplicationAgent({ applicationId, applicationStatus }) {
     resolveIntervention,
     canSend,
   } = useApplicationChat(applicationId);
+
+  // Report tool activity to parent for TechnologyTheatre
+  const toolHistoryRef = useRef([]);
+  useEffect(() => {
+    if (!onToolActivity) return;
+    // Track completed tools in history
+    if (activeTools.length === 0 && toolHistoryRef.current.length > 0) {
+      // Tools just finished — snapshot them
+    }
+    for (const t of activeTools) {
+      if (t.status === 'complete' && !toolHistoryRef.current.find(h => h.label === t.label)) {
+        toolHistoryRef.current = [...toolHistoryRef.current, { ...t, completedAt: new Date().toISOString() }];
+      }
+    }
+    onToolActivity(activeTools, toolHistoryRef.current);
+  }, [activeTools, onToolActivity]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
