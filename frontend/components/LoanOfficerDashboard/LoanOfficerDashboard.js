@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import ApplicationQueue from './ApplicationQueue';
 import AgentActivityLog from './AgentActivityLog';
@@ -19,9 +20,11 @@ import { PortfolioIntelligence } from './PortfolioIntelligence';
 import { LiveUnderwritingResults } from './LiveUnderwritingResults';
 import { StageProgressBar } from './StageProgressBar';
 import { useLoanOfficerWorkflow } from './useLoanOfficerWorkflow';
+import TechRail from './TechRail';
 
 export default function LoanOfficerDashboard({ active = true }) {
   const { toasts, addToast, removeToast } = useToasts();
+  const [lastCorrelatedEvent, setLastCorrelatedEvent] = useState(null);
 
   const {
     selectedApp, setSelectedApp,
@@ -315,22 +318,33 @@ export default function LoanOfficerDashboard({ active = true }) {
           )}
         </div>
 
+        {/* Agent Rail — "What the AI is doing" */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
-          width: 360,
-          minWidth: 260,
-          maxWidth: 420,
+          width: 320,
+          minWidth: 240,
           flexShrink: 0,
           overflow: 'hidden',
+          borderLeft: '1px solid var(--border-dim)',
         }}>
           <AgentActivityLog
-            onEvent={handleAgentEvent}
+            onEvent={(entry) => {
+              handleAgentEvent(entry);
+              setLastCorrelatedEvent({ ...entry, _correlationTs: Date.now() });
+            }}
             applicationId={selectedApp}
           />
           <PolicyExplorer />
           <PortfolioIntelligence />
         </div>
+
+        {/* Tech Rail — "What MongoDB is doing" */}
+        <TechRail
+          applicationId={selectedApp}
+          liveAgentOutput={liveAgentOutput}
+          lastCorrelatedEvent={lastCorrelatedEvent}
+        />
       </div>
 
       <NotificationToast toasts={toasts} onDismiss={removeToast} />

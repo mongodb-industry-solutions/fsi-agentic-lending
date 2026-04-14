@@ -455,6 +455,18 @@ input[type="range"]::-moz-range-thumb {
   to   { transform: rotate(360deg); }
 }
 
+/* ===================== OFFICER TECH RAIL ===================== */
+
+@keyframes pipelineStageIn {
+  from { opacity: 0.35; transform: translateX(-4px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pipelineFlow {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 1; }
+}
+
 /* ===================== REDUCED MOTION ===================== */
 @media (prefers-reduced-motion: reduce) {
   *,
