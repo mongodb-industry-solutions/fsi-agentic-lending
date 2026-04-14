@@ -22,7 +22,7 @@ const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
-const wsProxy = createProxyServer({ target: backendUrl, ws: true });
+const wsProxy = createProxyServer({ target: backendUrl, ws: true, changeOrigin: true });
 
 wsProxy.on('error', (err, _req, socket) => {
   console.error('[WS Proxy] Error:', err.message);

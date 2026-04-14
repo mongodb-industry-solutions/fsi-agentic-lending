@@ -51,18 +51,20 @@ components/
 │   ├── PolicyBoundsIndicator.js  # Visual indicator for policy bounds compliance
 │   ├── ManualWorkspace.js        # Manual parameter editing workspace
 │   ├── HITLReviewCard.js         # Human-in-the-loop review card
-│   ├── PolicyExplorer.js         # Collapsible Atlas Vector Search over lending policies
-│   ├── PortfolioIntelligence.js  # Lazy-loaded payment trends, EWS signals, events
+│   ├── PolicyExplorer.js         # Atlas Vector Search with relevance bars and provenance
+│   ├── PortfolioIntelligence.js  # Payment trends, severity-tiered EWS, events timeline
+│   ├── PortfolioIntelligence.module.css # CSS Module for timeline connectors
 │   ├── LiveUnderwritingResults.js # Real-time underwriting metrics overlay
 │   ├── StageProgressBar.js       # 3-stage workflow progress indicator
 │   ├── ApplicationQueue.js        # Real-time queue (WebSocket), filters, sort, review accent
 │   ├── ApplicationDetail.js       # Full/compact app detail + RiskPipelineViz + DocumentSearch
-│   ├── AgentActivityLog.js        # SSE activity feed, pause/resume, action badges, view modes
+│   ├── AgentActivityLog.js        # SSE activity feed with action-typed borders, metric strip, HITL entry
+│   ├── AgentActivityLog.module.css # CSS Module for entry hover/focus-visible
 │   ├── IntentPreview.js           # Per-step expand/collapse, dependency connectors, data readiness
 │   ├── IntentPreview.module.css   # CSS Module for connector pseudo-selectors (::after)
 │   ├── DecisionSummary.js         # ProvenanceChain, audit trail copy, before/after comparison
 │   └── AutonomyDial.js            # Placeholder (not active)
-├── DemoFlow/           # 6-scene scripted walkthrough + completion screen (WorkflowCanvas, TechRecap)
+├── DemoFlow/           # 6-scene scripted walkthrough + WorkflowCanvas (Canvas 2D graph engine)
 ├── Header/             # App header with Demo Reset button
 ├── educational/        # ContextualBanner, InfoWizard
 ├── visualizations/     # Risk gauge, FICO ring, charts
@@ -99,28 +101,26 @@ All HTTP requests go through the Next.js proxy at `/api/backend/*` → FastAPI b
 
 Components implementing agentic transparency and trust patterns:
 
-| Component | File | Description |
-|-----------|------|-------------|
-| `ContextGathering` | `ChatBubbles.js` | Shows each tool being invoked during LLM context build |
-| `CitationCard` | `ChatBubbles.js` | Expandable policy RAG citation cards below messages |
-| `ThinkingStrip` | `ActivityFeed.js` | Live agent activity indicator (agent name + action + pulse) |
-| `SavingsSummary` | `SavingsSummary.js` | Post-approval animated count-up metrics |
-| `InterventionCard` | `InterventionCard.js` | Intervention display with urgency escalation timer |
-| `FloatingChatDrawer` | `BorrowerPortal.js` | Pre-application chat bubble for general questions |
-| `HowAIHelpsStrip` | `BorrowerSelection.js` | Before/after AI impact comparison stats |
-| `PolicyExplorer` | `PolicyExplorer.js` | Collapsible Atlas Vector Search over lending policies |
-| `PortfolioIntelligence` | `PortfolioIntelligence.js` | Lazy-loaded payment trends, EWS signals, events |
-| `LiveUnderwritingResults` | `LiveUnderwritingResults.js` | Real-time underwriting metrics overlay |
-| `DocumentSearch` | `ApplicationDetail.js` | Semantic search across application documents |
+| Component | Description |
+|-----------|-------------|
+| `ContextGathering` | Tool invocation transparency during LLM context build |
+| `CitationCard` | Expandable policy RAG citations below messages |
+| `ThinkingStrip` | Live agent activity indicator with pulse |
+| `InterventionCard` | Action items with urgency escalation and document upload |
+| `WorkflowCanvas` | Canvas 2D graph with multi-particle flow, HITL barrier drama, rich tooltips |
+| `AgentRailHeader` | AI Agent Layer branding with live pulse and HITL state |
+| `PolicyExplorer` | Atlas Vector Search with relevance bars and provenance |
+| `PortfolioIntelligence` | Payment trends, severity-tiered EWS, events timeline |
+| `LiveUnderwritingResults` | Real-time underwriting metrics overlay |
 
-Custom `@keyframes` in `globals.css`: `thinkingFade`, `metricRevealBefore`, `metricRevealAfter`, `completionBurst`, `shimmerCard`, `urgencyPulse`, `toolCheckIn`.
+Custom `@keyframes` in `globals.css` for agentic animations. All respect `prefers-reduced-motion`. WorkflowCanvas uses JS-side `matchMedia` for Canvas 2D animations.
 
 ## Styling
 
 - **LeafyGreen UI** (`@leafygreen-ui/*`) — MongoDB design system components and tokens
 - **CSS Custom Properties** — defined in root layout (`--text-primary`, `--bg-surface`, `--border-dim`, `--mongo`, `--hitl-amber`, `--success`, `--danger`, `--success-dim`, `--danger-dim`, `--mongo-dim`, `--hitl-amber-dim`, etc.)
 - **Inline styles** — intentional for this demo to keep components self-contained
-- **CSS Modules** — used only for pseudo-selectors (`::after`, `:hover`) that can't be expressed inline (e.g., `IntentPreview.module.css`)
+- **CSS Modules** — used only for pseudo-selectors (`:hover`, `:focus-visible`, `::after`, `::before`) that can't be expressed inline
 - **CSS `@keyframes`** — defined in `globals.css` for animations. Agentic patterns under "AGENTIC UI PATTERNS" section. All respect `prefers-reduced-motion`.
 - **Fonts** — Euclid Circular A (display/body), Source Code Pro (mono)
 

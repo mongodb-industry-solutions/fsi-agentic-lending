@@ -18,8 +18,9 @@ End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangG
 │   │ • Form+Valid │  │ • Activity (SSE)   │  │ • Underwriting           │  │
 │   │ • Status(SSE)│  │ • HITL Review      │  │ • Approval               │  │
 │   │ • AI Chat    │  │ • Intent Preview   │  │ • Closing                │  │
-│   │ • Tech       │  │ • Decision Summary │  │ • Funding                │  │
-│   │   Theatre    │  │ • Tech Rail        │  │ • Servicing              │  │
+│   │   + Gen UI   │  │ • Decision Summary │  │ • Funding                │  │
+│   │ • Tech       │  │ • Tech Rail        │  │ • Servicing              │  │
+│   │   Theatre    │  │                    │  │                           │  │
 │   └──────┬───────┘  └────────┬───────────┘  └───────────────────────────┘  │
 │          │                   │                                              │
 │          └───────────┬───────┘                                              │
@@ -84,6 +85,8 @@ End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangG
 │   │ Agent      │  │ Lock         │  │ Service      │  │ Breaker      │   │
 │   │ (Chatbot)  │  │ (TTL-based)  │  │ (Bedrock     │  │              │   │
 │   │ SSE stream │  │              │  │  Converse)   │  │              │   │
+│   │ Generative │  │              │  │              │  │              │   │
+│   │ UI (7 comp)│  │              │  │              │  │              │   │
 │   └────────────┘  └──────────────┘  └──────────────┘  └──────────────┘   │
 │                                                                             │
 │   ┌────────────┐  ┌────────────┐  ┌──────────────┐                       │
@@ -262,16 +265,23 @@ Interventions include separate `internal_context` (for officer/pipeline use) and
 
 ### Application Agent (AI Chat)
 
-Context-aware conversational assistant for borrowers:
+Context-aware conversational assistant with **Generative UI** — the agent renders interactive React components inline in chat messages alongside text responses:
 
-- Streaming markdown responses via SSE with tool transparency (tool_call events during context gathering)
-- Intervention awareness — surfaces pending action items as in-chat cards with urgency escalation (pulse animation + elapsed timer after 30s)
-- Contextual suggested questions that adapt to application status phase
-- Policy RAG citations surfaced as expandable reference cards below assistant messages
-- Floating pre-application chat drawer available during profile selection and form phases
-- Conversation persistence in MongoDB `conversations` collection
-- Safety-filtered responses (PII, loan-specific guardrails)
-- Pre-application general chat (`/chat/general/message`) for questions before submitting
+- **Generative UI Components** — 7 interactive components rendered inline based on conversation context:
+  - **AffordabilityCalculator** — sliders for rate, term, down payment with live GDS/TDS gauges (Canadian semi-annual compounding)
+  - **DocumentChecklist** — real-time document status with progress bar
+  - **ApplicationStrength** — qualitative factor assessment (borrower-safe, no raw scores)
+  - **RateComparison** — Fixed 3yr/5yr/Variable with recommended badge and savings differential
+  - **PaymentSchedule** — amortization table with monthly/annual toggle and P/I ratio
+  - **ScenarioComparison** — side-by-side what-if with diff highlighting
+  - **ClosingTimeline** — post-approval 4-step timeline
+- **Architecture** — Backend detects components via keyword matching (`UI_TRIGGERS`) with status gates, emits `ui_component` SSE events with structured data, frontend maps to React via `ComponentRegistry`. LLM context injection tells the model which visuals are shown so text complements rather than duplicates.
+- **Stage-aware prompt** — response tone and content calibrated by application status (pre-submission, processing, underwriting, review, approved, declined)
+- **Tool transparency** — per-tool latency, result counts, source badges ("Your application", "Lending policies"), expandable reasoning disclosure
+- **Quick action pills** — context-aware buttons (Calculator, Documents, Rates) that trigger generative UI
+- **Context strip** — persistent bar showing borrower name, app ID, status, mortgage amount
+- **Proactive system messages** — status change notifications injected as centered banners
+- Streaming markdown responses via SSE, intervention cards with document upload, policy RAG citations, conversation persistence, safety filter, floating pre-application drawer
 
 ### Officer Overrides (HITL)
 
@@ -304,52 +314,36 @@ TTL-based distributed locks in the `pipeline_locks` collection prevent concurren
 
 Phase-based flow: **profile selection → application form → real-time tracking**.
 
-- **Borrower Selection** — 5 seeded demo profiles, each showcasing a different pipeline outcome. Cards display key stat badges (income, LTV, credit score), a narrative explaining *why* this profile produces its outcome, risk factor chips, and a color-coded pipeline hint badge. Profiles: Marcus Delgado (officer review), Jane Doe (auto-approve), John Smith (borderline escalate), Bob Johnson (decline), Sarah Williams (doc issue → fix → approve). Solo applicant handling for profiles without co-applicants. "How AI Helps" before/after comparison strip and interactive demo-flow explainer with expandable technology details per step.
-- **Application Form** — co-applicant fields, amortization calculator, hybrid read-only / editable sections, client-side validation with inline error states via LeafyGreen `TextInput`.
-- **Status Tracker** — 10-stage timeline driven by SSE (`/applications/{id}/status`) with live `ThinkingStrip` showing agent activity in real-time, confidence badges on completed stages (e.g., "N resolved by AI", "Document verified"), staggered before/after metric reveals, `completionBurst` animations. Decision Ready stage shows directional hints ("All metrics within auto-approval bounds" or "Risk exceeds threshold").
-- **Approval Context** — `ApprovalContextCard` shows "Why This Was Approved" with risk score, tier, GDS/TDS within policy limits, and credit score. Detects auto-approved vs officer-reviewed from decision reasoning.
-- **Decline Experience** — `DeclineCard` renders structured decline reasons from `decision_reasoning`, keyword-mapped actionable guidance (numbered steps), risk metric badges, and a "Speak with AI Assistant" CTA that opens the floating chat.
-- **Savings Summary** — profile-aware messaging: "Fully autonomous approval — zero officer touchpoints" for auto-approve, "AI prepared your case, officer confirmed approval" for officer-reviewed. Animated count-up metrics from real `stageContext`.
-- **Approval Details** — loan summary metrics (rate, payment, amount, product) and a 4-step closing timeline (Rate Lock → Doc Prep → Signing → Funding). Data from real `stageContext` — only populated for approved applications.
-- **Document Context** — document checklist with status polling, shimmer animation on processing documents, PDF + extracted JSON split-pane viewer.
-- **Application Agent (AI Chat)** — streaming markdown responses with tool transparency (`ContextGathering` component shows each tool being invoked during context build), policy RAG citations as expandable reference cards, contextual suggested questions adapting to application status, intervention action cards with urgency escalation (pulse + elapsed timer after 30s), **document upload buttons** for missing document interventions (uploads pre-seeded correction PDFs via demo-upload API), conversation history persistence.
-- **Floating Chat Drawer** — pre-application chat bubble available during profile selection and form phases for general questions.
-- **Technology Theatre** — collapsible lower zone ("glass floor") with drag-to-resize handle, revealing 3 tabs:
-  - **Change Stream Console** — live event feed synthesized from SSE, with operation badges (INSERT/UPDATE), collection filter, pause/resume, event count + connection status dot.
-  - **Document Model Viewer** — annotated recursive tree view of the application document with type-colored values and change-highlighting flash animations. Toggle between tree and raw JSON.
-  - **AI Capabilities Panel** — 6 tool cards with technology badges that glow when invoked during chat.
-- **Session Persistence** — `tracking` phase persists to `sessionStorage`; page refresh restores state. Demo reset clears all session keys.
-- **Demo Reset** — header button resets the demo with `POST /demo/reset` + session cleanup.
+- **Borrower Selection** — 5 seeded profiles (auto-approve, officer review, borderline, decline, doc issue). Cards with stats, narrative, risk factors, pipeline hint badge.
+- **Application Form** — co-applicant fields, amortization calculator, validation with LeafyGreen `TextInput`.
+- **Status Tracker** — SSE-driven 10-stage timeline with live ThinkingStrip, confidence badges, metric reveals.
+- **Outcome Cards** — ApprovalContextCard ("Why This Was Approved"), DeclineCard (structured reasons + actionable guidance), SavingsSummary (animated count-up metrics), approval details with closing timeline.
+- **AI Chat with Generative UI** — streaming markdown with inline interactive components (affordability calculator, document checklist, rate comparison, payment schedule, application strength, scenario comparison, closing timeline). Tool transparency with per-tool timing, source badges, reasoning disclosure. Quick action pills, context strip, proactive status notifications. Policy RAG citations, intervention cards with document upload. Floating pre-application drawer.
+- **Technology Theatre** — collapsible "glass floor" with Change Stream console, Document Model viewer, AI Capabilities panel (tool cards glow when invoked).
 
 ### 2. Loan Officer Dashboard
 
 Full-featured officer workspace with real-time data flows and human-in-the-loop decisioning. Dual-rail architecture on the right side.
 
-- **Application Queue** — real-time via WebSocket + MongoDB Change Stream. Filterable by status (All / Pending Review / Processing / Completed), sortable (Newest First / Needs Attention), with amber accent on applications awaiting review and a review-count badge.
-- **Application Detail** — comprehensive view: borrower info, income summary, loan terms, property details, risk assessment (score, tier, GDS/TDS), credit reports, documents with status badges. Compact mode for inline display during processing. Includes expandable **Pipeline Explorer** (7-stage MongoDB aggregation pipeline interactive horizontal/vertical flow with per-stage operator, timing, doc count, copy pipeline) and **Document Search** panel (semantic search via Atlas Vector Search).
-- **Live Underwriting Results** — real-time metrics overlay during processing, powered by `node_complete` SSE output capture. Shows document count, credit score, risk score with tier badge, GDS/TDS ratios, and stress test pass/fail.
-- **Stage Progress Bar** — 4-stage progress indicator (Origination → Underwriting → Closing → HITL) with animated transitions, elapsed durations per stage via ref-based timestamps.
-- **Agent Activity Log** — real-time SSE feed with search filtering, color-coded by agent (teal/amber/purple), compact/detailed view mode toggle, action-type badges (DATA, COMPUTE, SEARCH, DECIDE, ALERT), pause/resume with buffer count, REST fallback from `/hitl/{id}/context` for already-in-review apps.
-- **Policy Explorer** — collapsible panel for Atlas Vector Search across lending policies. Auto-loads on first expand, click-to-expand result cards.
-- **Portfolio Intelligence** — lazy-loaded payment trends, Early Warning System (EWS) signals (`signal`, `status`, `detail`, `icon`), and recent portfolio events. Auto-fetches a sample loan if none selected.
-- **Intent Preview** — agent's planned execution steps with per-step expand/collapse, dependency connectors (CSS Module pseudo-selectors), data readiness badges ("3/3 inputs"), dynamically computed total estimate, and a proceed button.
-- **HITL Review** — auto-fetched context enriched with risk metrics from LangGraph checkpoint state. Structured risk factor rows with pass/fail badges, GDS/TDS ThresholdBar visualizations, 3-part agent reasoning card. Approve/decline/modify with officer overrides (loan amount, risk tier, conditions). `submitting` state prevents double-submission. Modified terms trigger `modify_and_continue` with re-underwriting via SSE reconnection.
-- **Decision Summary** — provenance chain (horizontal Agent → Officer → Final flow with timestamps), "Copy Audit Trail" button with inline "Copied!" feedback, before/after comparison for modified decisions. Shows decision type (`auto` / `officer` / `manual` / `declined`), key metrics, policy violations for declines, stage timeline, and full expandable audit trail.
-- **Dashboard Stats** — stats bar with trend arrows (↑/↓ from `prevStatsRef`), average processing time, elapsed timer during execution. Portfolio stats merged from `GET /portfolio/stats`.
-- **Status-Aware Phase Initialization** — selecting an application reads its queue status to initialize the correct UI phase (preview, executing, HITL review, or decision summary) without race conditions.
-- **Agent Rail** (320px) — `AgentActivityLog` + `PolicyExplorer` + `PortfolioIntelligence` on white background.
-- **Tech Rail** (340px, collapsible to 40px icon strip) — on dark `--bg-void` background:
-  - **OfficerChangeStreamConsole** — SSE-driven change stream with ops/sec rolling counter (5s window), collection count badges, cross-rail correlation highlighting (500ms window → cyan left-border flash).
-  - **AggregationPipelineVisualizer** — 7-stage vertical waterfall, color-coded by operator type, stages progressively reveal from `liveAgentOutput`. Collapsed header shows "7-Stage Pipeline | 3.4ms | Risk: 34/100".
-  - **OfficerDocModelInspector** — wraps the borrower portal's `DocumentModelViewer`.
-- **Active-Gated Connections** — WebSocket, polling, and stats fetches only fire when the officer tab is visible (`active` prop). Reconnects on `false→true` transition.
+- **Application Queue** — real-time via WebSocket + Change Stream, filterable and sortable, amber accent on review-needed apps.
+- **Application Detail** — borrower info, risk assessment, credit reports, documents. Includes **Pipeline Explorer** (7-stage aggregation viz) and **Document Search** (Atlas Vector Search).
+- **Workflow Canvas** — Canvas 2D engine (21 nodes, 5 shape types) with multi-particle comet trails, layered glow, rich tooltips with technology context. HITL drama: amber barrier line, particle freeze, downstream dimming, resolution pulse.
+- **Live Underwriting Results** — real-time metrics overlay (risk score, GDS/TDS, credit score, stress test).
+- **Agent Activity Log** — SSE feed with color-coded left-borders by action type, metric summary strip, HITL gate entry, agent transition dividers, pause/resume.
+- **Policy Explorer** — Atlas Vector Search with relevance bars, search provenance, term highlighting, HITL auto-search.
+- **Portfolio Intelligence** — Payment trends (SVG trend line), severity-tiered EWS cards, events timeline.
+- **Intent Preview** — agent's planned execution steps with dependency connectors and data readiness badges.
+- **HITL Review** — risk metrics from LangGraph checkpoint, approve/decline/modify with officer overrides and re-underwriting.
+- **Decision Summary** — provenance chain, audit trail, before/after comparison for modified decisions.
+- **Agent Rail** (320px) — branded "AI Agent Layer" header with live pulse and stats, cyan-to-amber border on HITL. Agent events highlight corresponding canvas nodes.
+- **Tech Rail** (340px, collapsible) — Change Stream console (ops/sec, cross-rail correlation), Aggregation Pipeline visualizer, Document Model inspector.
 
 ### 3. Demo Flow
 
 6-scene scripted walkthrough demonstrating the full lending lifecycle.
 
 - **SceneNavBar** — scene navigation pills with progress connectors, capability counter Badge, single-click speed cycle, Play/Pause/Step/Back/Reset controls.
-- **WorkflowCanvas** — animated node graph (21 nodes + edges) showing data flow between agents and MongoDB capabilities. Softened glow oscillations, single particle per active edge. `needsAnimation` flag stops rAF loop when static. Exports `ALL_NODE_IDS` and `ALL_EDGES` for completion screen.
+- **WorkflowCanvas** — Canvas 2D engine (21 nodes, 5 shape types) with multi-particle comet trails, layered glow, technology-aware tooltips, and HITL barrier drama. Shared between Demo Flow and Officer Dashboard.
 - **AnnotationOverlay** — compact step annotation bar with progress dots, agent name, clickable capability badges with educational popovers, collapsible reasoning text.
 - **PipelineDrawer** — slide-out activity log (right edge toggle, Escape to close, `aria-expanded`).
 - **Origination** — multi-document extraction (CRA Notice, Bank Statement, Pay Stub) with progressive field reveal, tab switcher with aggregate confidence Badges, Open Banking headline metrics.

@@ -24,7 +24,7 @@ export const DOCUMENTS = [
   { id: "doc-investments", name: "Investment Statements", glyph: "Charts" },
   { id: "doc-property", name: "Existing Property Docs", glyph: "Building" },
   { id: "doc-application", name: "Mortgage Application", glyph: "Edit" },
-  { id: "doc-utilities", name: "Utility Bills", glyph: "Lightbulb" },
+  { id: "doc-utilities", name: "Utility Bills", glyph: "Bulb" },
   { id: "doc-credit", name: "Credit Reports", glyph: "CreditCard" },
   { id: "doc-carloan", name: "Car Loan Statement", glyph: "CreditCard" },
   { id: "doc-proptax", name: "Property Tax Notice", glyph: "Building" },
