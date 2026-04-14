@@ -253,7 +253,7 @@ export default function AICapabilitiesPanel({ applicationId, activeTools, toolHi
               transition: 'background 150ms ease',
             }}
           >
-            "{suggestedQuestion}"
+            &ldquo;{suggestedQuestion}&rdquo;
           </button>
         </div>
       </div>
