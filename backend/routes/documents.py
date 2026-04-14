@@ -88,16 +88,26 @@ async def get_document(doc_id: str):
 def _build_pdf_dirs():
     """Build the list of directories to search for PDF files.
 
-    Supports an optional PDF_BASE_DIR env var for custom locations (e.g. Docker
-    volumes). Falls back to resolving relative to this source file.
+    Searches all profile subdirectories under synthetic data/ so PDFs are
+    found regardless of which profile they belong to. Supports an optional
+    PDF_BASE_DIR env var for custom locations (e.g. Docker volumes).
     """
     base_override = os.environ.get("PDF_BASE_DIR")
     if base_override:
         base = Path(base_override).resolve()
-        dirs = [base / "synthetic data", base / "uploads", base]
+        synthetic = base / "synthetic data"
+        dirs = [base / "uploads", base]  # base root for flat Docker layouts
     else:
         docs_root = _PROJECT_ROOT / "docs"
-        dirs = [docs_root / "synthetic data", docs_root / "uploads"]
+        synthetic = docs_root / "synthetic data"
+        dirs = [docs_root / "uploads"]
+
+    # Add all profile subdirectories (marcus-delgado/, jane-doe/, etc.)
+    if synthetic.is_dir():
+        for d in sorted(synthetic.iterdir()):
+            if d.is_dir():
+                dirs.append(d)
+    dirs.append(synthetic)  # fallback: root level
     return dirs
 
 

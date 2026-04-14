@@ -3,6 +3,8 @@ from langgraph.types import Send
 
 from agents.state import LendFlowState
 from agents.pipeline.tools import log_agent_activity
+from db.mdb import get_db as _get_db
+from services.application_service import update_application_status
 
 PARALLEL_GATHER_NODES = ("doc_verifier", "credit_puller")
 
@@ -24,6 +26,27 @@ def supervisor_node(state: LendFlowState, **kwargs) -> dict:
     if state.get("last_error"):
         log_agent_activity(app_id, "supervisor", "error", "Max retries exceeded")
         return {"current_agent": "complete", "decision": "error"}
+
+    # Check for blocking interventions — pipeline must pause until borrower resolves them
+    try:
+        pending_blocking = _get_db()["interventions"].count_documents({
+            "application_id": app_id,
+            "internal_context.severity": "blocking",
+            "status": {"$in": ["pending", "active"]},
+        })
+    except Exception:
+        pending_blocking = 0  # DB unavailable — proceed without blocking
+
+    if pending_blocking > 0:
+        log_agent_activity(app_id, "supervisor", "blocked",
+            f"{pending_blocking} blocking intervention(s) require borrower action — pausing pipeline")
+        try:
+            update_application_status(app_id, "action_required",
+                f"Waiting for borrower to resolve {pending_blocking} issue(s)")
+        except Exception as e:
+            log_agent_activity(app_id, "supervisor", "error",
+                f"Failed to set action_required status: {e}")
+        return {"current_agent": "complete", "decision": "blocked"}
 
     gathered_once = state.get("gather_attempts", 0) >= 1
     if not gathered_once and (not state.get("documents_verified", False) or not state.get("credit_pulled", False)):

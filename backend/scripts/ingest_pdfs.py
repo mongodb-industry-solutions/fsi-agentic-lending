@@ -28,7 +28,7 @@ def _resolve_project_root() -> Path:
         return two_up
     return two_up.parent
 
-PDF_DIR = _resolve_project_root() / "docs" / "synthetic data"
+PDF_DIR = _resolve_project_root() / "docs" / "synthetic data" / "marcus-delgado"
 
 # Document type mapping (filename prefix -> doc_type)
 DOC_TYPES = {

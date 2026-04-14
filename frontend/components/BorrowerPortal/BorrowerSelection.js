@@ -146,8 +146,8 @@ const BORROWER_PROFILES = [
     creditScore: '760',
     seedApplicationId: 'APP-2026-00005',
     pipelineHint: 'Doc Issue \u2192 Fix \u2192 Approve',
-    narrative: 'AI flags missing pay stubs and approves on strong financials \u2014 borrower uploads the missing document via chat to complete the file before closing.',
-    riskFactors: ['Missing pay stubs flagged', 'Strong credit (760)', 'Expect: Approve + doc upload via chat'],
+    narrative: 'Strong finances but incomplete documentation \u2014 AI detects missing pay stubs, pauses processing, and guides resolution via chat before approving.',
+    riskFactors: ['Missing pay stubs blocks pipeline', 'Strong credit (760)', 'Expect: Upload \u2192 re-evaluate \u2192 auto-approve'],
   },
 ];
 

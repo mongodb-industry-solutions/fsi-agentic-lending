@@ -10,6 +10,11 @@ def completion_node(state: LendFlowState, **kwargs) -> dict:
     app_id = state["application_id"]
     decision = state.get("decision", "unknown")
 
-    log_agent_activity(app_id, "supervisor", "pipeline_complete", f"Lending pipeline complete. Final decision: {decision}")
+    if decision == "blocked":
+        log_agent_activity(app_id, "supervisor", "pipeline_paused",
+            "Pipeline paused — awaiting borrower action to resolve blocking intervention(s)")
+    else:
+        log_agent_activity(app_id, "supervisor", "pipeline_complete",
+            f"Lending pipeline complete. Final decision: {decision}")
 
     return {"current_agent": "complete", "completed_at": datetime.now(timezone.utc).isoformat()}

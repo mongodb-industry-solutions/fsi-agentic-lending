@@ -363,8 +363,9 @@ def reset_all_demo_data() -> dict:
 
 
 _VALID_TRANSITIONS = {
-    "submitted": {"processing", "error"},
-    "processing": {"underwriting", "review", "approved", "declined", "error"},
+    "submitted": {"processing", "action_required", "error"},
+    "processing": {"underwriting", "review", "approved", "declined", "action_required", "error"},
+    "action_required": {"processing", "error"},  # processing: re-evaluate after borrower resolves
     "underwriting": {"review", "approved", "declined", "error"},
     "review": {"processing", "approved", "declined", "error", "hitl_error"},
     "approved": {"closing", "error"},

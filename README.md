@@ -137,9 +137,12 @@ End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangG
                     │  • auto     — fully autonomous                  │
                     │                                                  │
                     │  Retry: last_error + retry_count < 3 → retry    │
+                    │  Blocking: pending blocking interventions →      │
+                    │            pause (status=action_required)        │
                     │  Gather: gather_attempts counter prevents loops  │
                     │                                                  │
                     │  Routing:                                        │
+                    │  • blocking interventions → complete (paused)    │
                     │  • not gathered → parallel (doc_verifier +      │
                     │                   credit_puller via Send)        │
                     │  • docs not verified → loan_app                 │
@@ -241,7 +244,7 @@ Default is `bounded`. HITL escalation triggers: high purchase price (>$500K), el
 
 ### OSFI B-20 Stress Test
 
-Every application is stress-tested at `max(contract_rate + 2%, 5.25%)`. Explicit pass/fail with GDS/TDS at the stress rate. Failure → automatic decline with regulatory reason. Stress metrics (`stress_gds`, `stress_tds`, `stress_rate`) are persisted to state and MongoDB.
+Every application is stress-tested at `max(contract_rate + 2%, 5.25%)`. LTV-aware: insured mortgages (LTV > 80%) use tighter limits (GDS 35%, TDS 42%) vs conventional (GDS 39%, TDS 44%). Explicit pass/fail with GDS/TDS at the stress rate. Failure → automatic decline with regulatory reason. Stress metrics (`stress_gds`, `stress_tds`, `stress_rate`, `gds_limit`, `tds_limit`, `is_insured`) are persisted to state and MongoDB.
 
 ### Intervention Pipeline
 
@@ -250,10 +253,12 @@ Pipeline agents create typed interventions that surface as borrower-facing actio
 - `stress_test_failure` — OSFI B-20 stress test failed (blocking)
 - `income_data_required` — combined income is zero/missing (blocking)
 - `credit_score_required` — primary credit score unavailable (blocking)
+- `missing_document` — required document types missing (blocking) — pipeline pauses until borrower uploads
 - `credit_data_unavailable` — credit bureau data not retrieved (advisory)
-- `missing_document` / `additional_info_required` — document gaps
+- `document_processing_error` — PDF extraction failed (advisory)
+- `additional_info_required` — escalation notification for officer review (advisory)
 
-Interventions include separate `internal_context` (for officer/pipeline use) and `borrower_context` (safe to display in chat). When a borrower resolves the last blocking intervention, the system auto-triggers `/agent/{id}/re-evaluate` to restart the pipeline.
+Interventions include separate `internal_context` (for officer/pipeline use) and `borrower_context` (safe to display in chat). **Blocking interventions pause the pipeline** — the supervisor detects pending blocking interventions and sets status to `action_required`, stopping execution until the borrower resolves them. When the last blocking intervention is resolved, the system auto-triggers `/agent/{id}/re-evaluate` to restart the pipeline. The `InterventionCard` in the chat UI renders "Upload Document" buttons for `missing_document` interventions, calling the demo-upload API endpoint to upload pre-seeded correction PDFs.
 
 ### Application Agent (AI Chat)
 
@@ -299,13 +304,15 @@ TTL-based distributed locks in the `pipeline_locks` collection prevent concurren
 
 Phase-based flow: **profile selection → application form → real-time tracking**.
 
-- **Borrower Selection** — seeded demo profiles with key stat badges (combined income, LTV ratio, credit score), a "How AI Helps" before/after comparison strip, and an interactive demo-flow explainer with expandable technology details per step.
+- **Borrower Selection** — 5 seeded demo profiles, each showcasing a different pipeline outcome. Cards display key stat badges (income, LTV, credit score), a narrative explaining *why* this profile produces its outcome, risk factor chips, and a color-coded pipeline hint badge. Profiles: Marcus Delgado (officer review), Jane Doe (auto-approve), John Smith (borderline escalate), Bob Johnson (decline), Sarah Williams (doc issue → fix → approve). Solo applicant handling for profiles without co-applicants. "How AI Helps" before/after comparison strip and interactive demo-flow explainer with expandable technology details per step.
 - **Application Form** — co-applicant fields, amortization calculator, hybrid read-only / editable sections, client-side validation with inline error states via LeafyGreen `TextInput`.
-- **Status Tracker** — 9-stage timeline driven by SSE (`/applications/{id}/status`) with live `ThinkingStrip` showing agent activity in real-time, confidence badges on completed stages (e.g., "N resolved by AI", "Document verified"), staggered before/after metric reveals, `completionBurst` animations, and a post-approval `SavingsSummary` card with animated count-up metrics.
+- **Status Tracker** — 10-stage timeline driven by SSE (`/applications/{id}/status`) with live `ThinkingStrip` showing agent activity in real-time, confidence badges on completed stages (e.g., "N resolved by AI", "Document verified"), staggered before/after metric reveals, `completionBurst` animations. Decision Ready stage shows directional hints ("All metrics within auto-approval bounds" or "Risk exceeds threshold").
+- **Approval Context** — `ApprovalContextCard` shows "Why This Was Approved" with risk score, tier, GDS/TDS within policy limits, and credit score. Detects auto-approved vs officer-reviewed from decision reasoning.
 - **Decline Experience** — `DeclineCard` renders structured decline reasons from `decision_reasoning`, keyword-mapped actionable guidance (numbered steps), risk metric badges, and a "Speak with AI Assistant" CTA that opens the floating chat.
+- **Savings Summary** — profile-aware messaging: "Fully autonomous approval — zero officer touchpoints" for auto-approve, "AI prepared your case, officer confirmed approval" for officer-reviewed. Animated count-up metrics from real `stageContext`.
 - **Approval Details** — loan summary metrics (rate, payment, amount, product) and a 4-step closing timeline (Rate Lock → Doc Prep → Signing → Funding). Data from real `stageContext` — only populated for approved applications.
 - **Document Context** — document checklist with status polling, shimmer animation on processing documents, PDF + extracted JSON split-pane viewer.
-- **Application Agent (AI Chat)** — streaming markdown responses with tool transparency (`ContextGathering` component shows each tool being invoked during context build), policy RAG citations as expandable reference cards, contextual suggested questions adapting to application status, intervention action cards with urgency escalation (pulse + elapsed timer after 30s), conversation history persistence.
+- **Application Agent (AI Chat)** — streaming markdown responses with tool transparency (`ContextGathering` component shows each tool being invoked during context build), policy RAG citations as expandable reference cards, contextual suggested questions adapting to application status, intervention action cards with urgency escalation (pulse + elapsed timer after 30s), **document upload buttons** for missing document interventions (uploads pre-seeded correction PDFs via demo-upload API), conversation history persistence.
 - **Floating Chat Drawer** — pre-application chat bubble available during profile selection and form phases for general questions.
 - **Technology Theatre** — collapsible lower zone ("glass floor") with drag-to-resize handle, revealing 3 tabs:
   - **Change Stream Console** — live event feed synthesized from SSE, with operation badges (INSERT/UPDATE), collection filter, pause/resume, event count + connection status dot.
@@ -353,6 +360,22 @@ Full-featured officer workspace with real-time data flows and human-in-the-loop 
 - **Servicing** — portfolio stats grid, top-3 Early Warning System signals, live event feed, 4-step renewal intervention card. Real-time data from `/portfolio/stats`.
 - **Completion Screen** — full WorkflowCanvas with all nodes completed (green edges, checkmarks), `TechRecap` card with 5 collapsible sections (Performance Stats, Tech Stack, Cross-Lifecycle Intelligence, By the Numbers).
 
+## Demo Borrower Profiles
+
+5 seeded profiles exercise every pipeline decision path:
+
+| Profile | Pipeline Path | Key Trigger | Province |
+|---------|--------------|------------|----------|
+| **Marcus & Sofia Delgado** | Officer Review → Approve | Purchase $875K > $500K threshold | AB |
+| **Jane & John Doe** | Auto-Approve | Clean credit (798/772), low ratios, < $500K | BC |
+| **John Smith** (solo) | Borderline → Officer Escalate | Credit 695 + stress GDS > 36% → Tier C | ON |
+| **Bob & Alice Johnson** | Decline | Stress test failure (GDS 68% vs 39% limit) | ON |
+| **Sarah Williams** (solo) | Doc Issue → Fix → Approve | Missing paystubs → blocking intervention → upload via chat → re-evaluate | ON |
+
+Each profile has 14 synthetic PDF documents (government ID, employment letter, paystubs, tax notices, bank statements, purchase agreement, investment statements, property docs, mortgage application, utility bills, credit report, car loan, property tax, property inspection) in `docs/synthetic data/<profile-id>/`. PDFs are generated by `backend/scripts/generate_profile_pdfs.py` using `fpdf2`.
+
+Sarah Williams demonstrates the **full intervention resolution loop**: pipeline detects missing paystubs → creates blocking intervention → pipeline pauses (`action_required` status) → borrower sees InterventionCard in chat with "Upload Pay Stubs" button → uploads pre-seeded PDF via demo-upload API → acknowledges intervention → pipeline re-evaluates → auto-approves.
+
 ## Prerequisites
 
 - Python 3.13+
@@ -375,7 +398,7 @@ cp .env.example .env
 make uv_init && make uv_sync
 
 uv run python -m scripts.create_indexes    # Create collections + indexes
-uv run python -m scripts.ingest_pdfs       # Ingest 14 synthetic PDFs + seed payments
+uv run python -m scripts.ingest_pdfs       # Seed 5 borrower profiles (70 PDFs + credit + payments + policies)
 uv run uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 

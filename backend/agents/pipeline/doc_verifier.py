@@ -123,9 +123,9 @@ def doc_verifier_node(state: LendFlowState, **kwargs) -> dict:
                 intervention_type="missing_document",
                 source_node="doc_verifier",
                 risk_flag="incomplete_documentation",
-                severity="advisory",
+                severity="blocking",
                 borrower_summary=f"We noticed {len(missing)} document(s) may be missing from your application.",
-                action_required="Please upload the missing documents to strengthen your application.",
+                action_required="Please upload the missing documents to continue processing.",
                 doc_types=list(missing),
                 internal_extras={"missing_types": list(missing)},
             ):

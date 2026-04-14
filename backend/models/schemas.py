@@ -8,6 +8,7 @@ from datetime import datetime
 class ApplicationStatus(str, Enum):
     submitted = "submitted"
     processing = "processing"
+    action_required = "action_required"
     underwriting = "underwriting"
     review = "review"
     approved = "approved"
