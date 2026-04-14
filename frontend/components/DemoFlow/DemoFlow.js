@@ -63,7 +63,7 @@ function DisclaimerModal({ onDismiss }) {
         justifyContent: 'center',
         background: 'rgba(0, 0, 0, 0.55)',
         backdropFilter: 'blur(6px)',
-        animation: 'sceneTitleEnter 0.3s ease-out forwards',
+        animation: 'fadeIn 0.3s ease-out',
       }}
       onClick={onDismiss}
     >
