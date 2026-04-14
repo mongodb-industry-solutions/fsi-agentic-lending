@@ -128,10 +128,13 @@ export function PortfolioIntelligence() {
                 }}>
                   <span style={{
                     width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
-                    background: (alert.severity === 'high' || alert.severity === 'critical')
-                      ? 'var(--danger)' : 'var(--hitl-amber)',
+                    background: (alert.status === 'red' || alert.severity === 'high' || alert.severity === 'critical')
+                      ? 'var(--danger)' : (alert.status === 'amber' ? 'var(--hitl-amber)' : 'var(--success)'),
                   }} />
-                  {alert.message || alert.description || alert.type || JSON.stringify(alert).slice(0, 80)}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <span>{alert.signal || alert.message || alert.description || alert.type || JSON.stringify(alert).slice(0, 80)}</span>
+                    {alert.detail && <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{alert.detail}</span>}
+                  </div>
                 </div>
               ))}
             </div>
@@ -161,7 +164,7 @@ export function PortfolioIntelligence() {
                     {ev.timestamp ? new Date(ev.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
                   </span>
                   <span style={{ color: 'var(--text-secondary)' }}>
-                    {ev.description || ev.event || ev.type || JSON.stringify(ev).slice(0, 80)}
+                    {ev.message || ev.description || ev.event || ev.type || JSON.stringify(ev).slice(0, 80)}
                   </span>
                 </div>
               ))}

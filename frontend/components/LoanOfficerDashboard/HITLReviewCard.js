@@ -20,7 +20,9 @@ export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove,
   const product = app.product || queueData?.product || 'N/A';
   const riskScore = app.risk_score ?? null;
   const policyCitations = activityTrail.filter((a) =>
-    a.action?.includes('policy') || a.action?.includes('escalat') || a.action?.includes('autonomy_gate')
+    a.action?.includes('policy') || a.action?.includes('escalat') || a.action?.includes('autonomy_gate') ||
+    a.action?.includes('decision') || a.action?.includes('interrupt') || a.action?.includes('risk_score') ||
+    a.action?.includes('intervention')
   );
   const recommendation = activityTrail.find((a) =>
     a.action?.includes('decision') || a.action?.includes('complete') || a.detail?.includes('recommend')

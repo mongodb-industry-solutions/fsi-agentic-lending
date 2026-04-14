@@ -219,7 +219,7 @@ async def get_interventions(application_id: str):
 
 @router.post("/chat/{application_id}/interventions/{intervention_id}/resolve")
 async def resolve_intervention(application_id: str, intervention_id: str):
-    """Resolve/acknowledge a pending intervention."""
+    """Resolve/acknowledge a pending intervention. Auto-triggers re-evaluate if no blocking interventions remain."""
     from agents.chatbot.tools import submit_intervention_response
     result = await asyncio.to_thread(
         submit_intervention_response,
@@ -231,6 +231,19 @@ async def resolve_intervention(application_id: str, intervention_id: str):
         if "Invalid" in result["error"]:
             raise HTTPException(status_code=400, detail=result["error"])
         raise HTTPException(status_code=404, detail=result["error"])
+
+    # Check if all blocking interventions are now resolved — auto-trigger re-evaluate
+    interventions_col = get_db()["interventions"]
+    pending_blocking = await asyncio.to_thread(
+        lambda: interventions_col.count_documents({
+            "application_id": application_id,
+            "internal_context.severity": "blocking",
+            "status": {"$in": ["pending", "active"]},
+        })
+    )
+    result["pending_blocking"] = pending_blocking
+    if pending_blocking == 0:
+        result["re_evaluate_eligible"] = True
     return result
 
 

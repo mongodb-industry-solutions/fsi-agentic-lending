@@ -16,6 +16,7 @@ class ApplicationStatus(str, Enum):
     funded = "funded"
     active = "active"
     error = "error"
+    hitl_error = "hitl_error"
 
 
 class ApplicationCreateRequest(BaseModel):
@@ -31,6 +32,7 @@ class ApplicationCreateRequest(BaseModel):
     primary_income: float
     co_applicant_income: Optional[float] = None
     annual_property_tax: float = 0
+    existing_monthly_debt: float = 0
     profile_id: Optional[str] = None
     demo_session_id: Optional[str] = None
 

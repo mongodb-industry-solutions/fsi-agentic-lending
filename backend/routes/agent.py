@@ -9,9 +9,9 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from pymongo.errors import DuplicateKeyError
 from db.mdb import get_db as _get_db
 from services import application_service
+from services.pipeline_lock import acquire_pipeline_lock as _acquire_pipeline_lock, release_pipeline_lock as _release_pipeline_lock
 from agents.graph import get_graph
 from agents.state import make_initial_state
 from agents.pipeline.tools import log_agent_activity
@@ -33,28 +33,6 @@ except ImportError:
 router = APIRouter(tags=["agent"])
 
 
-def _acquire_pipeline_lock(app_id: str) -> bool:
-    """Attempt to acquire a distributed pipeline lock via MongoDB.
-
-    Uses insert with unique ``_id`` as an atomic compare-and-swap so only one
-    process / pod can run the pipeline for a given application at a time.
-    Release deletes the document; the TTL index on ``locked_at`` acts as a
-    safety net for locks orphaned by crashes.
-    """
-    db = _get_db()
-    try:
-        db["pipeline_locks"].insert_one({
-            "_id": app_id,
-            "locked_at": datetime.now(timezone.utc),
-        })
-        return True
-    except DuplicateKeyError:
-        return False
-
-
-def _release_pipeline_lock(app_id: str):
-    db = _get_db()
-    db["pipeline_locks"].delete_one({"_id": app_id})
 
 
 
@@ -72,6 +50,13 @@ async def run_agent(app_id: str, autonomy_level: str = "bounded"):
 
     # Update status to processing
     application_service.update_application_status(app_id, "processing", "Agent pipeline started")
+
+    # Clean stale pending interventions from previous runs
+    db = _get_db()
+    db["interventions"].update_many(
+        {"application_id": app_id, "status": "pending"},
+        {"$set": {"status": "superseded"}},
+    )
 
     def _run_graph(app_id, autonomy_level):
         timed_out = threading.Event()
@@ -224,6 +209,13 @@ async def run_and_stream(app_id: str, autonomy_level: str = "bounded"):
 
     application_service.update_application_status(app_id, "processing", "Agent pipeline started")
 
+    # Clean stale pending interventions from previous runs
+    db = _get_db()
+    db["interventions"].update_many(
+        {"application_id": app_id, "status": "pending"},
+        {"$set": {"status": "superseded"}},
+    )
+
     async def event_generator():
         graph = get_graph()
         initial_state = make_initial_state(app_id, autonomy_level)
@@ -290,7 +282,7 @@ async def re_evaluate(app_id: str, autonomy_level: str = "bounded"):
     db = _get_db()
     pending_blocking = await asyncio.to_thread(
         db["interventions"].count_documents,
-        {"application_id": app_id, "severity": "blocking", "status": {"$in": ["pending", "active"]}},
+        {"application_id": app_id, "internal_context.severity": "blocking", "status": {"$in": ["pending", "active"]}},
     )
     if pending_blocking > 0:
         raise HTTPException(

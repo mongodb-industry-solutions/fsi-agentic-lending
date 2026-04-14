@@ -15,6 +15,7 @@ from agents.pipeline.prompts import UNDERWRITER_PROMPT
 from agents.pipeline.tool_schemas import UNDERWRITING_ANALYSIS_TOOL
 from agents.llm import get_llm
 from agents.helpers.interventions import create_intervention
+from db.mdb import get_db as _get_db
 
 logger = logging.getLogger(__name__)
 
@@ -204,10 +205,19 @@ def underwriter_node(state: LendFlowState, **kwargs) -> dict:
                 existing_debt_payments += payment
 
     if existing_debt_payments == 0:
-        log_agent_activity(
-            app_id, "underwriter", "data_gap",
-            "No structured monthly debt payments found in credit reports — treating as $0. Manual review recommended."
-        )
+        # Fall back to self-reported existing debt from application form
+        form_debt = app.get("existing_monthly_debt", 0)
+        if isinstance(form_debt, (int, float)) and form_debt > 0:
+            existing_debt_payments = form_debt
+            log_agent_activity(
+                app_id, "underwriter", "data_gap",
+                f"No credit report debt data — using self-reported ${form_debt:,.0f}/mo from application form."
+            )
+        else:
+            log_agent_activity(
+                app_id, "underwriter", "data_gap",
+                "No structured monthly debt payments found in credit reports — treating as $0. Manual review recommended."
+            )
 
     # --- GDS / TDS ---
     gds, tds = calculate_gds_tds(
@@ -377,6 +387,22 @@ Risk Tier: {risk_tier}
         decision_reasoning = f"Auto-approved: GDS {effective_gds:.1%}, TDS {effective_tds:.1%}, Risk {risk_score}/100 ({risk_tier})."
 
     log_agent_activity(app_id, "underwriter", "decision", decision_reasoning)
+
+    # Persist underwriting results to application document for HITL context
+    _get_db()["applications"].update_one(
+        {"application_id": app_id},
+        {"$set": {
+            "risk_score": risk_score,
+            "risk_tier": risk_tier,
+            "gds_ratio": round(gds, 4),
+            "tds_ratio": round(tds, 4),
+            "stress_gds": round(stress["stress_gds"], 4),
+            "stress_tds": round(stress["stress_tds"], 4),
+            "primary_credit_score": primary_score,
+            "ltv": round(ltv, 2),
+            "decision_reasoning": decision_reasoning,
+        }}
+    )
 
     if decision == "escalate":
         update_application_status(app_id, "review", f"Escalated to officer review — {decision_reasoning}")

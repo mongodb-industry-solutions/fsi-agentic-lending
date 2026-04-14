@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { apiPost, apiGet, apiSSE, apiWebSocket } from '../../lib/api';
 import { NODE_TO_STAGE } from './constants';
 
-export function useLoanOfficerWorkflow(addToast) {
+export function useLoanOfficerWorkflow(addToast, active = true) {
   const [selectedApp, setSelectedApp] = useState(null);
   const [workflowPhase, setWorkflowPhase] = useState('idle');
   const [workflowStage, setWorkflowStage] = useState(0);
@@ -30,7 +30,10 @@ export function useLoanOfficerWorkflow(addToast) {
 
   // Real-time application queue via WebSocket + MongoDB Change Stream,
   // with REST fallback when WebSocket cannot connect through Next.js proxy.
+  // Gated on `active` to avoid connections when the officer tab is hidden.
   useEffect(() => {
+    if (!active) return;
+
     snapshotReceived.current = false;
     let pollInterval = null;
 
@@ -81,14 +84,15 @@ export function useLoanOfficerWorkflow(addToast) {
       ws.close();
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, []);
+  }, [active]);
 
-  // Fetch portfolio stats on mount
+  // Fetch portfolio stats when tab becomes active
   useEffect(() => {
+    if (!active) return;
     apiGet('/portfolio/stats').then((data) => {
       if (data) setPortfolioStats(data);
     }).catch(() => {});
-  }, []);
+  }, [active]);
 
   // Fetch selected application detail from backend
   useEffect(() => {
@@ -354,8 +358,8 @@ export function useLoanOfficerWorkflow(addToast) {
       : selectedAppData?.name || 'Application';
 
     if (details?.mode === 'modified') {
-      addToast({ type: 'info', title: 'Modifications Applied', message: 'Agent re-running underwriting with updated terms.' });
-      await apiPost(`/hitl/${selectedApp}/decision`, {
+      addToast({ type: 'info', title: 'Submitting Modifications...', message: 'Sending updated terms to agent pipeline.' });
+      const modResult = await apiPost(`/hitl/${selectedApp}/decision`, {
         action: 'modify_and_continue',
         officer_notes: details.conditions || 'Modified terms',
         conditions: details.conditions ? [details.conditions] : [],
@@ -364,23 +368,34 @@ export function useLoanOfficerWorkflow(addToast) {
           ...(details.loanAmount ? { loan_amount: details.loanAmount } : {}),
         },
       });
-      setHitlReached(false);
-      setApproved(false);
-      setApprovalDetails(null);
-      reconnectActivitySSE(selectedApp);
+      if (modResult) {
+        setHitlReached(false);
+        setApproved(false);
+        setApprovalDetails(null);
+        reconnectActivitySSE(selectedApp);
+        addToast({ type: 'info', title: 'Modifications Applied', message: 'Agent re-running underwriting with updated terms.' });
+      } else {
+        addToast({ type: 'error', title: 'Modification Failed', message: 'Could not apply modified terms. Please try again.' });
+      }
       return;
     }
 
-    setApproved(true);
-    setApprovalDetails(details || { mode: 'recommended' });
     const rate = details?.rate || '';
     const suffix = details?.conditions ? ` · Conditions: ${details.conditions}` : '';
-    addToast({ type: 'success', title: 'Loan Approved', message: `${rate ? `@ ${rate} ` : ''}for ${appName}.${suffix}` });
+    addToast({ type: 'info', title: 'Processing Approval...', message: `Submitting decision for ${appName}.` });
 
-    await apiPost(`/hitl/${selectedApp}/decision`, {
+    const result = await apiPost(`/hitl/${selectedApp}/decision`, {
       action: 'approve',
       officer_notes: details?.conditions || 'Approved after manual review',
     });
+
+    if (result) {
+      setApproved(true);
+      setApprovalDetails(details || { mode: 'recommended' });
+      addToast({ type: 'success', title: 'Loan Approved', message: `${rate ? `@ ${rate} ` : ''}for ${appName}.${suffix}` });
+    } else {
+      addToast({ type: 'error', title: 'Approval Failed', message: 'Could not process approval. Please try again.' });
+    }
   }, [addToast, selectedApp, selectedAppDetail, selectedAppData]);
 
   const handleDecline = useCallback(async () => {
@@ -388,15 +403,20 @@ export function useLoanOfficerWorkflow(addToast) {
       ? selectedAppDetail.borrower_names.join(' & ')
       : selectedAppData?.name || 'Application';
 
-    setApproved(true);
-    setApprovalDetails({ mode: 'declined' });
-    addToast({ type: 'warning', title: 'Application Declined', message: `${appName} — declined after manual review.` });
-
     if (selectedApp) {
-      await apiPost(`/hitl/${selectedApp}/decision`, {
+      addToast({ type: 'info', title: 'Processing...', message: `Declining ${appName}.` });
+      const result = await apiPost(`/hitl/${selectedApp}/decision`, {
         action: 'decline',
         officer_notes: 'Declined after manual review',
       });
+
+      if (result) {
+        setApproved(true);
+        setApprovalDetails({ mode: 'declined' });
+        addToast({ type: 'warning', title: 'Application Declined', message: `${appName} — declined after manual review.` });
+      } else {
+        addToast({ type: 'error', title: 'Decline Failed', message: 'Could not process decline. Please try again.' });
+      }
     }
   }, [addToast, selectedApp, selectedAppDetail, selectedAppData]);
 

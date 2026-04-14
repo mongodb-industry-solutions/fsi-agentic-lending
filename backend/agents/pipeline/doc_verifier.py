@@ -82,6 +82,18 @@ def doc_verifier_node(state: LendFlowState, **kwargs) -> dict:
             app_id, "doc_verifier", "extraction_errors",
             f"{len(extraction_errors)} document(s) have extraction errors: {types}",
         )
+        if create_intervention(
+            app_id,
+            intervention_type="document_processing_error",
+            source_node="doc_verifier",
+            risk_flag="extraction_errors",
+            severity="advisory",
+            borrower_summary=f"{len(extraction_errors)} document(s) could not be fully processed.",
+            action_required="The affected documents may need to be re-uploaded. Please check that your PDFs are clear and complete.",
+            doc_types=types,
+            internal_extras={"extraction_error_types": types},
+        ):
+            log_agent_activity(app_id, "doc_verifier", "intervention", f"Created extraction_error intervention for {len(extraction_errors)} docs")
 
     # --- Duplicate detection ---
     duplicates = _detect_duplicates(documents)

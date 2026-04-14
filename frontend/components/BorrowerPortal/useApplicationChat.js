@@ -54,6 +54,12 @@ export function useApplicationChat(applicationId) {
     const result = await apiPost(`/chat/${applicationId}/interventions/${id}/resolve`);
     if (result && !result.error) {
       setInterventions(prev => prev.map(i => i._id === id ? { ...i, _resolved: true } : i));
+      // Auto-trigger pipeline re-evaluate when all blocking interventions are resolved
+      if (result.re_evaluate_eligible) {
+        apiPost(`/agent/${applicationId}/re-evaluate`).catch((err) => {
+          console.warn('[useApplicationChat] re-evaluate after intervention resolve failed:', err);
+        });
+      }
     }
     setResolvingId(null);
   }, [applicationId]);

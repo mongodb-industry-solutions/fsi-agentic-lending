@@ -21,26 +21,21 @@ export default function Home() {
     window.history.replaceState(null, '', `?screen=${screen}`);
   };
 
-  const renderScreen = () => {
-    switch (activeScreen) {
-      case "borrower":
-        return <ErrorBoundary><BorrowerPortal /></ErrorBoundary>;
-      case "officer":
-        return <ErrorBoundary><LoanOfficerDashboard /></ErrorBoundary>;
-      case "demo":
-        return <ErrorBoundary><DemoFlow /></ErrorBoundary>;
-      default:
-        return <ErrorBoundary><BorrowerPortal /></ErrorBoundary>;
-    }
-  };
-
   return (
     <>
       <Header activeScreen={activeScreen} onScreenChange={handleScreenChange} onInfoOpen={() => setInfoWizardOpen(true)} />
       <main className="app-main" style={{ paddingTop: 52 }}>
-        <div key={activeScreen} className="screen-content">
-          {renderScreen()}
+        <div className="screen-content" style={{ display: activeScreen === 'borrower' ? 'block' : 'none' }}>
+          <ErrorBoundary><BorrowerPortal /></ErrorBoundary>
         </div>
+        <div className="screen-content" style={{ display: activeScreen === 'officer' ? 'block' : 'none' }}>
+          <ErrorBoundary><LoanOfficerDashboard active={activeScreen === 'officer'} /></ErrorBoundary>
+        </div>
+        {activeScreen === 'demo' && (
+          <div className="screen-content">
+            <ErrorBoundary><DemoFlow /></ErrorBoundary>
+          </div>
+        )}
       </main>
       <InfoWizardPanel
         isOpen={infoWizardOpen}

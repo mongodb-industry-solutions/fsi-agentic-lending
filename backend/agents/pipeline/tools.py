@@ -55,18 +55,21 @@ def get_application_summary(application_id: str) -> dict:
 _logger = logging.getLogger(__name__)
 
 
-def log_agent_activity(application_id: str, agent: str, action: str, detail: str, checkpoint_id: str = None):
+def log_agent_activity(application_id: str, agent: str, action: str, detail: str, checkpoint_id: str = None, run_id: str = None):
     """Log an agent action to the agent_activity time-series collection."""
     try:
         db = _get_db()
-        db["agent_activity"].insert_one({
+        entry = {
             "application_id": application_id,
             "agent": agent,
             "action": action,
             "detail": detail,
             "checkpoint_id": checkpoint_id,
             "timestamp": datetime.now(timezone.utc),
-        })
+        }
+        if run_id:
+            entry["run_id"] = run_id
+        db["agent_activity"].insert_one(entry)
     except Exception as e:
         _logger.warning(f"Failed to log agent activity for {application_id}: {e}")
 

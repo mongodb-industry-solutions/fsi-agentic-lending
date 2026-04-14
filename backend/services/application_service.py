@@ -69,6 +69,7 @@ def create_application(data: dict, profile_id: str = None, demo_session_id: str 
             "primary": data["primary_income"],
             "co_applicant": data.get("co_applicant_income", 0),
         },
+        "existing_monthly_debt": data.get("existing_monthly_debt", 0),
         "status": "submitted",
         "status_history": [
             {"status": "submitted", "timestamp": now, "detail": "Application received"}
@@ -151,7 +152,7 @@ def clone_demo_documents(source_app_id: str, target_app_id: str) -> int:
     now = datetime.now(timezone.utc)
     clones = []
     for doc in source_docs:
-        clone = {k: v for k, v in doc.items() if k != "_id"}
+        clone = {k: v for k, v in doc.items() if k not in ("_id", "content_hash")}
         clone["application_id"] = target_app_id
         clone["created_at"] = now
         clones.append(clone)
@@ -161,10 +162,60 @@ def clone_demo_documents(source_app_id: str, target_app_id: str) -> int:
     return len(clones)
 
 
+def clone_demo_credit_reports(source_app_id: str, target_app_id: str) -> int:
+    """Clone credit reports from a seeded application's borrowers to a new application's borrowers.
+
+    Seeded credit reports are linked by borrower_id. New demo apps create fresh
+    borrower ObjectIds, so we must copy reports and re-link them to the new IDs.
+    """
+    db = _get_db()
+    source_app = db["applications"].find_one({"application_id": source_app_id}, {"borrower_ids": 1})
+    target_app = db["applications"].find_one({"application_id": target_app_id}, {"borrower_ids": 1})
+    if not source_app or not target_app:
+        return 0
+
+    source_bids = source_app.get("borrower_ids", [])
+    target_bids = target_app.get("borrower_ids", [])
+    if not source_bids or not target_bids:
+        return 0
+
+    source_reports = list(db["credit_reports"].find({"borrower_id": {"$in": source_bids}}))
+    if not source_reports:
+        logger.warning(f"No source credit reports found for {source_app_id}")
+        return 0
+
+    now = datetime.now(timezone.utc)
+    # Build a mapping: source borrower_id → target borrower_id (positional)
+    bid_map = {}
+    for i, sbid in enumerate(source_bids):
+        if i < len(target_bids):
+            bid_map[sbid] = target_bids[i]
+
+    clones = []
+    for report in source_reports:
+        new_bid = bid_map.get(report["borrower_id"])
+        if not new_bid:
+            continue
+        clone = {k: v for k, v in report.items() if k != "_id"}
+        clone["borrower_id"] = new_bid
+        clone["cloned_at"] = now
+        clones.append(clone)
+
+    if clones:
+        db["credit_reports"].insert_many(clones)
+    logger.info(f"Cloned {len(clones)} credit reports from {source_app_id} to {target_app_id}")
+    return len(clones)
+
+
 def _reset_application_state(app_id: str) -> None:
-    """Wipe all transient state for an application (conversations, interventions, checkpoints, agent_activity)."""
+    """Wipe all transient and cloned state for an application."""
     db = _get_db()
     now = datetime.now(timezone.utc)
+
+    # Get borrower IDs for credit report cleanup
+    app = db["applications"].find_one({"application_id": app_id}, {"borrower_ids": 1})
+    borrower_ids = app.get("borrower_ids", []) if app else []
+
     db["applications"].update_one(
         {"application_id": app_id},
         {
@@ -175,12 +226,21 @@ def _reset_application_state(app_id: str) -> None:
                     {"status": "submitted", "timestamp": now, "detail": "Application received (demo reset)"}
                 ],
             },
+            "$unset": {
+                "risk_score": "", "risk_tier": "", "gds_ratio": "", "tds_ratio": "",
+                "stress_gds": "", "stress_tds": "", "primary_credit_score": "",
+                "ltv": "", "decision_reasoning": "",
+            },
         },
     )
+    db["documents"].delete_many({"application_id": app_id})
+    if borrower_ids:
+        db["credit_reports"].delete_many({"borrower_id": {"$in": borrower_ids}})
     db["conversations"].delete_many({"application_id": app_id})
     db["interventions"].delete_many({"application_id": app_id})
     db["checkpoints"].delete_many({"thread_id": app_id})
     db["checkpoint_writes"].delete_many({"thread_id": app_id})
+    db["pipeline_locks"].delete_many({"_id": app_id})
     try:
         db["agent_activity"].delete_many({"application_id": app_id})
     except Exception as e:
@@ -202,16 +262,24 @@ def upsert_demo_application(profile_id: str, demo_session_id: str, data: dict) -
 
     if existing:
         app_id = existing["application_id"]
+        profile = existing.get("profile_id")
         _reset_application_state(app_id)
+        # Re-clone seed data after reset
+        seed_app_id = SEED_APPLICATION_IDS.get(profile) or SEED_APPLICATION_IDS.get("marcus-delgado")
+        if seed_app_id:
+            clone_demo_documents(seed_app_id, app_id)
+            clone_demo_credit_reports(seed_app_id, app_id)
         logger.info(f"Reset existing demo application {app_id} for session {demo_session_id[:8]}")
         return {"application_id": app_id, "status": "submitted", "reset": True}
 
     app = create_application(data, profile_id=profile_id, demo_session_id=demo_session_id)
     app_id = app["application_id"]
 
-    seed_app_id = SEED_APPLICATION_IDS.get(profile_id)
+    # Clone seed data — fall back to default seed if profile not explicitly mapped
+    seed_app_id = SEED_APPLICATION_IDS.get(profile_id) or SEED_APPLICATION_IDS.get("marcus-delgado")
     if seed_app_id:
         clone_demo_documents(seed_app_id, app_id)
+        clone_demo_credit_reports(seed_app_id, app_id)
 
     return {"application_id": app_id, "status": "submitted", "reset": False}
 
@@ -242,6 +310,7 @@ def reset_all_demo_data() -> dict:
     except Exception as e:
         logger.warning(f"Could not delete agent_activity: {e}")
     if borrower_ids:
+        db["credit_reports"].delete_many({"borrower_id": {"$in": borrower_ids}})
         db["borrowers"].delete_many({"_id": {"$in": borrower_ids}})
     result = db["applications"].delete_many({"demo_session_id": {"$exists": True}})
     logger.info(f"Reset demo: deleted {result.deleted_count} applications")
@@ -252,7 +321,7 @@ _VALID_TRANSITIONS = {
     "submitted": {"processing", "error"},
     "processing": {"underwriting", "review", "approved", "declined", "error"},
     "underwriting": {"review", "approved", "declined", "error"},
-    "review": {"processing", "approved", "declined", "error"},
+    "review": {"processing", "approved", "declined", "error", "hitl_error"},
     "approved": {"closing", "error"},
     "closing": {"funded", "error"},
     "funded": {"active", "error"},
@@ -289,9 +358,8 @@ def update_application_status(application_id: str, status: str, detail: str = ""
             "$set": {"status": status, "updated_at": now},
             "$push": {
                 "status_history": {
-                    "status": status,
-                    "timestamp": now,
-                    "detail": detail,
+                    "$each": [{"status": status, "timestamp": now, "detail": detail}],
+                    "$slice": -50,
                 }
             },
         },

@@ -9,6 +9,7 @@ from services import application_service
 from db.mdb import get_db as _get_db
 from agents.graph import get_graph
 from agents.pipeline.tools import log_agent_activity
+from services.pipeline_lock import acquire_pipeline_lock as _acquire_pipeline_lock, release_pipeline_lock as _release_pipeline_lock
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["hitl"])
@@ -40,6 +41,22 @@ async def get_hitl_context(app_id: str):
     for a in activity:
         if hasattr(a.get("timestamp"), "isoformat"):
             a["timestamp"] = a["timestamp"].isoformat()
+
+    # Enrich with graph state if available (has risk metrics from underwriter)
+    try:
+        graph = get_graph()
+        graph_state = await asyncio.to_thread(
+            graph.get_state,
+            {"configurable": {"thread_id": app_id}},
+        )
+        if graph_state and graph_state.values:
+            vals = graph_state.values
+            for key in ("risk_score", "risk_tier", "gds_ratio", "tds_ratio",
+                         "stress_gds", "stress_tds", "decision_reasoning", "primary_credit_score"):
+                if vals.get(key) is not None and not app.get(key):
+                    app[key] = vals[key]
+    except Exception as e:
+        logger.debug(f"Graph state not available for {app_id}: {e}")
 
     return {
         "application": app,
@@ -86,10 +103,16 @@ async def submit_hitl_decision(app_id: str, req: HITLDecisionRequest):
         for t in getattr(graph_state, "tasks", ())
     )
     if not pending_interrupts:
-        raise HTTPException(
-            status_code=409,
-            detail="No pending interrupt for this application — decision may have already been submitted.",
-        )
+        # No graph checkpoint — apply decision directly (e.g., seeded demo app)
+        logger.warning(f"No pending interrupt for {app_id} — applying decision directly")
+        application_service.update_application_status(app_id, new_status, detail)
+        log_agent_activity(app_id, "hitl_gate", "direct_decision",
+            f"No graph checkpoint — officer decision applied directly: {req.action}. {req.officer_notes or ''}")
+        return {"application_id": app_id, "status": new_status, "detail": detail}
+
+    # Acquire pipeline lock to prevent concurrent graph execution
+    if not _acquire_pipeline_lock(app_id):
+        raise HTTPException(status_code=409, detail="Pipeline already running for this application")
 
     try:
         await asyncio.to_thread(
@@ -108,5 +131,7 @@ async def submit_hitl_decision(app_id: str, req: HITLDecisionRequest):
         application_service.update_application_status(app_id, "hitl_error", f"Graph resume failed: {str(e)[:200]}")
         log_agent_activity(app_id, "hitl_gate", "resume_failed", f"Graph resume error: {str(e)[:200]}")
         raise HTTPException(status_code=500, detail=f"HITL resume failed: {str(e)[:200]}")
+    finally:
+        _release_pipeline_lock(app_id)
 
     return {"application_id": app_id, "status": new_status, "detail": detail}

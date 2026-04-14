@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
-import { apiSSE } from '../../lib/api';
+import { apiSSE, apiGet } from '../../lib/api';
 
 const FILTERS = [
   { id: 'all', label: 'All' },
@@ -113,6 +113,26 @@ export default function AgentActivityLog({ onEvent, applicationId }) {
         }
       }
     );
+
+    // REST fallback: fetch activity trail for apps already in review (SSE may have no new events)
+    apiGet(`/hitl/${applicationId}/context`).then((ctx) => {
+      if (ctx?.activity_trail?.length > 0) {
+        const trailEntries = ctx.activity_trail.map((a, i) => ({
+          id: `trail-${i}-${Date.now()}`,
+          agent: a.agent || 'System',
+          category: (a.agent || '').toLowerCase().includes('underwrit') ? 'underwriting'
+            : (a.agent || '').toLowerCase().includes('supervisor') ? 'supervisor'
+            : (a.agent || '').toLowerCase().includes('hitl') ? 'hitl'
+            : 'loanapp',
+          action: a.action || '',
+          reasoning: a.detail || '',
+          time: a.timestamp ? new Date(a.timestamp).toLocaleTimeString() : '',
+          isLive: false,
+        }));
+        setEntries((prev) => prev.length === 0 ? trailEntries : prev);
+        setTotalReceived((prev) => prev === 0 ? trailEntries.length : prev);
+      }
+    }).catch(() => {});
 
     return () => source?.close();
   }, [applicationId]); // eslint-disable-line react-hooks/exhaustive-deps

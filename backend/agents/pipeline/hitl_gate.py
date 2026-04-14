@@ -52,21 +52,19 @@ def hitl_gate(state: LendFlowState, **kwargs) -> dict:
     if action == "modify_and_continue":
         state_updates["risk_score"] = None
         state_updates["decision"] = None
-        # Preserve hitl_approved_nodes to avoid re-gating already-approved nodes
-
-    if overrides.get("risk_tier") and overrides["risk_tier"] in ("A", "B+", "B", "C", "D"):
-        state_updates["risk_tier"] = overrides["risk_tier"]
-    else:
-        if overrides.get("risk_tier"):
-            log_agent_activity(app_id, "hitl_gate", "invalid_override", f"Invalid risk_tier override: {overrides['risk_tier']}")
-    if overrides.get("loan_amount") is not None and isinstance(overrides["loan_amount"], (int, float)) and overrides["loan_amount"] > 0:
-        state_updates["risk_score"] = None
-        state_updates["decision"] = None
-        state_updates["decision_reasoning"] = f"Re-underwriting: officer adjusted loan to ${overrides['loan_amount']:,.0f}"
-        # Reset gather flags so supervisor triggers fresh data pull for new loan amount
+        # Always reset gather flags so supervisor re-gathers fresh data
         state_updates["documents_verified"] = False
         state_updates["credit_pulled"] = False
         state_updates["gather_attempts"] = 0
+        # Preserve hitl_approved_nodes to avoid re-gating already-approved nodes
+
+    if overrides.get("risk_tier"):
+        if overrides["risk_tier"] in ("A", "B+", "B", "C", "D"):
+            state_updates["risk_tier"] = overrides["risk_tier"]
+        else:
+            log_agent_activity(app_id, "hitl_gate", "invalid_override", f"Invalid risk_tier override: {overrides['risk_tier']}")
+    if overrides.get("loan_amount") is not None and isinstance(overrides["loan_amount"], (int, float)) and overrides["loan_amount"] > 0:
+        state_updates["decision_reasoning"] = f"Re-underwriting: officer adjusted loan to ${overrides['loan_amount']:,.0f}"
         from db.mdb import get_db as _get_db
         db = _get_db()
         db["applications"].update_one(

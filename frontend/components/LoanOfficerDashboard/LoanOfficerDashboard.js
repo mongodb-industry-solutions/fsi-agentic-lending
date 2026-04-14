@@ -20,7 +20,7 @@ import { LiveUnderwritingResults } from './LiveUnderwritingResults';
 import { StageProgressBar } from './StageProgressBar';
 import { useLoanOfficerWorkflow } from './useLoanOfficerWorkflow';
 
-export default function LoanOfficerDashboard() {
+export default function LoanOfficerDashboard({ active = true }) {
   const { toasts, addToast, removeToast } = useToasts();
 
   const {
@@ -40,7 +40,7 @@ export default function LoanOfficerDashboard() {
     handleApprove,
     handleDecline,
     handleAgentEvent,
-  } = useLoanOfficerWorkflow(addToast);
+  } = useLoanOfficerWorkflow(addToast, active);
 
   const selectedAppData = liveApplications.find((a) => a.application_id === selectedApp);
   const appName = getAppDisplayName(selectedAppDetail, selectedAppData);
@@ -169,7 +169,7 @@ export default function LoanOfficerDashboard() {
           )}
 
           {/* Workflow Canvas + overlays */}
-          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: '35vh' }}>
             {selectedApp && (workflowPhase === 'executing' || workflowPhase === 'preview') ? (
               <>
                 <WorkflowCanvas
@@ -288,7 +288,7 @@ export default function LoanOfficerDashboard() {
 
           {/* HITL Review panel */}
           {selectedApp && hitlReached && !approved && (
-            <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '55vh' }}>
+            <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '40vh' }}>
               <HITLReviewCard
                 applicationId={selectedApp}
                 appDetail={selectedAppDetail}
@@ -303,7 +303,7 @@ export default function LoanOfficerDashboard() {
 
           {/* Decision Summary */}
           {selectedApp && approved && (
-            <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '55vh' }}>
+            <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '40vh' }}>
               <DecisionSummary
                 applicationId={selectedApp}
                 appDetail={selectedAppDetail}

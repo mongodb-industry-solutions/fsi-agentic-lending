@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import { apiPost } from '../../lib/api';
 
@@ -9,6 +9,21 @@ export function PolicyExplorer() {
   const [results, setResults] = useState(null);
   const [searching, setSearching] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [expandedResult, setExpandedResult] = useState(null);
+  const [preloaded, setPreloaded] = useState(false);
+
+  // Auto-load common policies on first expand
+  useEffect(() => {
+    if (!expanded || preloaded) return;
+    setPreloaded(true);
+    (async () => {
+      setSearching(true);
+      const data = await apiPost('/policies/search', { query: 'mortgage lending requirements GDS TDS credit score', limit: 5 });
+      setSearching(false);
+      if (data?.results) setResults(data.results);
+      else if (Array.isArray(data)) setResults(data);
+    })();
+  }, [expanded, preloaded]);
 
   const handleSearch = useCallback(async () => {
     if (!query.trim()) return;
@@ -95,22 +110,31 @@ export function PolicyExplorer() {
           {results && results.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {results.map((r, i) => (
-                <div key={i} style={{
+                <div key={i} onClick={() => setExpandedResult(expandedResult === i ? null : i)} style={{
                   padding: '6px 8px', background: 'var(--bg-surface)', borderRadius: 6,
-                  border: '1px solid var(--border-dim)',
+                  border: `1px solid ${expandedResult === i ? 'var(--voyage)' : 'var(--border-dim)'}`,
+                  cursor: 'pointer',
                   animation: `thinkingFade 200ms cubic-bezier(0.33, 1, 0.68, 1) ${i * 60}ms both`,
+                  transition: 'border-color 150ms ease',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
                     <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-primary)' }}>
                       {r.title || 'Policy'}
                     </span>
-                    {r.score != null && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {r.score != null && (
+                        <span style={{
+                          width: 6, height: 6, borderRadius: '50%',
+                          background: r.score > 0.7 ? 'var(--success)' : 'var(--hitl-amber)',
+                          flexShrink: 0,
+                        }} />
+                      )}
                       <span style={{
-                        width: 6, height: 6, borderRadius: '50%',
-                        background: r.score > 0.7 ? 'var(--success)' : 'var(--hitl-amber)',
-                        flexShrink: 0,
-                      }} />
-                    )}
+                        fontSize: 8, color: 'var(--text-dim)',
+                        transform: expandedResult === i ? 'rotate(180deg)' : 'rotate(0)',
+                        transition: 'transform 150ms ease', display: 'inline-block',
+                      }}>{'\u25BE'}</span>
+                    </div>
                   </div>
                   {r.section && (
                     <div style={{ fontSize: 8, fontFamily: 'var(--font-mono)', color: 'var(--voyage)', marginBottom: 2 }}>
@@ -119,7 +143,7 @@ export function PolicyExplorer() {
                   )}
                   {r.content && (
                     <div style={{ fontSize: 9, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                      {r.content.slice(0, 200)}{r.content.length > 200 ? '...' : ''}
+                      {expandedResult === i ? r.content : (r.content.slice(0, 200) + (r.content.length > 200 ? '...' : ''))}
                     </div>
                   )}
                 </div>

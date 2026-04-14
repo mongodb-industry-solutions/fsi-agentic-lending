@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import BorrowerSelection from './BorrowerSelection';
 import ApplicationForm from './ApplicationForm';
+import DocumentUpload from './DocumentUpload';
 import StatusTracker from './StatusTracker';
 import DocumentContext from './DocumentContext';
 import ApplicationAgent from './ApplicationAgent';
@@ -362,6 +363,8 @@ export default function BorrowerPortal() {
         co_applicant_income: coIncome,
         annual_property_tax:
           parseFloat(formData.annualPropertyTax) || 0,
+        existing_monthly_debt:
+          parseFloat(formData.existingDebt) || 0,
         profile_id: borrowerProfile?.id || null,
         demo_session_id: demoSessionId || null,
       });
@@ -501,6 +504,10 @@ export default function BorrowerPortal() {
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <ApplicationForm
           onSubmit={handleSubmit}
+          borrowerProfile={borrowerProfile}
+        />
+        <DocumentUpload
+          applicationId={applicationId}
           borrowerProfile={borrowerProfile}
         />
       </div>
