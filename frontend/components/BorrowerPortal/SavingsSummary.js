@@ -53,9 +53,18 @@ export function SavingsSummary({ stageContext = {} }) {
         fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5,
         marginBottom: spacing[3],
       }}>
-        {resolved > 0
-          ? `Your AI-assisted application was processed with ${resolved} issue${resolved !== 1 ? 's' : ''} resolved automatically — no manual intervention required.`
-          : 'Your application was processed end-to-end by the AI pipeline.'}
+        {(() => {
+          const wasOfficerReviewed = stageContext.decisionReasoning?.toLowerCase().includes('officer')
+            || stageContext.decisionReasoning?.toLowerCase().includes('escalat');
+          if (wasOfficerReviewed) {
+            return resolved > 0
+              ? `AI prepared your case and resolved ${resolved} issue${resolved !== 1 ? 's' : ''} — officer confirmed approval with full context.`
+              : 'AI prepared your case end-to-end — officer confirmed approval with full context.';
+          }
+          return resolved > 0
+            ? `Fully autonomous approval — ${resolved} issue${resolved !== 1 ? 's' : ''} resolved automatically with zero officer touchpoints.`
+            : 'Fully autonomous approval — processed end-to-end by the AI pipeline with zero officer touchpoints.';
+        })()}
       </div>
       <div style={{ display: 'flex', gap: spacing[2], flexWrap: 'wrap' }}>
         <SavingsMetric label="Issues Resolved" value={resolved} />

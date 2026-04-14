@@ -108,6 +108,7 @@ export default function ApplicationAgent({ applicationId, applicationStatus, onT
                 intervention={intv}
                 onResolve={resolveIntervention}
                 resolving={resolvingId === intv._id}
+                applicationId={applicationId}
               />
             ))}
           </div>

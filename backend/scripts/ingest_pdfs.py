@@ -50,6 +50,124 @@ DOC_TYPES = {
 
 APPLICATION_ID = "APP-2026-00001"
 
+# Additional borrower profiles — these seed apps share Marcus's 14 PDFs (cloned at
+# demo-session time with name-patching), but have their own credit reports and
+# payment histories to exercise different pipeline decision paths.
+ADDITIONAL_PROFILES = [
+    {
+        "app_id": "APP-2026-00002",
+        "profile_id": "jane-doe",
+        "borrowers": [
+            {"full_name": "Jane Doe", "employer": "Pacific Coast Medical Group", "job_title": "Nurse Practitioner", "annual_salary": 95000, "credit_score": 798},
+            {"full_name": "John Doe", "employer": "Doe & Associates Accounting", "job_title": "Senior Accountant", "annual_salary": 70000, "credit_score": 772},
+        ],
+        "loan_amount": 340000,
+        "purchase_price": 425000,
+        "down_payment": 85000,
+        "product": "5yr Fixed (25yr Amort)",
+        "property": {"address": "1438 Garden Terrace, Burnaby, BC V5A 3G2", "type": "Townhouse", "purchase_price": 425000, "annual_tax": 3950},
+        "income": {"combined_gross": 165000, "primary": 95000, "co_applicant": 70000},
+        "existing_monthly_debt": 650,
+        "credit_reports": [
+            {"score": 798, "bureau": "Equifax", "accounts": [
+                {"creditor": "TD Visa", "balance": 1200, "monthly_payment": 60, "status": "good"},
+                {"creditor": "RBC Line of Credit", "balance": 0, "monthly_payment": 0, "status": "good"},
+            ], "total_outstanding": 1200, "payment_history_summary": "48 months on-time, no late payments", "inquiries": [], "derogatory_items": []},
+            {"score": 772, "bureau": "Equifax", "accounts": [
+                {"creditor": "CIBC Visa", "balance": 800, "monthly_payment": 40, "status": "good"},
+                {"creditor": "Student Loan", "balance": 12000, "monthly_payment": 550, "status": "good"},
+            ], "total_outstanding": 12800, "payment_history_summary": "36 months on-time, no late payments", "inquiries": [], "derogatory_items": []},
+        ],
+        "payment_history": {"loan_id": "L-00002", "loan_amount": 340000, "rate": 0.0489, "months": 36, "late_months": []},
+    },
+    {
+        "app_id": "APP-2026-00003",
+        "profile_id": "john-smith",
+        "borrowers": [
+            {"full_name": "John Smith", "employer": "Meridian Creative Agency", "job_title": "Marketing Manager", "annual_salary": 108000, "credit_score": 695},
+        ],
+        "loan_amount": 392000,
+        "purchase_price": 490000,
+        "down_payment": 98000,
+        "product": "5yr Fixed (25yr Amort)",
+        "property": {"address": "55 Bremner Blvd, Unit 3402, Toronto, ON M5J 0A6", "type": "Condo", "purchase_price": 490000, "annual_tax": 4200},
+        "income": {"combined_gross": 108000, "primary": 108000, "co_applicant": 0},
+        "existing_monthly_debt": 400,
+        "credit_reports": [
+            {"score": 695, "bureau": "Equifax", "accounts": [
+                {"creditor": "BMO Mastercard", "balance": 3200, "monthly_payment": 96, "status": "good"},
+                {"creditor": "Honda Finance (Civic)", "balance": 8500, "monthly_payment": 195, "status": "good"},
+                {"creditor": "Student Loan (OSAP)", "balance": 4800, "monthly_payment": 109, "status": "good"},
+            ], "total_outstanding": 16500, "payment_history_summary": "24 months on-time, 2 late payments 30+ days (2025)", "inquiries": [
+                {"type": "hard", "date": "2026-01-15", "lender": "TD Bank Mortgages"},
+                {"type": "hard", "date": "2026-02-01", "lender": "Scotiabank Mortgage"},
+            ], "derogatory_items": []},
+        ],
+        "payment_history": {"loan_id": "L-00003", "loan_amount": 392000, "rate": 0.0489, "months": 36, "late_months": [28, 31, 34]},
+    },
+    {
+        "app_id": "APP-2026-00004",
+        "profile_id": "bob-johnson",
+        "borrowers": [
+            {"full_name": "Bob Johnson", "employer": "Great Lakes Logistics Ltd.", "job_title": "Operations Coordinator", "annual_salary": 85000, "credit_score": 648},
+            {"full_name": "Alice Johnson", "employer": "Halton District School Board", "job_title": "Supply Teacher", "annual_salary": 50000, "credit_score": 612},
+        ],
+        "loan_amount": 960000,
+        "purchase_price": 1200000,
+        "down_payment": 240000,
+        "product": "5yr Fixed (25yr Amort)",
+        "property": {"address": "27 Chartwell Crescent, Oakville, ON L6J 3Z8", "type": "Detached Home", "purchase_price": 1200000, "annual_tax": 9200},
+        "income": {"combined_gross": 135000, "primary": 85000, "co_applicant": 50000},
+        "existing_monthly_debt": 3070,
+        "credit_reports": [
+            {"score": 648, "bureau": "Equifax", "accounts": [
+                {"creditor": "TD Visa Infinite", "balance": 18000, "monthly_payment": 540, "status": "fair"},
+                {"creditor": "Ford Credit (F-150)", "balance": 38000, "monthly_payment": 720, "status": "fair"},
+                {"creditor": "CIBC Personal LOC", "balance": 25000, "monthly_payment": 625, "status": "fair"},
+                {"creditor": "Furniture Financing", "balance": 6000, "monthly_payment": 200, "status": "good"},
+            ], "total_outstanding": 87000, "payment_history_summary": "36 months; 5 late payments 30+ days, 1 payment 60+ days (2025)", "inquiries": [
+                {"type": "hard", "date": "2025-11-01", "lender": "RBC Mortgage"},
+                {"type": "hard", "date": "2025-12-15", "lender": "National Bank Mortgage"},
+                {"type": "hard", "date": "2026-01-20", "lender": "First National Mortgage"},
+            ], "derogatory_items": [
+                {"type": "collection", "amount": 2400, "creditor": "Bell Canada", "date": "2025-06-01"},
+            ]},
+            {"score": 612, "bureau": "Equifax", "accounts": [
+                {"creditor": "RBC Visa", "balance": 12000, "monthly_payment": 360, "status": "fair"},
+                {"creditor": "Student Loan (OSAP)", "balance": 28000, "monthly_payment": 520, "status": "good"},
+                {"creditor": "Retail Store Card", "balance": 3500, "monthly_payment": 105, "status": "fair"},
+            ], "total_outstanding": 43500, "payment_history_summary": "30 months; 3 late payments 30+ days (2025-2026)", "inquiries": [
+                {"type": "hard", "date": "2026-01-20", "lender": "First National Mortgage"},
+            ], "derogatory_items": []},
+        ],
+        "payment_history": {"loan_id": "L-00004", "loan_amount": 960000, "rate": 0.0489, "months": 36, "late_months": [18, 22, 26, 30, 33, 35]},
+    },
+    {
+        "app_id": "APP-2026-00005",
+        "profile_id": "sarah-williams",
+        "borrowers": [
+            {"full_name": "Sarah Williams", "employer": "Shopify Inc.", "job_title": "Senior Data Analyst", "annual_salary": 115000, "credit_score": 760},
+        ],
+        "loan_amount": 364000,
+        "purchase_price": 455000,
+        "down_payment": 91000,
+        "product": "5yr Fixed (25yr Amort)",
+        "property": {"address": "280 Metcalfe Street, Unit 801, Ottawa, ON K2P 1R7", "type": "Condo", "purchase_price": 455000, "annual_tax": 3800},
+        "income": {"combined_gross": 115000, "primary": 115000, "co_applicant": 0},
+        "existing_monthly_debt": 350,
+        "credit_reports": [
+            {"score": 760, "bureau": "Equifax", "accounts": [
+                {"creditor": "RBC Visa", "balance": 1800, "monthly_payment": 54, "status": "good"},
+                {"creditor": "Student Loan (NSLSC)", "balance": 8200, "monthly_payment": 296, "status": "good"},
+            ], "total_outstanding": 10000, "payment_history_summary": "36 months on-time, no late payments", "inquiries": [
+                {"type": "hard", "date": "2026-02-10", "lender": "Axiom Mortgage Solutions"},
+            ], "derogatory_items": []},
+        ],
+        "payment_history": {"loan_id": "L-00005", "loan_amount": 364000, "rate": 0.0489, "months": 36, "late_months": []},
+        "skip_doc_types": ["paystubs"],
+    },
+]
+
 
 def create_borrowers(db, extraction_data: dict) -> list:
     """Create borrower documents from gov ID + employment letter extractions."""
@@ -161,6 +279,7 @@ def create_policies(db):
         {"policy_id": "AMORT-001", "section": "Amortization", "title": "Amortization Period Rules", "content": "Maximum 25 years for insured mortgages (LTV > 80%). Maximum 30 years for conventional mortgages (LTV <= 80%). Shorter amortization reduces total interest cost. 5-year term is most common in Canada (available for refinancing at maturity). Fixed vs variable rate at borrower's choice. Break penalties: 3 months interest (variable) or Interest Rate Differential (fixed)."},
         {"policy_id": "CLOSING-001", "section": "Closing", "title": "Closing Requirements and Conditions", "content": "Required before closing: title search and insurance, property insurance (minimum replacement cost coverage), final employment verification (within 10 days of closing), source of down payment confirmation, lawyer/notary engagement letter. Standard conditions: satisfactory appraisal, clear title, no material change in financial circumstances, property insurance binder. Closing costs typically 1.5-4% of purchase price."},
         {"policy_id": "REGULATORY-001", "section": "Regulatory Compliance", "title": "OSFI B-20 and Provincial Requirements", "content": "OSFI Guideline B-20: stress test mandatory for all federally regulated lenders. FINTRAC: anti-money laundering reporting for transactions over $10,000. Provincial requirements: Alberta Real Estate Act compliance, land titles registration, Alberta mortgage broker licensing. Privacy: PIPEDA compliance for all borrower data handling. Fair lending: no discrimination based on protected grounds under Canadian Human Rights Act."},
+        {"policy_id": "INSURED-001", "section": "Mortgage Insurance", "title": "CMHC Insured Mortgage Requirements", "content": "Mortgages with LTV > 80% require CMHC (or equivalent) mortgage default insurance. Insurance premiums range from 2.80% (LTV 80.01-85%) to 4.00% (LTV 90.01-95%) of the mortgage amount, added to the loan balance. Insured mortgages have tighter qualification limits: maximum GDS of 35% and maximum TDS of 42% (compared to 39%/44% for conventional). Maximum amortization is 25 years for insured mortgages. Maximum purchase price is $999,999 for insured mortgages — properties at or above $1,000,000 require minimum 20% down payment and cannot be insured."},
     ]
 
     now = datetime.now(timezone.utc)
@@ -191,38 +310,36 @@ def create_policies(db):
     print(f"  Upserted {len(policies)} underwriting policies")
 
 
-def create_payment_history(db):
-    """Insert 36 monthly payment records for loan L-00001."""
+def _generate_payment_records(loan_id: str, loan_amount: float, annual_rate: float,
+                               num_months: int, late_months: list[int]) -> list[dict]:
+    """Generate monthly amortization payment records with configurable late months."""
     from dateutil.relativedelta import relativedelta
 
-    # Idempotency check
-    if db["payments"].count_documents({"loan_id": "L-00001"}) > 0:
-        print("  Payment history already exists, skipping")
-        return
-
-    loan_amount = 700000
-    annual_rate = 0.0489
     monthly_rate = annual_rate / 12
     amort_months = 300  # 25 years
-    monthly_payment = 4047.39
+    # Standard amortization formula
+    monthly_payment = round(
+        loan_amount * (monthly_rate * (1 + monthly_rate) ** amort_months)
+        / ((1 + monthly_rate) ** amort_months - 1), 2
+    )
 
     outstanding = loan_amount
     start_date = datetime(2023, 7, 1, tzinfo=timezone.utc)
     records = []
 
-    for month in range(1, 37):
+    for month in range(1, num_months + 1):
         interest = round(outstanding * monthly_rate, 2)
         principal = round(monthly_payment - interest, 2)
         outstanding = round(outstanding - principal, 2)
 
-        # Month 32 is late
-        days_late = 47 if month == 32 else 0
-        status = "late" if days_late > 0 else "on_time"
+        is_late = month in late_months
+        days_late = 47 if is_late else 0
+        status = "late" if is_late else "on_time"
 
         ts = start_date + relativedelta(months=month - 1)
 
         records.append({
-            "loan_id": "L-00001",
+            "loan_id": loan_id,
             "payment_number": month,
             "amount": monthly_payment,
             "principal": principal,
@@ -233,8 +350,207 @@ def create_payment_history(db):
             "timestamp": ts,
         })
 
+    return records
+
+
+def create_payment_history(db):
+    """Insert 36 monthly payment records for loan L-00001."""
+    if db["payments"].count_documents({"loan_id": "L-00001"}) > 0:
+        print("  Payment history already exists for L-00001, skipping")
+        return
+
+    records = _generate_payment_records("L-00001", 700000, 0.0489, 36, [32])
     db["payments"].insert_many(records)
     print(f"  Inserted {len(records)} payment records for L-00001")
+
+
+def _ingest_profile_pdfs(db, profile_id: str, app_id: str, skip_doc_types: list[str] | None = None) -> int:
+    """Ingest profile-specific PDFs from docs/synthetic data/<profile_id>/.
+
+    Args:
+        skip_doc_types: Doc types to skip during seed (e.g., ["paystubs"]).
+            Skipped docs remain on disk for later demo-upload by the borrower.
+
+    Returns the number of documents ingested, or 0 if no profile directory found.
+    """
+    profile_pdf_dir = _resolve_project_root() / "docs" / "synthetic data" / profile_id
+    if not profile_pdf_dir.is_dir():
+        return 0
+
+    pdf_files = sorted(profile_pdf_dir.glob("*.pdf"))
+    if not pdf_files:
+        return 0
+
+    count = 0
+    for pdf_path in pdf_files:
+        prefix = pdf_path.name[:2]
+        doc_type = DOC_TYPES.get(prefix, "unknown")
+        if skip_doc_types and doc_type in skip_doc_types:
+            print(f"      Skipping: {pdf_path.name} ({doc_type}) — will be uploaded by borrower during demo")
+            continue
+        print(f"      Extracting: {pdf_path.name} ({doc_type})")
+
+        try:
+            extracted = extract_from_pdf(pdf_path, doc_type)
+            text_for_display = extracted.get("text_summary", json.dumps(extracted, indent=2))
+
+            embedding = None
+            embedding_pages = 0
+            try:
+                embedding, embedding_pages = embed_document(pdf_path)
+            except Exception as e:
+                print(f"      Warning: embedding failed: {e}")
+
+            db["documents"].insert_one({
+                "application_id": app_id,
+                "doc_type": doc_type,
+                "filename": pdf_path.name,
+                "extracted_text": text_for_display,
+                "structured_data": extracted,
+                "embedding": embedding,
+                "embedding_type": "multimodal" if embedding else None,
+                "embedding_pages": embedding_pages if embedding else 0,
+                "status": "parsed",
+                "created_at": datetime.now(timezone.utc),
+            })
+            count += 1
+        except Exception as e:
+            print(f"      ERROR extracting {pdf_path.name}: {e}")
+            db["documents"].insert_one({
+                "application_id": app_id,
+                "doc_type": doc_type,
+                "filename": pdf_path.name,
+                "extracted_text": f"Extraction failed: {str(e)}",
+                "structured_data": {},
+                "status": "error",
+                "created_at": datetime.now(timezone.utc),
+            })
+            count += 1
+
+    return count
+
+
+def seed_additional_profiles(db):
+    """Seed borrower/application/credit/payment data for additional profiles.
+
+    If profile-specific PDFs exist in docs/synthetic data/<profile_id>/,
+    they are extracted via Bedrock Claude (same as Marcus). Otherwise,
+    falls back to cloning Marcus's 14 documents with name-patching.
+    """
+    from services.application_service import clone_demo_documents
+
+    for profile in ADDITIONAL_PROFILES:
+        app_id = profile["app_id"]
+
+        # Idempotency — only skip if fully seeded (seed_complete flag set at end)
+        if db["applications"].count_documents({"application_id": app_id, "seed_complete": True}) > 0:
+            print(f"  {app_id} ({profile['profile_id']}) already fully seeded, skipping")
+            continue
+        # Clean up partial seed if app exists without seed_complete
+        if db["applications"].count_documents({"application_id": app_id}) > 0:
+            print(f"  {app_id} partially seeded — cleaning up and re-seeding")
+            old_app = db["applications"].find_one({"application_id": app_id}, {"borrower_ids": 1})
+            old_bids = old_app.get("borrower_ids", []) if old_app else []
+            db["applications"].delete_many({"application_id": app_id})
+            db["borrowers"].delete_many({"application_id": app_id})
+            db["documents"].delete_many({"application_id": app_id})
+            if old_bids:
+                db["credit_reports"].delete_many({"borrower_id": {"$in": old_bids}})
+            ph = profile.get("payment_history")
+            if ph:
+                db["payments"].delete_many({"loan_id": ph["loan_id"]})
+
+        now = datetime.now(timezone.utc)
+
+        # --- Borrowers ---
+        borrower_ids = []
+        borrower_names = []
+        for b in profile["borrowers"]:
+            borrower_doc = {
+                "full_name": b["full_name"],
+                "employment": {
+                    "employer": b["employer"],
+                    "job_title": b["job_title"],
+                    "annual_salary": b["annual_salary"],
+                },
+                "credit_score": b["credit_score"],
+                "application_id": app_id,
+                "created_at": now,
+            }
+            result = db["borrowers"].insert_one(borrower_doc)
+            borrower_ids.append(result.inserted_id)
+            borrower_names.append(b["full_name"])
+            print(f"    Borrower: {b['full_name']} (credit: {b['credit_score']})")
+
+        # --- Application ---
+        application = {
+            "application_id": app_id,
+            "borrower_ids": borrower_ids,
+            "borrower_names": borrower_names,
+            "loan_amount": profile["loan_amount"],
+            "purchase_price": profile["purchase_price"],
+            "down_payment": profile["down_payment"],
+            "product": profile["product"],
+            "property": profile["property"],
+            "income_summary": profile["income"],
+            "existing_monthly_debt": profile.get("existing_monthly_debt", 0),
+            "status": "submitted",
+            "status_history": [
+                {"status": "submitted", "timestamp": now, "detail": "Application received"}
+            ],
+            "created_at": now,
+            "updated_at": now,
+        }
+        db["applications"].insert_one(application)
+        print(f"    Application: {app_id}")
+
+        # --- Documents: use profile-specific PDFs if available, else clone Marcus's ---
+        skip_types = profile.get("skip_doc_types")
+        ingested = _ingest_profile_pdfs(db, profile["profile_id"], app_id, skip_doc_types=skip_types)
+        if ingested > 0:
+            skipped_msg = f" (skipped: {', '.join(skip_types)})" if skip_types else ""
+            print(f"    Ingested {ingested} profile-specific documents from docs/synthetic data/{profile['profile_id']}/{skipped_msg}")
+        else:
+            cloned = clone_demo_documents(APPLICATION_ID, app_id)
+            print(f"    Cloned {cloned} documents from {APPLICATION_ID} (no profile PDFs found)")
+
+        # --- Credit Reports ---
+        for i, cr in enumerate(profile["credit_reports"]):
+            if i >= len(borrower_ids):
+                break
+            credit_doc = {
+                "borrower_id": borrower_ids[i],
+                "borrower_name": borrower_names[i],
+                "score": cr["score"],
+                "bureau": cr["bureau"],
+                "accounts": cr["accounts"],
+                "total_outstanding": cr.get("total_outstanding", 0),
+                "payment_history": cr.get("payment_history_summary", ""),
+                "inquiries": cr.get("inquiries", []),
+                "derogatory_items": cr.get("derogatory_items", []),
+                "pulled_at": now,
+            }
+            db["credit_reports"].insert_one(credit_doc)
+            print(f"    Credit report: {borrower_names[i]} (score: {cr['score']})")
+
+        # --- Payment History ---
+        ph = profile.get("payment_history")
+        if ph:
+            loan_id = ph["loan_id"]
+            if db["payments"].count_documents({"loan_id": loan_id}) == 0:
+                records = _generate_payment_records(
+                    loan_id, ph["loan_amount"], ph["rate"],
+                    ph["months"], ph.get("late_months", [])
+                )
+                db["payments"].insert_many(records)
+                print(f"    Payments: {len(records)} records for {loan_id} ({len(ph.get('late_months', []))} late)")
+
+        # Mark as fully seeded so re-runs skip this profile
+        db["applications"].update_one(
+            {"application_id": app_id},
+            {"$set": {"seed_complete": True}}
+        )
+        print(f"  Seeded profile: {profile['profile_id']} ({app_id})")
 
 
 def main():
@@ -242,11 +558,17 @@ def main():
     db_connector = MongoDBConnector()
     db = db_connector.client[os.getenv("DATABASE_NAME", "lendflow")]
 
-    # Idempotency check
+    # Idempotency check — if Marcus already exists, skip PDF extraction but
+    # still seed additional profiles, policies, and payment histories (they
+    # have their own idempotency checks).
     existing = db["applications"].count_documents({"application_id": APPLICATION_ID})
     if existing > 0:
-        print(f"Data already ingested for {APPLICATION_ID} ({existing} docs found). Skipping.")
-        print("To re-ingest, drop the collections first.")
+        print(f"Data already ingested for {APPLICATION_ID}. Skipping PDF extraction.")
+        print("Checking additional profiles, policies, and payments...\n")
+        create_policies(db)
+        create_payment_history(db)
+        seed_additional_profiles(db)
+        print("\nDone.")
         sys.exit(0)
 
     model_id = os.getenv("CHATCOMPLETIONS_MODEL_ID")
@@ -346,6 +668,12 @@ def main():
     print("STEP 6: Inserting payment history")
     print("=" * 60)
     create_payment_history(db)
+
+    # Step 7: Seed additional borrower profiles
+    print("\n" + "=" * 60)
+    print("STEP 7: Seeding additional borrower profiles")
+    print("=" * 60)
+    seed_additional_profiles(db)
 
     # Summary
     print("\n" + "=" * 60)

@@ -2,11 +2,31 @@
 
 import { useState, useEffect } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
+import { apiPost } from '../../lib/api';
 
-export function InterventionCard({ intervention, onResolve, resolving }) {
+const DOC_TYPE_LABELS = {
+  government_id: 'Government ID',
+  employment_letter: 'Employment Letter',
+  paystubs: 'Pay Stubs',
+  income_tax: 'CRA Tax Notices',
+  bank_statements: 'Bank Statements',
+  purchase_agreement: 'Purchase Agreement',
+  investment_statements: 'Investment Statements',
+  other_property_docs: 'Property Docs',
+  mortgage_application: 'Mortgage Application',
+  utility_bills: 'Utility Bills',
+  credit_report: 'Credit Report',
+  car_loan_statement: 'Car Loan Statement',
+  property_tax: 'Property Tax',
+  property_inspection: 'Property Inspection',
+};
+
+export function InterventionCard({ intervention, onResolve, resolving, applicationId }) {
   const isResolved = intervention._resolved;
   const ctx = intervention.borrower_context || {};
   const [elapsed, setElapsed] = useState(0);
+  const [uploading, setUploading] = useState(null);
+  const [uploadedTypes, setUploadedTypes] = useState([]);
 
   useEffect(() => {
     if (isResolved) return;
@@ -18,6 +38,24 @@ export function InterventionCard({ intervention, onResolve, resolving }) {
   }, [intervention.created_at, isResolved]);
 
   const isUrgent = !isResolved && elapsed > 30000;
+
+  const missingDocTypes = (intervention.type === 'missing_document' || intervention.type === 'document_processing_error')
+    ? (ctx.document_types_accepted || [])
+    : [];
+
+  const handleDemoUpload = async (docType) => {
+    if (!applicationId || uploading) return;
+    setUploading(docType);
+    try {
+      const result = await apiPost(`/applications/${applicationId}/documents/demo-upload/${docType}`, {});
+      if (result && !result.error) {
+        setUploadedTypes(prev => [...prev, docType]);
+      }
+    } catch (err) {
+      console.warn('[InterventionCard] demo upload failed:', err);
+    }
+    setUploading(null);
+  };
 
   return (
     <div style={{
@@ -66,6 +104,42 @@ export function InterventionCard({ intervention, onResolve, resolving }) {
       {ctx.action_required && !isResolved && (
         <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4, marginBottom: 8 }}>
           {ctx.action_required}
+        </div>
+      )}
+
+      {/* Upload buttons for missing document types */}
+      {!isResolved && missingDocTypes.length > 0 && applicationId && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+          {missingDocTypes.map((docType) => {
+            const alreadyUploaded = uploadedTypes.includes(docType);
+            const isUploading = uploading === docType;
+            return (
+              <button
+                key={docType}
+                type="button"
+                onClick={() => handleDemoUpload(docType)}
+                disabled={isUploading || alreadyUploaded}
+                style={{
+                  padding: '5px 12px', borderRadius: 6,
+                  border: alreadyUploaded ? '1px solid var(--success)' : '1px solid var(--mongo)',
+                  background: alreadyUploaded ? 'var(--success-dim)' : 'var(--mongo-dim)',
+                  color: alreadyUploaded ? 'var(--success)' : 'var(--mongo)',
+                  fontSize: 11, fontWeight: 600,
+                  fontFamily: 'var(--font-display)',
+                  cursor: isUploading || alreadyUploaded ? 'default' : 'pointer',
+                  opacity: isUploading ? 0.6 : 1,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                {alreadyUploaded ? '\u2713' : isUploading ? '' : '\u2191'}
+                {isUploading
+                  ? 'Uploading...'
+                  : alreadyUploaded
+                    ? `${DOC_TYPE_LABELS[docType] || docType} Uploaded`
+                    : `Upload ${DOC_TYPE_LABELS[docType] || docType}`}
+              </button>
+            );
+          })}
         </div>
       )}
 

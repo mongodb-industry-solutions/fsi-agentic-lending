@@ -248,3 +248,91 @@ async def upload_document(
     doc_record["_id"] = result.inserted_id
 
     return serialize_doc(doc_record)
+
+
+# Reverse mapping: doc_type -> filename prefix (e.g., "paystubs" -> "03")
+_DOC_TYPE_TO_PREFIX = {
+    "government_id": "01", "employment_letter": "02", "paystubs": "03",
+    "income_tax": "04", "bank_statements": "05", "purchase_agreement": "06",
+    "investment_statements": "07", "other_property_docs": "08",
+    "mortgage_application": "09", "utility_bills": "10", "credit_report": "11",
+    "car_loan_statement": "12", "property_tax": "13", "property_inspection": "14",
+}
+
+
+_PROFILE_ID_PATTERN = re.compile(r'^[a-z0-9][a-z0-9-]{1,40}$')
+
+
+@router.post("/applications/{app_id}/documents/demo-upload/{doc_type}")
+async def demo_upload_document(app_id: str, doc_type: str):
+    """Upload a pre-seeded correction document for demo purposes.
+
+    Looks up the application's profile_id, finds the matching PDF in
+    docs/synthetic data/{profile_id}/, and runs it through the real
+    extraction + embedding pipeline.
+    """
+    _validate_app_id(app_id)
+    db = get_db()
+    app = db["applications"].find_one({"application_id": app_id}, {"profile_id": 1})
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    profile_id = app.get("profile_id")
+    if not profile_id or not _PROFILE_ID_PATTERN.match(profile_id):
+        raise HTTPException(status_code=400, detail="Application has no valid profile_id")
+
+    if doc_type not in _DOC_TYPE_TO_PREFIX:
+        raise HTTPException(status_code=400, detail=f"Unknown doc_type: {doc_type}")
+
+    prefix = _DOC_TYPE_TO_PREFIX[doc_type]
+    pdf_path = _PROJECT_ROOT / "docs" / "synthetic data" / profile_id / f"{prefix}_{doc_type}.pdf"
+    if not pdf_path.is_file():
+        raise HTTPException(status_code=404, detail=f"No pre-seeded {doc_type} PDF found for profile {profile_id}")
+
+    # Check for dedup
+    content = pdf_path.read_bytes()
+    content_hash = hashlib.sha256(content).hexdigest()
+    existing = db["documents"].find_one({
+        "application_id": app_id,
+        "doc_type": doc_type,
+        "content_hash": content_hash,
+        "status": {"$ne": "error"},
+    })
+    if existing:
+        return serialize_doc(existing)
+
+    # Extract via Bedrock Claude
+    try:
+        extraction = await asyncio.to_thread(extract_from_pdf, pdf_path, doc_type)
+    except Exception as e:
+        extraction = {"text_summary": f"Extraction failed: {str(e)}", "error": str(e)}
+
+    text_for_display = extraction.get("text_summary", json.dumps(extraction, indent=2))
+
+    # Generate multimodal embedding
+    embedding = None
+    embedding_pages = 0
+    try:
+        embedding, embedding_pages = await asyncio.to_thread(_embed_document, pdf_path)
+    except Exception as e:
+        logger.warning(f"Demo upload embedding failed: {e}")
+
+    doc_record = {
+        "application_id": app_id,
+        "doc_type": doc_type,
+        "content_hash": content_hash,
+        "filename": pdf_path.name,
+        "extracted_text": text_for_display,
+        "structured_data": extraction,
+        "embedding": embedding,
+        "embedding_type": "multimodal" if embedding else None,
+        "embedding_pages": embedding_pages if embedding else 0,
+        "status": "parsed" if "error" not in extraction else "error",
+        "created_at": datetime.now(timezone.utc),
+    }
+
+    result = db["documents"].insert_one(doc_record)
+    doc_record["_id"] = result.inserted_id
+    logger.info(f"Demo upload: {doc_type} for {app_id} (profile: {profile_id})")
+
+    return serialize_doc(doc_record)

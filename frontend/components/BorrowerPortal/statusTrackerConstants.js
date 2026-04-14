@@ -127,6 +127,13 @@ export const STAGES = [
       const resolved = ctx.totalResolved || 0;
       if (typeof ctx.riskScore === 'number') {
         let msg = `Underwriting complete. Risk score: ${ctx.riskScore}/100 (${ctx.riskTier || 'N/A'}).`;
+        if (ctx.riskScore <= 50 && typeof ctx.gds === 'number' && ctx.gds <= 0.36) {
+          msg += ' All metrics within auto-approval bounds.';
+        } else if (ctx.riskScore > 80) {
+          msg += ' Risk exceeds acceptable threshold.';
+        } else if (typeof ctx.gds === 'number' && ctx.gds > 0.36) {
+          msg += ' Debt service ratios require officer review.';
+        }
         if (resolved > 0) msg += ` ${resolved} issue${resolved !== 1 ? 's' : ''} resolved by AI.`;
         return msg;
       }
@@ -153,6 +160,9 @@ export const STAGES = [
       }
       const parts = ['Congratulations! Your mortgage has been approved.'];
       if (ctx.product) parts.push(`Product: ${ctx.product}.`);
+      if (typeof ctx.riskScore === 'number') {
+        parts.push(`Risk score: ${ctx.riskScore}/100 (${ctx.riskTier || 'N/A'}).`);
+      }
       return parts.join(' ');
     },
     getAgentStatus: (ctx) => ctx.isDeclined

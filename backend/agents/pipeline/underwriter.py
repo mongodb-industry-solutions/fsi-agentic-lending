@@ -68,21 +68,33 @@ def run_stress_test(
     property_tax_monthly: float,
     heating: float,
     existing_debt_payments: float,
+    ltv: float = 0.80,
 ) -> dict:
-    """Run OSFI B-20 stress test. Returns stress metrics and pass/fail."""
+    """Run OSFI B-20 stress test. Returns stress metrics and pass/fail.
+
+    Insured mortgages (LTV > 80%) use tighter limits: GDS 35%, TDS 42%.
+    Conventional mortgages (LTV <= 80%) use standard limits: GDS 39%, TDS 44%.
+    """
     stress_rate = max(annual_rate + 0.02, 0.0525)
     stress_payment = _calculate_mortgage_payment(loan_amount, stress_rate)
     stress_gds, stress_tds = calculate_gds_tds(
         stress_payment, property_tax_monthly, heating,
         existing_debt_payments, monthly_income,
     )
-    passed = stress_gds <= 0.39 and stress_tds <= 0.44
+    # Insured mortgages have tighter ratio limits
+    is_insured = ltv > 0.80
+    gds_limit = 0.35 if is_insured else 0.39
+    tds_limit = 0.42 if is_insured else 0.44
+    passed = stress_gds <= gds_limit and stress_tds <= tds_limit
     return {
         "stress_rate": stress_rate,
         "stress_payment": stress_payment,
         "stress_gds": stress_gds,
         "stress_tds": stress_tds,
         "passed": passed,
+        "gds_limit": gds_limit,
+        "tds_limit": tds_limit,
+        "is_insured": is_insured,
     }
 
 
@@ -219,6 +231,10 @@ def underwriter_node(state: LendFlowState, **kwargs) -> dict:
                 "No structured monthly debt payments found in credit reports — treating as $0. Manual review recommended."
             )
 
+    # --- LTV (needed before stress test for insured mortgage detection) ---
+    ltv = agg_result.get("ltv") if agg_result.get("ltv") is not None else ((loan_amount / purchase_price) * 100 if purchase_price > 0 else 100)
+    ltv_decimal = ltv / 100  # Convert percentage to decimal for stress test
+
     # --- GDS / TDS ---
     gds, tds = calculate_gds_tds(
         estimated_mortgage_payment, property_tax_monthly,
@@ -230,11 +246,13 @@ def underwriter_node(state: LendFlowState, **kwargs) -> dict:
     stress = run_stress_test(
         loan_amount, annual_rate, monthly_income,
         property_tax_monthly, heating_estimate, existing_debt_payments,
+        ltv=ltv_decimal,
     )
     log_agent_activity(app_id, "underwriter", "stress_test",
-        f"Stress rate: {stress['stress_rate']:.2%}, Stress GDS: {stress['stress_gds']:.1%}, Stress TDS: {stress['stress_tds']:.1%}")
+        f"Stress rate: {stress['stress_rate']:.2%}, Stress GDS: {stress['stress_gds']:.1%} (limit {stress['gds_limit']:.0%}), Stress TDS: {stress['stress_tds']:.1%} (limit {stress['tds_limit']:.0%})")
     log_agent_activity(app_id, "underwriter", "stress_test_result",
-        f"{'PASSED' if stress['passed'] else 'FAILED'}: Stress GDS {stress['stress_gds']:.1%}, Stress TDS {stress['stress_tds']:.1%}")
+        f"{'PASSED' if stress['passed'] else 'FAILED'}: Stress GDS {stress['stress_gds']:.1%} vs {stress['gds_limit']:.0%}, Stress TDS {stress['stress_tds']:.1%} vs {stress['tds_limit']:.0%}"
+        + (f" [Insured mortgage — tighter limits apply]" if stress.get("is_insured") else ""))
 
     effective_gds = max(gds, stress["stress_gds"])
     effective_tds = max(tds, stress["stress_tds"])
@@ -264,10 +282,9 @@ def underwriter_node(state: LendFlowState, **kwargs) -> dict:
             "messages": [{"role": "assistant", "content": "Primary credit score unavailable — application declined."}],
         }
 
-    ltv = agg_result.get("ltv") if agg_result.get("ltv") is not None else ((loan_amount / purchase_price) * 100 if purchase_price > 0 else 100)
     doc_count = agg_result.get("doc_count") if agg_result.get("doc_count") is not None else 0
 
-    log_agent_activity(app_id, "underwriter", "ltv_calc", f"LTV: {ltv:.1f}% ({loan_amount:,.0f} / {purchase_price:,.0f})")
+    log_agent_activity(app_id, "underwriter", "ltv_calc", f"LTV: {ltv:.1f}% ({loan_amount:,.0f} / {purchase_price:,.0f}){' [INSURED]' if stress.get('is_insured') else ''}")
     log_agent_activity(app_id, "underwriter", "agg_data",
         f"Aggregation: primary_score={primary_score}, co_score={co_score}, doc_count={doc_count}, pipeline_ms={agg_result.get('pipeline_elapsed_ms', 'N/A')}")
 
@@ -333,7 +350,7 @@ Risk Tier: {risk_tier}
     # --- Stress test failure early exit ---
     if not stress["passed"]:
         decision = "decline"
-        decision_reasoning = f"OSFI B-20 stress test failure: Stress GDS {stress['stress_gds']:.1%} (limit 39%), Stress TDS {stress['stress_tds']:.1%} (limit 44%)"
+        decision_reasoning = f"OSFI B-20 stress test failure: Stress GDS {stress['stress_gds']:.1%} (limit {stress['gds_limit']:.0%}), Stress TDS {stress['stress_tds']:.1%} (limit {stress['tds_limit']:.0%})"
         log_agent_activity(app_id, "underwriter", "decision", decision_reasoning)
         if create_intervention(
             app_id,
@@ -347,8 +364,9 @@ Risk Tier: {risk_tier}
                 "stress_gds": round(stress["stress_gds"], 4),
                 "stress_tds": round(stress["stress_tds"], 4),
                 "stress_rate": round(stress["stress_rate"], 4),
-                "gds_limit": 0.39,
-                "tds_limit": 0.44,
+                "gds_limit": stress["gds_limit"],
+                "tds_limit": stress["tds_limit"],
+                "is_insured": stress.get("is_insured", False),
             },
         ):
             log_agent_activity(app_id, "underwriter", "intervention", "Created stress_test_failure intervention")

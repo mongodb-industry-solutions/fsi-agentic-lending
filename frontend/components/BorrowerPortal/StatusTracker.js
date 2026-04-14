@@ -7,6 +7,75 @@ import { STAGES, STATUS_TO_STAGE, mapEventToStageIdx } from './statusTrackerCons
 import { SavingsSummary } from './SavingsSummary';
 import { TimelineStageCard } from './TimelineStageCard';
 
+function ApprovalContextCard({ stageContext }) {
+  const parts = [];
+  if (typeof stageContext.riskScore === 'number') {
+    parts.push(`Risk Tier ${stageContext.riskTier || 'N/A'} (score ${stageContext.riskScore}/100)`);
+  }
+  if (typeof stageContext.gds === 'number') {
+    parts.push(`GDS ${(stageContext.gds * 100).toFixed(1)}% within policy limits`);
+  }
+  if (typeof stageContext.tds === 'number') {
+    parts.push(`TDS ${(stageContext.tds * 100).toFixed(1)}% within policy limits`);
+  }
+  if (typeof stageContext.creditScore === 'number') {
+    parts.push(`credit score ${stageContext.creditScore}`);
+  }
+  if (parts.length === 0) return null;
+
+  const wasOfficerReviewed = stageContext.decisionReasoning?.toLowerCase().includes('officer')
+    || stageContext.decisionReasoning?.toLowerCase().includes('escalat');
+  const prefix = wasOfficerReviewed
+    ? 'Officer approved after AI review'
+    : 'Auto-approved by AI pipeline';
+
+  return (
+    <div style={{
+      padding: spacing[3],
+      background: 'var(--bg-surface)',
+      borderRadius: 'var(--radius-md)',
+      border: '1px solid var(--success)',
+      borderLeft: '4px solid var(--success)',
+      marginTop: spacing[3],
+      animation: 'cardEnter 0.4s cubic-bezier(0.33, 1, 0.68, 1) both',
+    }}>
+      <div style={{
+        fontFamily: 'var(--font-display)', fontWeight: 700,
+        fontSize: 13, color: 'var(--success)', marginBottom: spacing[2],
+      }}>
+        Why This Was Approved
+      </div>
+      <div style={{
+        fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5,
+      }}>
+        {prefix}: {parts.join(', ')}.
+      </div>
+      {(typeof stageContext.riskScore === 'number' || typeof stageContext.gds === 'number') && (
+        <div style={{ display: 'flex', gap: spacing[2], marginTop: spacing[2], flexWrap: 'wrap' }}>
+          {typeof stageContext.riskScore === 'number' && (
+            <div style={{ padding: '4px 8px', background: 'var(--success-dim)', borderRadius: 4, fontSize: 9 }}>
+              <span style={{ color: 'var(--text-dim)' }}>Risk Score: </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--success)' }}>{stageContext.riskScore}/100</span>
+            </div>
+          )}
+          {typeof stageContext.gds === 'number' && (
+            <div style={{ padding: '4px 8px', background: 'var(--success-dim)', borderRadius: 4, fontSize: 9 }}>
+              <span style={{ color: 'var(--text-dim)' }}>GDS: </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{(stageContext.gds * 100).toFixed(1)}%</span>
+            </div>
+          )}
+          {typeof stageContext.tds === 'number' && (
+            <div style={{ padding: '4px 8px', background: 'var(--success-dim)', borderRadius: 4, fontSize: 9 }}>
+              <span style={{ color: 'var(--text-dim)' }}>TDS: </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{(stageContext.tds * 100).toFixed(1)}%</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DeclineCard({ stageContext, onOpenChat }) {
   const reasoning = stageContext.decisionReasoning || '';
   const r = reasoning.toLowerCase();
@@ -509,9 +578,12 @@ export default function StatusTracker({ onNotification, applicationId, applicati
         ))}
       </div>
 
-      {/* Post-Approval Savings Summary */}
+      {/* Post-Approval Context + Savings Summary */}
       {isComplete && !isDeclined && (
-        <SavingsSummary stageContext={stageContext} />
+        <>
+          <ApprovalContextCard stageContext={stageContext} />
+          <SavingsSummary stageContext={stageContext} />
+        </>
       )}
 
       {/* Decline Experience Card */}

@@ -29,6 +29,125 @@ const BORROWER_PROFILES = [
     existingDebt: '1842',
     creditScore: '784',
     seedApplicationId: 'APP-2026-00001',
+    pipelineHint: 'Officer Review',
+    narrative: 'Strong finances but $875K purchase exceeds the $500K auto-approval threshold — triggers mandatory officer review.',
+    riskFactors: ['Purchase > $500K', 'Excellent credit offsets risk', 'Expect: Officer approves as-is'],
+  },
+  {
+    id: 'jane-doe',
+    firstName: 'Jane',
+    middleInitial: 'M',
+    lastName: 'Doe',
+    email: 'jane.doe@email.com',
+    phone: '(604) 555-0231',
+    sin: '***-***-719',
+    address: '2150 Marine Drive, Apt 804, West Vancouver, BC V7V 1K4',
+    employer: 'Pacific Coast Medical Group',
+    jobTitle: 'Nurse Practitioner',
+    yearsEmployed: '6',
+    annualIncome: '95000',
+    coApplicantName: 'John Doe',
+    coApplicantIncome: '70000',
+    propertyAddress: '1438 Garden Terrace, Burnaby, BC V5A 3G2',
+    annualPropertyTax: '3950',
+    loanAmount: '425000',
+    loanPurpose: 'Purchase',
+    propertyType: 'Townhouse',
+    productType: '5yr Fixed (25yr Amort)',
+    downPayment: '85000',
+    existingDebt: '650',
+    creditScore: '798',
+    seedApplicationId: 'APP-2026-00002',
+    pipelineHint: 'Auto-Approve',
+    narrative: 'Clean credit, low ratios, and purchase under $500K — qualifies for fully autonomous approval with no officer intervention.',
+    riskFactors: ['All ratios well under limits', 'Both scores > 750', 'Expect: ~15s end-to-end'],
+  },
+  {
+    id: 'john-smith',
+    firstName: 'John',
+    middleInitial: 'R',
+    lastName: 'Smith',
+    email: 'john.smith@email.com',
+    phone: '(416) 555-0384',
+    sin: '***-***-256',
+    address: '88 Harbour Street, Unit 1207, Toronto, ON M5J 2L4',
+    employer: 'Meridian Creative Agency',
+    jobTitle: 'Marketing Manager',
+    yearsEmployed: '2',
+    annualIncome: '108000',
+    coApplicantName: '',
+    coApplicantIncome: '0',
+    propertyAddress: '55 Bremner Blvd, Unit 3402, Toronto, ON M5J 0A6',
+    annualPropertyTax: '4200',
+    loanAmount: '490000',
+    loanPurpose: 'Purchase',
+    propertyType: 'Condo',
+    productType: '5yr Fixed (25yr Amort)',
+    downPayment: '98000',
+    existingDebt: '400',
+    creditScore: '695',
+    seedApplicationId: 'APP-2026-00003',
+    pipelineHint: 'Borderline',
+    narrative: 'Borderline 695 credit score and elevated stress-test ratios push risk to Tier C — requires officer judgment call.',
+    riskFactors: ['Credit 695 (borderline)', 'Stress GDS > 36% threshold', 'Expect: Officer modifies terms'],
+  },
+  {
+    id: 'bob-johnson',
+    firstName: 'Bob',
+    middleInitial: 'T',
+    lastName: 'Johnson',
+    email: 'bob.johnson@email.com',
+    phone: '(905) 555-0672',
+    sin: '***-***-903',
+    address: '312 Lakeshore Road E, Oakville, ON L6J 1J6',
+    employer: 'Great Lakes Logistics Ltd.',
+    jobTitle: 'Operations Coordinator',
+    yearsEmployed: '3',
+    annualIncome: '85000',
+    coApplicantName: 'Alice Johnson',
+    coApplicantIncome: '50000',
+    propertyAddress: '27 Chartwell Crescent, Oakville, ON L6J 3Z8',
+    annualPropertyTax: '9200',
+    loanAmount: '1200000',
+    loanPurpose: 'Purchase',
+    propertyType: 'Detached Home',
+    productType: '5yr Fixed (25yr Amort)',
+    downPayment: '240000',
+    existingDebt: '3070',
+    creditScore: '648',
+    seedApplicationId: 'APP-2026-00004',
+    pipelineHint: 'Decline',
+    narrative: 'High debt load on modest income causes stress test failure (GDS exceeds limit) — automatic decline by policy.',
+    riskFactors: ['High-risk credit (648/612)', 'Stress GDS fails 39% limit', 'Expect: Immediate decline'],
+  },
+  {
+    id: 'sarah-williams',
+    firstName: 'Sarah',
+    middleInitial: 'K',
+    lastName: 'Williams',
+    email: 'sarah.williams@email.com',
+    phone: '(613) 555-0892',
+    sin: '***-***-641',
+    address: '45 Sparks Street, Unit 1504, Ottawa, ON K1P 5A5',
+    employer: 'Shopify Inc.',
+    jobTitle: 'Senior Data Analyst',
+    yearsEmployed: '4',
+    annualIncome: '115000',
+    coApplicantName: '',
+    coApplicantIncome: '0',
+    propertyAddress: '280 Metcalfe Street, Unit 801, Ottawa, ON K2P 1R7',
+    annualPropertyTax: '3800',
+    loanAmount: '455000',
+    loanPurpose: 'Purchase',
+    propertyType: 'Condo',
+    productType: '5yr Fixed (25yr Amort)',
+    downPayment: '91000',
+    existingDebt: '350',
+    creditScore: '760',
+    seedApplicationId: 'APP-2026-00005',
+    pipelineHint: 'Doc Issue \u2192 Fix \u2192 Approve',
+    narrative: 'AI flags missing pay stubs and approves on strong financials \u2014 borrower uploads the missing document via chat to complete the file before closing.',
+    riskFactors: ['Missing pay stubs flagged', 'Strong credit (760)', 'Expect: Approve + doc upload via chat'],
   },
 ];
 
@@ -70,8 +189,9 @@ function ActiveCard({ profile, onClick }) {
           marginBottom: spacing[1],
         }}
       >
-        {profile.firstName} & {profile.coApplicantName.split(' ')[0]}{' '}
-        {profile.lastName}
+        {profile.coApplicantName
+          ? `${profile.firstName} & ${profile.coApplicantName.split(' ')[0]} ${profile.lastName}`
+          : `${profile.firstName} ${profile.lastName}`}
       </div>
 
       {/* Product */}
@@ -79,11 +199,25 @@ function ActiveCard({ profile, onClick }) {
         style={{
           fontSize: 12,
           color: 'var(--text-secondary)',
-          marginBottom: spacing[4],
+          marginBottom: spacing[2],
         }}
       >
         {profile.productType}
       </div>
+
+      {/* Narrative */}
+      {profile.narrative && (
+        <div
+          style={{
+            fontSize: 10,
+            color: 'var(--text-secondary)',
+            lineHeight: 1.5,
+            marginBottom: spacing[3],
+          }}
+        >
+          {profile.narrative}
+        </div>
+      )}
 
       {/* Details */}
       <div
@@ -104,11 +238,63 @@ function ActiveCard({ profile, onClick }) {
           value={`$${Number(profile.downPayment).toLocaleString('en-US')}`}
           mono
         />
-        <DetailRow
-          label="Co-Applicant"
-          value={profile.coApplicantName}
-        />
+        {profile.coApplicantName && (
+          <DetailRow
+            label="Co-Applicant"
+            value={profile.coApplicantName}
+          />
+        )}
       </div>
+
+      {/* Pipeline hint badge + risk factors */}
+      {profile.pipelineHint && (
+        <div style={{ marginTop: spacing[3] }}>
+          <div
+            style={{
+              display: 'inline-block',
+              padding: '3px 8px',
+              borderRadius: 4,
+              fontSize: 9,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              fontFamily: 'var(--font-mono)',
+              background: profile.pipelineHint === 'Auto-Approve'
+                ? 'var(--success-dim)'
+                : profile.pipelineHint === 'Decline'
+                  ? 'var(--danger-dim)'
+                  : 'var(--hitl-amber-dim)',
+              color: profile.pipelineHint === 'Auto-Approve'
+                ? 'var(--success)'
+                : profile.pipelineHint === 'Decline'
+                  ? 'var(--danger)'
+                  : 'var(--hitl-amber)',
+            }}
+          >
+            Expected: {profile.pipelineHint}
+          </div>
+          {profile.riskFactors?.length > 0 && (
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+              {profile.riskFactors.map((factor) => (
+                <span
+                  key={factor}
+                  style={{
+                    fontSize: 8,
+                    fontFamily: 'var(--font-mono)',
+                    fontWeight: 600,
+                    padding: '2px 6px',
+                    borderRadius: 3,
+                    background: 'var(--bg-raised)',
+                    color: 'var(--text-dim)',
+                  }}
+                >
+                  {factor}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Key stats strip */}
       <div
@@ -121,8 +307,8 @@ function ActiveCard({ profile, onClick }) {
         }}
       >
         <StatBadge
-          label="Combined Income"
-          value={`$${(Number(profile.annualIncome) + Number(profile.coApplicantIncome)).toLocaleString('en-US')}`}
+          label={profile.coApplicantName ? 'Combined Income' : 'Annual Income'}
+          value={`$${(Number(profile.annualIncome) + Number(profile.coApplicantIncome || 0)).toLocaleString('en-US')}`}
         />
         <StatBadge
           label="LTV"
@@ -559,7 +745,7 @@ export default function BorrowerSelection({ onSelect }) {
         style={{
           display: 'flex',
           gap: spacing[4],
-          maxWidth: 960,
+          maxWidth: 1200,
           width: '100%',
           flexWrap: 'wrap',
           justifyContent: 'center',

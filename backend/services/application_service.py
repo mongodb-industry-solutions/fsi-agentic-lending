@@ -139,22 +139,67 @@ def list_applications(skip: int = 0, limit: int = 50) -> list[dict]:
 
 SEED_APPLICATION_IDS = {
     "marcus-delgado": "APP-2026-00001",
+    "jane-doe": "APP-2026-00002",
+    "john-smith": "APP-2026-00003",
+    "bob-johnson": "APP-2026-00004",
+    "sarah-williams": "APP-2026-00005",
 }
 
 
+def _patch_structured_data_names(structured_data: dict, source_names: list[str], target_names: list[str]) -> dict:
+    """Patch person names in structured_data when cloning docs across profiles.
+
+    Replaces source borrower names with target borrower names in the ``persons``
+    array (used by government_id, employment_letter, credit_report, etc.).
+    Returns a new dict — does not mutate the input.
+    """
+    if not structured_data or not source_names or not target_names:
+        return structured_data
+    patched = dict(structured_data)
+    persons = patched.get("persons")
+    if isinstance(persons, list):
+        new_persons = []
+        for person in persons:
+            person = dict(person)  # shallow copy to avoid mutating source
+            if "full_name" in person:
+                for si, sname in enumerate(source_names):
+                    if si < len(target_names) and person["full_name"] == sname:
+                        person["full_name"] = target_names[si]
+                        break
+            new_persons.append(person)
+        patched["persons"] = new_persons
+    return patched
+
+
 def clone_demo_documents(source_app_id: str, target_app_id: str) -> int:
-    """Clone all documents from a seeded application to a new application."""
+    """Clone all documents from a seeded application to a new application.
+
+    When cloning across profiles, patches ``structured_data.persons[].full_name``
+    to match the target application's borrower names.
+    """
     db = _get_db()
     source_docs = list(db["documents"].find({"application_id": source_app_id}))
     if not source_docs:
         logger.warning(f"No source documents found for {source_app_id}")
         return 0
+
+    # Look up borrower names for name-patching when cloning across profiles
+    source_app = db["applications"].find_one({"application_id": source_app_id}, {"borrower_names": 1})
+    target_app = db["applications"].find_one({"application_id": target_app_id}, {"borrower_names": 1})
+    source_names = source_app.get("borrower_names", []) if source_app else []
+    target_names = target_app.get("borrower_names", []) if target_app else []
+    needs_patch = source_names and target_names and source_names != target_names
+
     now = datetime.now(timezone.utc)
     clones = []
     for doc in source_docs:
         clone = {k: v for k, v in doc.items() if k not in ("_id", "content_hash")}
         clone["application_id"] = target_app_id
         clone["created_at"] = now
+        if needs_patch and clone.get("structured_data"):
+            clone["structured_data"] = _patch_structured_data_names(
+                clone["structured_data"], source_names, target_names
+            )
         clones.append(clone)
     if clones:
         db["documents"].insert_many(clones)

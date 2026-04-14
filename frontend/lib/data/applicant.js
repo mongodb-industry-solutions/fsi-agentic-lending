@@ -1,3 +1,7 @@
+/**
+ * Static applicant data for the DemoFlow scripted walkthrough only.
+ * The live BorrowerPortal derives all values from the selected BORROWER_PROFILES entry.
+ */
 export const APPLICANT = {
   name: "Marcus & Sofia Delgado",
   id: "APP-2026-00001",
