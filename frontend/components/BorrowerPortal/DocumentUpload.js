@@ -5,22 +5,40 @@ import { spacing } from '@leafygreen-ui/tokens';
 import { apiGet } from '../../lib/api';
 import DocumentViewer from '../DocumentViewer';
 
-const INITIAL_DOCUMENTS = [
-  { id: 'gov-id', type: 'Government IDs', docType: 'government_id', abbr: 'ID', fileName: 'ID_MarcusDelgado_AB_DL.pdf', size: '1.1 MB', pages: 2, status: 'uploaded', mongoId: null },
-  { id: 'employment', type: 'Employment Letters', docType: 'employment_letter', abbr: 'EMP', fileName: 'EmploymentLetter_TechNova.pdf', size: '412 KB', pages: 1, status: 'uploaded', mongoId: null },
-  { id: 'paystubs', type: 'Pay Stubs (6)', docType: 'paystubs', abbr: 'PAY', fileName: 'PayStubs_Delgado_Q4Q1.pdf', size: '1.8 MB', pages: 6, status: 'uploaded', mongoId: null },
-  { id: 'tax', type: 'CRA Tax Notices', docType: 'income_tax', abbr: 'TAX', fileName: 'NOA_2025_Delgado.pdf', size: '624 KB', pages: 4, status: 'uploaded', mongoId: null },
-  { id: 'bank', type: 'Bank Statements (3mo)', docType: 'bank_statements', abbr: 'BNK', fileName: 'TD_Statement_Jan-Mar2026.pdf', size: '1.4 MB', pages: 8, status: 'uploaded', mongoId: null },
-  { id: 'purchase', type: 'Purchase Agreement', docType: 'purchase_agreement', abbr: 'PSA', fileName: 'PurchaseAgreement_4718Coronation.pdf', size: '2.3 MB', pages: 12, status: 'uploaded', mongoId: null },
-  { id: 'investments', type: 'Investment Statements', docType: 'investment_statements', abbr: 'INV', fileName: 'RRSP_Investments_Delgado.pdf', size: '986 KB', pages: 3, status: 'uploaded', mongoId: null },
-  { id: 'property', type: 'Existing Property Docs', docType: 'other_property_docs', abbr: 'PTY', fileName: 'Condo_10180_104St_Edmonton.pdf', size: '1.6 MB', pages: 5, status: 'uploaded', mongoId: null },
-  { id: 'application', type: 'Mortgage Application', docType: 'mortgage_application', abbr: 'APP', fileName: 'MortgageApp_Delgado_APP-2026-00001.pdf', size: '542 KB', pages: 8, status: 'uploaded', mongoId: null },
-  { id: 'utilities', type: 'Utility Bills', docType: 'utility_bills', abbr: 'UTL', fileName: 'Utilities_Enmax_Feb2026.pdf', size: '218 KB', pages: 2, status: 'uploaded', mongoId: null },
-  { id: 'credit', type: 'Credit Reports', docType: 'credit_report', abbr: 'CRD', fileName: 'Equifax_Delgado_Mar2026.pdf', size: '1.3 MB', pages: 6, status: 'uploaded', mongoId: null },
-  { id: 'carloan', type: 'Car Loan Statement', docType: 'car_loan_statement', abbr: 'CAR', fileName: 'Scotiabank_AutoLoan_Delgado.pdf', size: '324 KB', pages: 2, status: 'uploaded', mongoId: null },
-  { id: 'proptax', type: 'Property Tax Notice', docType: 'property_tax', abbr: 'PTX', fileName: 'PropertyTax_Calgary_2026.pdf', size: '186 KB', pages: 1, status: 'uploaded', mongoId: null },
-  { id: 'inspection', type: 'Property Inspection', docType: 'property_inspection', abbr: 'INS', fileName: 'Inspection_4718Coronation.pdf', size: '3.2 MB', pages: 14, status: 'uploaded', mongoId: null },
-];
+// Display metadata keyed by doc_type — used to enrich API-fetched documents
+const DOC_TYPE_META = {
+  government_id:        { type: 'Government IDs',           abbr: 'ID'  },
+  employment_letter:    { type: 'Employment Letters',        abbr: 'EMP' },
+  paystubs:             { type: 'Pay Stubs',                 abbr: 'PAY' },
+  income_tax:           { type: 'CRA Tax Notices',           abbr: 'TAX' },
+  bank_statements:      { type: 'Bank Statements',           abbr: 'BNK' },
+  purchase_agreement:   { type: 'Purchase Agreement',        abbr: 'PSA' },
+  investment_statements:{ type: 'Investment Statements',      abbr: 'INV' },
+  other_property_docs:  { type: 'Existing Property Docs',    abbr: 'PTY' },
+  mortgage_application: { type: 'Mortgage Application',      abbr: 'APP' },
+  utility_bills:        { type: 'Utility Bills',             abbr: 'UTL' },
+  credit_report:        { type: 'Credit Reports',            abbr: 'CRD' },
+  car_loan_statement:   { type: 'Car Loan Statement',        abbr: 'CAR' },
+  property_tax:         { type: 'Property Tax Notice',       abbr: 'PTX' },
+  property_inspection:  { type: 'Property Inspection',       abbr: 'INS' },
+};
+
+function buildDocList(apiDocs) {
+  return apiDocs.map((d) => {
+    const meta = DOC_TYPE_META[d.doc_type] || { type: d.doc_type, abbr: 'DOC' };
+    return {
+      id: d._id,
+      type: meta.type,
+      docType: d.doc_type,
+      abbr: meta.abbr,
+      fileName: d.filename || d.doc_type,
+      // embedding_pages approximates PDF page count; 0 means embedding ran but produced no chunks
+      pages: d.embedding_pages > 0 ? d.embedding_pages : null,
+      status: d.status === 'error' ? 'error' : 'uploaded',
+      mongoId: d._id,
+    };
+  });
+}
 
 function DocCard({ doc, onViewDoc }) {
   const [hovered, setHovered] = useState(false);
@@ -90,10 +108,12 @@ function DocCard({ doc, onViewDoc }) {
           {doc.fileName}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
-          <span>{doc.size}</span>
-          <span style={{ opacity: 0.5 }}>|</span>
-          <span>{doc.pages} page{doc.pages > 1 ? 's' : ''}</span>
-          <span style={{ opacity: 0.5 }}>|</span>
+          {doc.pages != null && (
+            <>
+              <span>{doc.pages} page{doc.pages > 1 ? 's' : ''}</span>
+              <span style={{ opacity: 0.5 }}>|</span>
+            </>
+          )}
           <span style={{
             color: doc.status === 'error' ? 'var(--danger)' : 'var(--success)',
             fontWeight: 600,
@@ -107,22 +127,25 @@ function DocCard({ doc, onViewDoc }) {
 }
 
 export default function DocumentUpload({ applicationId, borrowerProfile }) {
-  const [documents, setDocuments] = useState(INITIAL_DOCUMENTS);
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [viewingDocId, setViewingDocId] = useState(null);
 
   const sourceAppId = applicationId || borrowerProfile?.seedApplicationId;
 
   useEffect(() => {
-    if (!sourceAppId) return;
+    if (!sourceAppId) { setLoading(false); return; }
+    setDocuments([]);
+    setFetchError(false);
+    setLoading(true);
 
     apiGet(`/applications/${sourceAppId}/documents`).then((docs) => {
-      if (docs && Array.isArray(docs) && docs.length > 0) {
-        setDocuments(prev => prev.map(d => {
-          const match = docs.find(bd => bd.doc_type === d.docType);
-          return match ? { ...d, mongoId: match._id } : d;
-        }));
+      if (docs === null) { setFetchError(true); return; }
+      if (Array.isArray(docs) && docs.length > 0) {
+        setDocuments(buildDocList(docs));
       }
-    });
+    }).finally(() => setLoading(false));
   }, [sourceAppId]);
 
   return (
@@ -130,10 +153,16 @@ export default function DocumentUpload({ applicationId, borrowerProfile }) {
       <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 20, marginBottom: 4, color: 'var(--text-primary)' }}>
         Supporting Documents
       </div>
-      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: spacing[4] }}>
-        {applicationId
-          ? 'Documents submitted with this application.'
-          : '14 documents prepared for this application. Click View to inspect extracted data.'}
+      <div style={{ fontSize: 12, color: fetchError ? 'var(--danger)' : 'var(--text-secondary)', marginBottom: spacing[4] }}>
+        {loading
+          ? 'Loading documents...'
+          : fetchError
+            ? 'Could not load documents. Please refresh.'
+            : documents.length > 0
+              ? applicationId
+                ? `${documents.length} documents submitted with this application.`
+                : `${documents.length} documents prepared for this application. Click View to inspect extracted data.`
+              : 'No documents found for this profile.'}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: spacing[4] }}>

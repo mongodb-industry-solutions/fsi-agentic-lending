@@ -1,0 +1,24 @@
+.timelineEvent {
+  position: relative;
+}
+
+.timelineEvent::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 8px;
+  bottom: 0;
+  width: 1px;
+  background: var(--border-base);
+}
+
+.timelineEventLast {
+  position: relative;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timelineEvent,
+  .timelineEventLast {
+    transition: none;
+  }
+}

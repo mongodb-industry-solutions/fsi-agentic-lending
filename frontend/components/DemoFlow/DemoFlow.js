@@ -244,7 +244,7 @@ export default function Demo() {
         {engine.allScenesComplete ? (
           <div style={{ flex: 1, overflowY: 'auto', padding: spacing[4] }}>
             <div style={{
-              height: 300,
+              height: 'clamp(340px, 50vh, 500px)',
               borderRadius: 8,
               border: `1px solid ${palette.gray.light2}`,
               overflow: 'hidden',
@@ -259,7 +259,7 @@ export default function Demo() {
             </div>
 
             <div style={{ maxWidth: 700, width: '100%', margin: '0 auto' }}>
-              <div style={{ textAlign: 'center', marginTop: spacing[3], marginBottom: spacing[4] }}>
+              <div style={{ textAlign: 'center', marginTop: spacing[4], marginBottom: spacing[4] }}>
                 <div style={{ marginBottom: spacing[3] }}><Icon glyph="Favorite" size="xlarge" fill={palette.green.dark2} /></div>
                 <div style={{ fontFamily: uiTokens.font, fontWeight: 800, fontSize: 28, color: 'var(--mongo)', marginBottom: spacing[2] }}>
                   Full Lifecycle Complete

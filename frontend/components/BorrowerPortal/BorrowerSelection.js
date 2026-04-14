@@ -2,6 +2,15 @@
 
 import { useState } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
+import Avatar from 'boring-avatars';
+
+const AVATAR_COLORS = {
+  'marcus-delgado': ['#00684A', '#00ED64', '#023430', '#E3FCF7', '#004D3A'],
+  'jane-doe':       ['#6341e0', '#8B6CE7', '#4A2DB3', '#EDE8FC', '#7B5FD4'],
+  'john-smith':     ['#d97706', '#F59E0B', '#B45309', '#FEF3C7', '#D69E2E'],
+  'bob-johnson':    ['#DB3030', '#EF4444', '#991B1B', '#FEE2E2', '#C53030'],
+  'sarah-williams': ['#0891b2', '#06B6D4', '#155E75', '#CFFAFE', '#0E7490'],
+};
 
 const BORROWER_PROFILES = [
   {
@@ -151,246 +160,116 @@ const BORROWER_PROFILES = [
   },
 ];
 
-function ActiveCard({ profile, onClick }) {
+function ActiveCard({ profile, onClick, colors }) {
   return (
     <button
       type="button"
       onClick={() => onClick(profile)}
       style={{
-        flex: 1,
-        minWidth: 260,
-        padding: spacing[5],
+        flex: '0 0 auto',
+        width: 200,
+        padding: `${spacing[3]}px ${spacing[2]}px`,
         background: 'var(--bg-surface)',
-        borderRadius: 8,
+        borderRadius: 10,
         border: '1px solid var(--border-dim)',
         cursor: 'pointer',
-        textAlign: 'left',
-        transition:
-          'border-color 0.25s cubic-bezier(0.33, 1, 0.68, 1), box-shadow 0.25s cubic-bezier(0.33, 1, 0.68, 1)',
+        textAlign: 'center',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: spacing[2],
+        transition: 'var(--transition-base)',
         position: 'relative',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = 'var(--mongo)';
-        e.currentTarget.style.boxShadow =
-          '0 2px 12px rgba(0, 108, 74, 0.10)';
+        e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 108, 74, 0.12)';
+        e.currentTarget.style.transform = 'translateY(-2px)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = 'var(--border-dim)';
         e.currentTarget.style.boxShadow = 'none';
+        e.currentTarget.style.transform = 'translateY(0)';
       }}
     >
-      {/* Header */}
+      {/* Avatar */}
+      <Avatar
+        size={48}
+        name={`${profile.firstName} ${profile.lastName}`}
+        variant="beam"
+        colors={colors}
+      />
+
+      {/* Name */}
       <div
         style={{
           fontFamily: 'var(--font-display)',
           fontWeight: 700,
-          fontSize: 16,
+          fontSize: 14,
           color: 'var(--text-primary)',
-          marginBottom: spacing[1],
+          lineHeight: 1.2,
         }}
       >
         {profile.coApplicantName
-          ? `${profile.firstName} & ${profile.coApplicantName.split(' ')[0]} ${profile.lastName}`
+          ? `${profile.firstName} & ${profile.coApplicantName.split(' ')[0]}`
           : `${profile.firstName} ${profile.lastName}`}
       </div>
 
-      {/* Product */}
-      <div
-        style={{
-          fontSize: 12,
-          color: 'var(--text-secondary)',
-          marginBottom: spacing[2],
-        }}
-      >
-        {profile.productType}
-      </div>
-
-      {/* Narrative */}
-      {profile.narrative && (
+      {/* Pipeline hint badge */}
+      {profile.pipelineHint && (
         <div
           style={{
-            fontSize: 10,
-            color: 'var(--text-secondary)',
-            lineHeight: 1.5,
-            marginBottom: spacing[3],
+            padding: '3px 10px',
+            borderRadius: 4,
+            fontSize: 9,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            fontFamily: 'var(--font-mono)',
+            background: profile.pipelineHint === 'Auto-Approve'
+              ? 'var(--success-dim)'
+              : profile.pipelineHint === 'Decline'
+                ? 'var(--danger-dim)'
+                : 'var(--hitl-amber-dim)',
+            color: profile.pipelineHint === 'Auto-Approve'
+              ? 'var(--success)'
+              : profile.pipelineHint === 'Decline'
+                ? 'var(--danger)'
+                : 'var(--hitl-amber)',
           }}
         >
-          {profile.narrative}
+          {profile.pipelineHint}
         </div>
       )}
 
-      {/* Details */}
+      {/* Divider + stats */}
       <div
         style={{
+          width: '100%',
+          paddingTop: spacing[2],
+          borderTop: '1px solid var(--border-dim)',
           display: 'flex',
-          flexDirection: 'column',
-          gap: spacing[2],
+          justifyContent: 'space-between',
         }}
       >
-        <DetailRow label="Property" value={profile.propertyAddress} />
-        <DetailRow
-          label="Loan Amount"
-          value={`$${Number(profile.loanAmount).toLocaleString('en-US')}`}
-          mono
-        />
-        <DetailRow
-          label="Down Payment"
-          value={`$${Number(profile.downPayment).toLocaleString('en-US')}`}
-          mono
-        />
-        {profile.coApplicantName && (
-          <DetailRow
-            label="Co-Applicant"
-            value={profile.coApplicantName}
-          />
-        )}
-      </div>
-
-      {/* Pipeline hint badge + risk factors */}
-      {profile.pipelineHint && (
-        <div style={{ marginTop: spacing[3] }}>
-          <div
-            style={{
-              display: 'inline-block',
-              padding: '3px 8px',
-              borderRadius: 4,
-              fontSize: 9,
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              fontFamily: 'var(--font-mono)',
-              background: profile.pipelineHint === 'Auto-Approve'
-                ? 'var(--success-dim)'
-                : profile.pipelineHint === 'Decline'
-                  ? 'var(--danger-dim)'
-                  : 'var(--hitl-amber-dim)',
-              color: profile.pipelineHint === 'Auto-Approve'
-                ? 'var(--success)'
-                : profile.pipelineHint === 'Decline'
-                  ? 'var(--danger)'
-                  : 'var(--hitl-amber)',
-            }}
-          >
-            Expected: {profile.pipelineHint}
+        <div style={{ textAlign: 'left' }}>
+          <div style={{ fontSize: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-dim)', marginBottom: 2 }}>
+            Loan
           </div>
-          {profile.riskFactors?.length > 0 && (
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
-              {profile.riskFactors.map((factor) => (
-                <span
-                  key={factor}
-                  style={{
-                    fontSize: 8,
-                    fontFamily: 'var(--font-mono)',
-                    fontWeight: 600,
-                    padding: '2px 6px',
-                    borderRadius: 3,
-                    background: 'var(--bg-raised)',
-                    color: 'var(--text-dim)',
-                  }}
-                >
-                  {factor}
-                </span>
-              ))}
-            </div>
-          )}
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>
+            ${Number(profile.loanAmount).toLocaleString('en-US')}
+          </div>
         </div>
-      )}
-
-      {/* Key stats strip */}
-      <div
-        style={{
-          display: 'flex',
-          gap: spacing[3],
-          marginTop: spacing[3],
-          paddingTop: spacing[3],
-          borderTop: '1px solid var(--border-dim)',
-        }}
-      >
-        <StatBadge
-          label={profile.coApplicantName ? 'Combined Income' : 'Annual Income'}
-          value={`$${(Number(profile.annualIncome) + Number(profile.coApplicantIncome || 0)).toLocaleString('en-US')}`}
-        />
-        <StatBadge
-          label="LTV"
-          value={`${Math.round(((Number(profile.loanAmount) - Number(profile.downPayment)) / Number(profile.loanAmount)) * 100)}%`}
-        />
-        <StatBadge label="Credit Score" value={profile.creditScore} />
-      </div>
-
-      {/* Select indicator */}
-      <div
-        style={{
-          marginTop: spacing[4],
-          padding: '8px 0',
-          borderTop: '1px solid var(--border-dim)',
-          fontFamily: 'var(--font-display)',
-          fontWeight: 600,
-          fontSize: 12,
-          color: 'var(--mongo)',
-          textAlign: 'center',
-        }}
-      >
-        Select Profile
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-dim)', marginBottom: 2 }}>
+            Credit
+          </div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>
+            {profile.creditScore}
+          </div>
+        </div>
       </div>
     </button>
-  );
-}
-
-function StatBadge({ label, value }) {
-  return (
-    <div style={{ flex: 1, textAlign: 'center' }}>
-      <div
-        style={{
-          fontSize: 8,
-          fontWeight: 700,
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          color: 'var(--text-dim)',
-          marginBottom: 2,
-        }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 13,
-          fontWeight: 700,
-          color: 'var(--mongo)',
-        }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function DetailRow({ label, value, mono = false }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-      <div
-        style={{
-          fontSize: 9,
-          fontWeight: 600,
-          color: 'var(--text-dim)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-        }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          fontSize: 12,
-          fontWeight: mono ? 600 : 500,
-          fontFamily: mono ? 'var(--font-mono)' : 'inherit',
-          color: 'var(--text-primary)',
-          lineHeight: 1.3,
-        }}
-      >
-        {value}
-      </div>
-    </div>
   );
 }
 
@@ -538,9 +417,7 @@ function DemoFlowCard() {
   return (
     <div
       style={{
-        flex: 1,
-        minWidth: 260,
-        maxWidth: 420,
+        width: '100%',
         padding: spacing[5],
         borderRadius: 8,
         border: '1px solid var(--border-dim)',
@@ -740,15 +617,17 @@ export default function BorrowerSelection({ onSelect }) {
       {/* How AI Helps strip */}
       <HowAIHelpsStrip />
 
-      {/* Card grid */}
+      {/* Card row — single line, horizontal scroll on narrow viewports */}
       <div
         style={{
           display: 'flex',
-          gap: spacing[4],
+          gap: spacing[3],
           maxWidth: 1200,
           width: '100%',
-          flexWrap: 'wrap',
+          flexWrap: 'nowrap',
           justifyContent: 'center',
+          overflowX: 'auto',
+          paddingBottom: spacing[2],
         }}
       >
         {BORROWER_PROFILES.map((profile) => (
@@ -756,8 +635,21 @@ export default function BorrowerSelection({ onSelect }) {
             key={profile.id}
             profile={profile}
             onClick={onSelect}
+            colors={AVATAR_COLORS[profile.id]}
           />
         ))}
+      </div>
+
+      {/* Demo info section */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          maxWidth: 720,
+          width: '100%',
+          marginTop: spacing[5],
+        }}
+      >
         <DemoFlowCard />
       </div>
     </div>

@@ -22,9 +22,77 @@ import { StageProgressBar } from './StageProgressBar';
 import { useLoanOfficerWorkflow } from './useLoanOfficerWorkflow';
 import TechRail from './TechRail';
 
+function AgentRailHeader({ agentStats, elapsedSeconds, hitlReached, applicationId }) {
+  const isActive = applicationId && agentStats.totalReceived > 0;
+  return (
+    <div style={{
+      padding: '8px 10px',
+      borderBottom: '1px solid var(--border-dim)',
+      background: 'var(--bg-base)',
+      flexShrink: 0,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{
+            fontFamily: 'var(--font-display)', fontWeight: 700,
+            fontSize: 11, color: 'var(--text-primary)',
+            textTransform: 'uppercase', letterSpacing: '0.5px',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            AI Agent Layer
+            {hitlReached && (
+              <span style={{
+                fontSize: 7, fontWeight: 700, fontFamily: 'var(--font-mono)',
+                padding: '1px 5px', borderRadius: 3,
+                background: 'var(--hitl-amber)', color: '#fff',
+              }}>
+                AWAITING REVIEW
+              </span>
+            )}
+          </div>
+          <div style={{
+            fontSize: 9, color: 'var(--text-dim)',
+            fontFamily: 'var(--font-mono)', marginTop: 1,
+          }}>
+            LangGraph orchestration
+          </div>
+        </div>
+        {/* Live pulse */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: hitlReached ? 'var(--hitl-amber)' : isActive ? 'var(--success)' : 'var(--border-base)',
+            boxShadow: hitlReached ? '0 0 6px var(--hitl-amber)' : isActive ? '0 0 6px var(--success)' : 'none',
+            animation: hitlReached ? 'none' : isActive ? 'pulse 1.5s infinite' : 'none',
+          }} />
+        </div>
+      </div>
+      {/* Aggregate stats */}
+      {isActive && (
+        <div aria-live="polite" style={{
+          marginTop: 4, fontSize: 8, fontFamily: 'var(--font-mono)',
+          color: 'var(--text-dim)', fontWeight: 600,
+          display: 'flex', gap: 4, alignItems: 'center',
+        }}>
+          <span>3 agents</span>
+          <span style={{ color: 'var(--border-base)' }}>{'\u00b7'}</span>
+          <span>{agentStats.totalReceived} actions</span>
+          {elapsedSeconds > 0 && (
+            <>
+              <span style={{ color: 'var(--border-base)' }}>{'\u00b7'}</span>
+              <span>{elapsedSeconds < 60 ? `${elapsedSeconds}s` : `${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s`}</span>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LoanOfficerDashboard({ active = true }) {
   const { toasts, addToast, removeToast } = useToasts();
   const [lastCorrelatedEvent, setLastCorrelatedEvent] = useState(null);
+  const [agentStats, setAgentStats] = useState({ totalReceived: 0 });
 
   const {
     selectedApp, setSelectedApp,
@@ -326,16 +394,26 @@ export default function LoanOfficerDashboard({ active = true }) {
           minWidth: 240,
           flexShrink: 0,
           overflow: 'hidden',
-          borderLeft: '1px solid var(--border-dim)',
+          borderLeft: `3px solid ${hitlReached && !approved ? 'var(--hitl-amber)' : 'var(--agent-cyan)'}`,
+          transition: 'border-color 400ms ease',
         }}>
+          <AgentRailHeader
+            agentStats={agentStats}
+            elapsedSeconds={elapsedSeconds}
+            hitlReached={hitlReached && !approved}
+            applicationId={selectedApp}
+          />
           <AgentActivityLog
             onEvent={(entry) => {
               handleAgentEvent(entry);
               setLastCorrelatedEvent({ ...entry, _correlationTs: Date.now() });
             }}
             applicationId={selectedApp}
+            onStatsChange={setAgentStats}
+            hitlReached={hitlReached && !approved}
+            liveAgentOutput={liveAgentOutput}
           />
-          <PolicyExplorer />
+          <PolicyExplorer autoQuery={hitlReached && !approved ? 'GDS TDS stress test mortgage thresholds' : ''} />
           <PortfolioIntelligence />
         </div>
 

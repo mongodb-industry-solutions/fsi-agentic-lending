@@ -30,6 +30,7 @@
     "@leafygreen-ui/tokens": "^4.2.2",
     "@leafygreen-ui/tooltip": "^14.3.1",
     "@leafygreen-ui/typography": "^20.1.9",
+    "boring-avatars": "^2.0.4",
     "dotenv": "^17.2.2",
     "http-proxy": "^1.18.1",
     "next": "^15.5.7",

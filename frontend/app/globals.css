@@ -467,6 +467,14 @@ input[type="range"]::-moz-range-thumb {
   50%      { opacity: 1; }
 }
 
+/* ===================== OFFICER AGENT RAIL ===================== */
+
+@keyframes agentEntryPing {
+  0%  { box-shadow: 0 0 0 0 var(--agent-cyan); }
+  70% { box-shadow: 0 0 0 4px transparent; }
+  100% { box-shadow: none; }
+}
+
 /* ===================== REDUCED MOTION ===================== */
 @media (prefers-reduced-motion: reduce) {
   *,
