@@ -229,7 +229,7 @@ def _reset_application_state(app_id: str) -> None:
             "$unset": {
                 "risk_score": "", "risk_tier": "", "gds_ratio": "", "tds_ratio": "",
                 "stress_gds": "", "stress_tds": "", "primary_credit_score": "",
-                "ltv": "", "decision_reasoning": "",
+                "ltv": "", "decision_reasoning": "", "status_detail": "",
             },
         },
     )
@@ -355,7 +355,7 @@ def update_application_status(application_id: str, status: str, detail: str = ""
     result = db["applications"].update_one(
         {"application_id": application_id},
         {
-            "$set": {"status": status, "updated_at": now},
+            "$set": {"status": status, "status_detail": detail, "updated_at": now},
             "$push": {
                 "status_history": {
                     "$each": [{"status": status, "timestamp": now, "detail": detail}],

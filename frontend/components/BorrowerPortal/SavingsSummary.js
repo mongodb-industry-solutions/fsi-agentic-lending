@@ -28,7 +28,12 @@ export function SavingsMetric({ label, value, prefix = '', suffix = '' }) {
   );
 }
 
-export function SavingsSummary({ interventionsResolved }) {
+export function SavingsSummary({ stageContext = {} }) {
+  const resolved = stageContext.totalResolved || 0;
+  const creditScore = typeof stageContext.creditScore === 'number' ? stageContext.creditScore : null;
+  const rate = typeof stageContext.approvedRate === 'number' ? stageContext.approvedRate : null;
+  const payment = typeof stageContext.monthlyPayment === 'number' ? stageContext.monthlyPayment : null;
+
   return (
     <div style={{
       padding: spacing[3],
@@ -48,13 +53,15 @@ export function SavingsSummary({ interventionsResolved }) {
         fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5,
         marginBottom: spacing[3],
       }}>
-        Without AI intervention, your application would have scored 68 (B tier) with a higher rate of 5.24%.
+        {resolved > 0
+          ? `Your AI-assisted application was processed with ${resolved} issue${resolved !== 1 ? 's' : ''} resolved automatically — no manual intervention required.`
+          : 'Your application was processed end-to-end by the AI pipeline.'}
       </div>
-      <div style={{ display: 'flex', gap: spacing[2] }}>
-        <SavingsMetric label="Issues Resolved" value={interventionsResolved} />
-        <SavingsMetric label="Score Improvement" value={4} prefix="+" suffix=" pts" />
-        <SavingsMetric label="Rate Improvement" value={35} prefix="-" suffix=" bps" />
-        <SavingsMetric label="Lifetime Savings" value={40500} prefix="$" />
+      <div style={{ display: 'flex', gap: spacing[2], flexWrap: 'wrap' }}>
+        <SavingsMetric label="Issues Resolved" value={resolved} />
+        {creditScore !== null && <SavingsMetric label="Credit Score" value={creditScore} />}
+        {rate !== null && <SavingsMetric label="Approved Rate" value={+(rate * 100).toFixed(2)} suffix="%" />}
+        {payment !== null && <SavingsMetric label="Monthly Payment" value={payment} prefix="$" />}
       </div>
     </div>
   );

@@ -227,6 +227,7 @@ export default function WorkflowCanvas({
   highlightNode = null,
 }) {
   const canvasRef = useRef(null);
+  const redrawRef = useRef(null);
   const stateRef = useRef({
     activeSet: new Set(),
     edgeSet: new Set(),
@@ -265,6 +266,7 @@ export default function WorkflowCanvas({
       state.hoveredNode = hit;
       canvas.style.cursor = hit ? 'pointer' : 'default';
       if (onNodeHover) onNodeHover(hit);
+      if (redrawRef.current) redrawRef.current();
     }
   }, [onNodeHover]);
 
@@ -281,6 +283,7 @@ export default function WorkflowCanvas({
   const handleMouseLeave = useCallback(() => {
     state.hoveredNode = null;
     if (onNodeHover) onNodeHover(null);
+    if (redrawRef.current) redrawRef.current();
   }, [onNodeHover]);
 
   useEffect(() => {
@@ -313,10 +316,19 @@ export default function WorkflowCanvas({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       state.nodePositions = layoutNodes(W, H);
       readTheme();
+      if (redrawRef.current) redrawRef.current();
     };
+
+    let needsAnimation = false;
+    const scheduleRedraw = () => {
+      cancelAnimationFrame(animId);
+      animId = requestAnimationFrame(draw);
+    };
+    redrawRef.current = scheduleRedraw;
 
     const draw = () => {
       if (!ctx || !W) return;
+      needsAnimation = false;
       const now = Date.now();
       nowRef.current = now;
       ctx.clearRect(0, 0, W, H);
@@ -440,6 +452,7 @@ export default function WorkflowCanvas({
 
         // Flow particles on active non-completed edges
         if (isActive && !bothCompleted && ctx.globalAlpha > 0.3) {
+          needsAnimation = true;
           const particleCount = 1;
           for (let p = 0; p < particleCount; p++) {
             const offset = 0;
@@ -486,6 +499,7 @@ export default function WorkflowCanvas({
         const entryScale = isActive || isCompleted
           ? Math.min(entryAge / 300, 1) * 0.08 + 0.92
           : 1;
+        if (isPulsing || ((isActive || isCompleted) && entryAge < 300)) needsAnimation = true;
 
         // Determine opacity tier
         if (isActive || isPulsing) {
@@ -651,7 +665,9 @@ export default function WorkflowCanvas({
         ctx.fillText(tooltipText, tx + tw / 2, ty + 9);
       }
 
-      animId = requestAnimationFrame(draw);
+      if (needsAnimation) {
+        animId = requestAnimationFrame(draw);
+      }
     };
 
     resize();
@@ -659,8 +675,8 @@ export default function WorkflowCanvas({
     canvas.addEventListener('mousemove', handleMouseMove);
     canvas.addEventListener('click', handleClick);
     canvas.addEventListener('mouseleave', handleMouseLeave);
-    animId = requestAnimationFrame(draw);
     return () => {
+      redrawRef.current = null;
       window.removeEventListener('resize', resize);
       canvas.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('click', handleClick);
@@ -671,3 +687,6 @@ export default function WorkflowCanvas({
 
   return <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />;
 }
+
+export const ALL_NODE_IDS = Object.keys(NODES);
+export const ALL_EDGES = EDGES;

@@ -7,7 +7,113 @@ import { STAGES, STATUS_TO_STAGE, mapEventToStageIdx } from './statusTrackerCons
 import { SavingsSummary } from './SavingsSummary';
 import { TimelineStageCard } from './TimelineStageCard';
 
-export default function StatusTracker({ onNotification, applicationId, applicationData }) {
+function DeclineCard({ stageContext, onOpenChat }) {
+  const reasoning = stageContext.decisionReasoning || '';
+  const r = reasoning.toLowerCase();
+
+  // Map decline keywords to actionable guidance
+  const guidance = [];
+  if (r.includes('stress test')) guidance.push('Consider increasing your down payment or choosing a less expensive property to improve your stress test results.');
+  if (r.includes('income') || r.includes('zero')) guidance.push('Ensure all income documentation is uploaded and accurate, including employment letters, pay stubs, and tax notices.');
+  if (r.includes('credit')) guidance.push('Review your credit report for errors and consider resolving any outstanding debts before reapplying.');
+  if (r.includes('gds') || r.includes('tds') || r.includes('debt')) guidance.push('Reducing existing monthly debt payments will improve your debt service ratios.');
+  if (r.includes('risk') && r.includes('threshold')) guidance.push('Your risk profile exceeded the automated approval threshold. A loan officer may be able to review your case manually.');
+  if (guidance.length === 0) guidance.push('Contact a loan officer for personalized guidance on your application.');
+
+  return (
+    <div style={{
+      padding: spacing[3],
+      background: 'var(--bg-surface)',
+      borderRadius: 'var(--radius-md)',
+      border: '1px solid var(--danger)',
+      borderLeft: '4px solid var(--danger)',
+      marginTop: spacing[3],
+      animation: 'cardEnter 0.4s cubic-bezier(0.33, 1, 0.68, 1) both',
+    }}>
+      <div style={{
+        fontFamily: 'var(--font-display)', fontWeight: 700,
+        fontSize: 13, color: 'var(--danger)', marginBottom: spacing[2],
+      }}>
+        Application Not Approved
+      </div>
+
+      {/* Decline reasoning */}
+      {reasoning && (
+        <div style={{
+          padding: '8px 10px', marginBottom: spacing[2],
+          background: 'var(--danger-dim)', borderRadius: 'var(--radius-sm)',
+          fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5,
+        }}>
+          {reasoning}
+        </div>
+      )}
+
+      {/* Key metrics at decline */}
+      {(typeof stageContext.riskScore === 'number' || typeof stageContext.gds === 'number') && (
+        <div style={{ display: 'flex', gap: spacing[2], marginBottom: spacing[2], flexWrap: 'wrap' }}>
+          {typeof stageContext.riskScore === 'number' && (
+            <div style={{ padding: '4px 8px', background: 'var(--bg-raised)', borderRadius: 4, fontSize: 9 }}>
+              <span style={{ color: 'var(--text-dim)' }}>Risk Score: </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--danger)' }}>{stageContext.riskScore}/100</span>
+            </div>
+          )}
+          {typeof stageContext.gds === 'number' && (
+            <div style={{ padding: '4px 8px', background: 'var(--bg-raised)', borderRadius: 4, fontSize: 9 }}>
+              <span style={{ color: 'var(--text-dim)' }}>GDS: </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{(stageContext.gds * 100).toFixed(1)}%</span>
+            </div>
+          )}
+          {typeof stageContext.tds === 'number' && (
+            <div style={{ padding: '4px 8px', background: 'var(--bg-raised)', borderRadius: 4, fontSize: 9 }}>
+              <span style={{ color: 'var(--text-dim)' }}>TDS: </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{(stageContext.tds * 100).toFixed(1)}%</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Actionable guidance */}
+      <div style={{
+        fontSize: 10, fontWeight: 700, color: 'var(--text-primary)',
+        textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6,
+      }}>
+        What You Can Do
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: spacing[3] }}>
+        {guidance.map((tip, i) => (
+          <div key={i} style={{ display: 'flex', gap: 8, fontSize: 10, lineHeight: 1.5 }}>
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 11,
+              color: 'var(--mongo)', minWidth: 16,
+            }}>
+              {i + 1}
+            </span>
+            <span style={{ color: 'var(--text-secondary)' }}>{tip}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* CTA */}
+      {onOpenChat && (
+        <button
+          type="button"
+          onClick={onOpenChat}
+          style={{
+            width: '100%', padding: '10px 16px',
+            background: 'var(--mongo)', color: '#fff',
+            border: 'none', borderRadius: 'var(--radius-md)',
+            fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12,
+            cursor: 'pointer',
+          }}
+        >
+          Speak with AI Assistant
+        </button>
+      )}
+    </div>
+  );
+}
+
+export default function StatusTracker({ onNotification, applicationId, applicationData, onOpenChat }) {
   const [activeStage, setActiveStage] = useState(0);
   const [timestamps, setTimestamps] = useState([]);
   const [expandedStage, setExpandedStage] = useState(null);
@@ -16,6 +122,8 @@ export default function StatusTracker({ onNotification, applicationId, applicati
   const [stampAnimated, setStampAnimated] = useState(false);
   const [activityEvents, setActivityEvents] = useState({});
   const [feedCollapsed, setFeedCollapsed] = useState(false);
+  const [timelineCtx, setTimelineCtx] = useState(null);
+  const stageContextRef = useRef({});
   const stageIdxRef = useRef(0);
   const activitySourceRef = useRef(null);
 
@@ -33,7 +141,9 @@ export default function StatusTracker({ onNotification, applicationId, applicati
       while (stageIdxRef.current < targetIdx) {
         stageIdxRef.current++;
         newTimestamps.push(now);
-        sendNotification(STAGES[stageIdxRef.current], now);
+        const s = STAGES[stageIdxRef.current];
+        const ctx = stageContextRef.current;
+        sendNotification({ ...s, type: s.getType ? s.getType(ctx) : 'clean', detail: s.getDetail ? s.getDetail(ctx) : '' }, now);
       }
       setActiveStage(targetIdx);
       setTimestamps((prev) => [...prev, ...newTimestamps]);
@@ -43,6 +153,11 @@ export default function StatusTracker({ onNotification, applicationId, applicati
   // SSE connection for real-time backend status, with REST polling fallback
   useEffect(() => {
     if (!applicationId) return;
+    setIsDeclined(false);
+    stageIdxRef.current = 0;
+    setActiveStage(0);
+    setTimestamps([]);
+    setActivityEvents({});
     let sseAlive = false;
     let pollInterval = null;
 
@@ -110,25 +225,75 @@ export default function StatusTracker({ onNotification, applicationId, applicati
     };
   }, [applicationId]);
 
+  // Fetch timeline context from backend — debounced re-fetch as stages advance
+  useEffect(() => {
+    if (!applicationId) return;
+    let ignore = false;
+    const timer = setTimeout(() => {
+      apiGet(`/applications/${applicationId}/timeline-context`).then(
+        (data) => { if (!ignore && data) setTimelineCtx(data); }
+      ).catch(() => {});
+    }, activeStage === 0 ? 0 : 250);
+    return () => { ignore = true; clearTimeout(timer); };
+  }, [applicationId, activeStage]);
+
+  // Build context object for stage template functions
+  const stageContext = useMemo(() => {
+    const app = timelineCtx?.application || {};
+    const interventions = timelineCtx?.interventions || [];
+    const summary = timelineCtx?.activity_summary || {};
+
+    const docTypes = ['missing_document'];
+    const creditTypes = ['credit_score_required', 'credit_data_unavailable'];
+    const riskTypes = ['stress_test_failure', 'income_data_required'];
+    const actionTypes = ['additional_info_required'];
+
+    const active = interventions.filter((i) => i.status !== 'superseded');
+
+    return {
+      appId: applicationId,
+      loanAmount: app.loan_amount,
+      product: app.product,
+      riskScore: app.risk_score,
+      riskTier: app.risk_tier,
+      gds: app.gds_ratio,
+      tds: app.tds_ratio,
+      creditScore: app.primary_credit_score,
+      decisionReasoning: app.decision_reasoning,
+      docCount: app.doc_count || 0,
+      borrowerNames: app.borrower_names || [],
+      approvedRate: app.approved_rate,
+      monthlyPayment: app.monthly_payment,
+      isDeclined,
+      totalResolved: summary.issues_resolved || 0,
+      docInterventions: active.filter((i) => docTypes.includes(i.type)),
+      creditInterventions: active.filter((i) => creditTypes.includes(i.type)),
+      riskInterventions: active.filter((i) => riskTypes.includes(i.type)),
+      pendingInterventions: active.filter((i) => actionTypes.includes(i.type) && i.status === 'pending'),
+    };
+  }, [timelineCtx, applicationId, isDeclined]);
+  stageContextRef.current = stageContext;
+
   const isComplete = activeStage >= STAGES.length - 1;
   const currentStage = STAGES[activeStage];
 
   const statusLabel = isDeclined ? 'Declined' : isComplete ? 'Complete' : 'Processing';
   const statusColor = isDeclined ? 'var(--danger)' : isComplete ? 'var(--success)' : 'var(--mongo)';
 
-  const interventionsResolved = useMemo(() => {
-    let count = 0;
-    for (let i = 0; i <= activeStage && i < STAGES.length; i++) {
-      const s = STAGES[i];
-      if (i < activeStage && s.interventions) count += s.interventions.length;
-      if (i < activeStage && s.type === 'action-required') count += 1;
-    }
-    return count;
-  }, [activeStage]);
+  const interventionsResolved = stageContext.totalResolved;
 
-  const currentAgentStatus = (currentStage?.agentStatusActive && !isComplete)
-    ? currentStage.agentStatusActive || currentStage.agentStatus
-    : currentStage?.agentStatus;
+  const currentAgentStatus = currentStage?.getAgentStatus
+    ? currentStage.getAgentStatus(stageContext)
+    : 'Processing...';
+
+  // Prefer backend data over stale form data for summary card
+  const displayName = stageContext.borrowerNames?.length > 0
+    ? stageContext.borrowerNames.join(' & ')
+    : applicationData
+      ? [applicationData.firstName, applicationData.coApplicantName ? `& ${applicationData.coApplicantName.split(' ')[0]}` : null, applicationData.lastName].filter(Boolean).join(' ')
+      : 'Application';
+  const displayAmount = stageContext.loanAmount || (applicationData ? Number(applicationData.loanAmount) : null);
+  const displayProduct = stageContext.product || applicationData?.productType || '';
 
   const assistantColor = isComplete
     ? 'var(--success)'
@@ -230,14 +395,10 @@ export default function StatusTracker({ onNotification, applicationId, applicati
       }}>
         <div>
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18, color: 'var(--text-primary)' }}>
-            {applicationData
-              ? `${applicationData.firstName}${applicationData.coApplicantName ? ` & ${applicationData.coApplicantName.split(' ')[0]}` : ''} ${applicationData.lastName}`
-              : 'Application Status'}
+            {displayName}
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
-            {applicationData
-              ? `${applicationId || ''} · $${Number(applicationData.loanAmount).toLocaleString('en-US')} · ${applicationData.productType || ''}`
-              : applicationId || ''}
+            {[applicationId, displayAmount ? `$${Number(displayAmount).toLocaleString('en-US')}` : null, displayProduct].filter(Boolean).join(' \u00b7 ')}
           </div>
         </div>
         <div style={{
@@ -332,6 +493,7 @@ export default function StatusTracker({ onNotification, applicationId, applicati
           <TimelineStageCard
             key={stage.id}
             stage={stage}
+            stageContext={stageContext}
             index={i}
             activeStage={activeStage}
             timestamps={timestamps}
@@ -349,7 +511,12 @@ export default function StatusTracker({ onNotification, applicationId, applicati
 
       {/* Post-Approval Savings Summary */}
       {isComplete && !isDeclined && (
-        <SavingsSummary interventionsResolved={interventionsResolved} />
+        <SavingsSummary stageContext={stageContext} />
+      )}
+
+      {/* Decline Experience Card */}
+      {isDeclined && (
+        <DeclineCard stageContext={stageContext} onOpenChat={onOpenChat} />
       )}
     </div>
   );

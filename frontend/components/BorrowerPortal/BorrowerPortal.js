@@ -256,19 +256,9 @@ function SubmittingOverlay({ currentStep, applicationId }) {
 }
 
 export default function BorrowerPortal() {
-  const [phase, setPhase] = useState(() => {
-    if (typeof window === 'undefined') return 'select';
-    const saved = sessionStorage.getItem('lendflow_phase');
-    return saved === 'tracking' ? 'tracking' : 'select';
-  });
-  const [borrowerProfile, setBorrowerProfile] = useState(() => {
-    if (typeof window === 'undefined') return null;
-    try { return JSON.parse(sessionStorage.getItem('lendflow_borrower')); } catch { return null; }
-  });
-  const [applicationId, setApplicationId] = useState(() => {
-    if (typeof window === 'undefined') return null;
-    return sessionStorage.getItem('lendflow_app_id') || null;
-  });
+  const [phase, setPhase] = useState('select');
+  const [borrowerProfile, setBorrowerProfile] = useState(null);
+  const [applicationId, setApplicationId] = useState(null);
   const { toasts, addToast, removeToast } = useToasts();
   const [demoSessionId, setDemoSessionId] = useState('');
   const [submitStep, setSubmitStep] = useState(0);
@@ -277,8 +267,19 @@ export default function BorrowerPortal() {
   const [chatOpen, setChatOpen] = useState(false);
   const statusSourceRef = useRef(null);
 
+  // Restore session state after hydration (avoids SSR/client mismatch)
   useEffect(() => {
     setDemoSessionId(getDemoSessionId());
+    const savedPhase = sessionStorage.getItem('lendflow_phase');
+    const savedAppId = sessionStorage.getItem('lendflow_app_id');
+    const savedBorrower = sessionStorage.getItem('lendflow_borrower');
+    if (savedPhase === 'tracking' && savedAppId) {
+      setApplicationId(savedAppId);
+      if (savedBorrower) {
+        try { setBorrowerProfile(JSON.parse(savedBorrower)); } catch { /* ignore */ }
+      }
+      setPhase('tracking');
+    }
   }, []);
 
   // Tool activity state lifted from ApplicationAgent for TechnologyTheatre
@@ -472,6 +473,7 @@ export default function BorrowerPortal() {
           <StatusTracker
             applicationId={applicationId}
             applicationData={borrowerProfile}
+            onOpenChat={() => setChatOpen(true)}
           />
           <DocumentContext applicationId={applicationId} />
           <ApplicationAgent

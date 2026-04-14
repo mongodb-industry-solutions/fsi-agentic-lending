@@ -8,9 +8,8 @@ env:
   PORT: '8080'
   HOSTNAME: '0.0.0.0'
   # Server-side backend URL for Next.js rewrites (internal pod communication)
+  # WebSocket is proxied by server.mjs to this same URL on upgrade requests
   NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
-  # WebSocket proxy port
-  WS_PROXY_PORT: '8081'
 
 # Sidecar container (backend)
 sidecarContainers:

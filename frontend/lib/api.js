@@ -52,18 +52,37 @@ export async function apiUpload(path, file, fields = {}) {
 
 /**
  * WebSocket client with automatic reconnection.
- * Connects directly to the backend (Next.js rewrites don't support WS).
- * Derives the WS URL from NEXT_PUBLIC_BACKEND_URL so it bypasses Next.js.
+ * Connects directly to the backend (Next.js rewrites don't support WS upgrade).
+ *
+ * URL resolution order:
+ * 1. NEXT_PUBLIC_WS_BASE env var (explicit override)
+ * 2. NEXT_PUBLIC_BACKEND_URL converted to ws:// (if it's not localhost)
+ * 3. Browser origin (for K8s ingress — browser uses the same host as HTTP)
+ * 4. localhost:8000 fallback (local dev only)
  */
 function deriveWsBase() {
+  // Explicit WS base takes priority
   if (process.env.NEXT_PUBLIC_WS_BASE) return process.env.NEXT_PUBLIC_WS_BASE;
+
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-  if (backendUrl) {
+
+  // If backend URL is non-localhost (e.g., Docker Compose hostname), use it directly
+  if (backendUrl && !backendUrl.includes('localhost') && !backendUrl.includes('127.0.0.1')) {
     return backendUrl.replace(/^http/, 'ws').replace(/\/$/, '') + '/api';
   }
+
   if (typeof window !== 'undefined') {
-    return `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//localhost:8000/api`;
+    const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocalDev) {
+      // Local dev: connect directly to backend (next dev doesn't proxy WS)
+      return 'ws://localhost:8000/api';
+    }
+    // K8s / deployed: route WS through the custom server (server.mjs)
+    // which proxies /api/backend/* WS upgrades to the backend sidecar
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.host}/api/backend`;
   }
+
   return 'ws://localhost:8000/api';
 }
 const WS_BASE = deriveWsBase();

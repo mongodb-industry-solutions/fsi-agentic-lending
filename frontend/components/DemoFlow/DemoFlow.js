@@ -9,6 +9,7 @@ import { SCENE_META } from '../../lib/data/demoScenes';
 import { uiTokens } from '../../lib/uiTokens';
 import SceneNavBar from './SceneNavBar';
 import TechRecap from './TechRecap';
+import WorkflowCanvas, { ALL_NODE_IDS, ALL_EDGES } from './WorkflowCanvas';
 
 import OriginationScene from './scenes/OriginationScene';
 import UnderwritingScene from './scenes/UnderwritingScene';
@@ -241,9 +242,24 @@ export default function Demo() {
       >
         {showTitleCard && <SceneTitleCard sceneMeta={engine.currentSceneMeta} />}
         {engine.allScenesComplete ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: spacing[600], position: 'relative' }}>
-            <div style={{ maxWidth: 700, width: '100%' }}>
-              <div style={{ textAlign: 'center', marginBottom: spacing[4] }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: spacing[4] }}>
+            <div style={{
+              height: 300,
+              borderRadius: 8,
+              border: `1px solid ${palette.gray.light2}`,
+              overflow: 'hidden',
+              position: 'relative',
+            }}>
+              <WorkflowCanvas
+                activeNodes={ALL_NODE_IDS}
+                activeEdges={ALL_EDGES}
+                completedNodes={ALL_NODE_IDS}
+                currentScene={null}
+              />
+            </div>
+
+            <div style={{ maxWidth: 700, width: '100%', margin: '0 auto' }}>
+              <div style={{ textAlign: 'center', marginTop: spacing[3], marginBottom: spacing[4] }}>
                 <div style={{ marginBottom: spacing[3] }}><Icon glyph="Favorite" size="xlarge" fill={palette.green.dark2} /></div>
                 <div style={{ fontFamily: uiTokens.font, fontWeight: 800, fontSize: 28, color: 'var(--mongo)', marginBottom: spacing[2] }}>
                   Full Lifecycle Complete
@@ -254,7 +270,7 @@ export default function Demo() {
                   All on one platform. All in real-time.
                 </div>
               </div>
-              <TechRecap elapsedMs={engine.elapsedMs} activeFeatures={engine.activeFeatures} />
+              <TechRecap activeFeatures={engine.activeFeatures} />
             </div>
           </div>
         ) : (

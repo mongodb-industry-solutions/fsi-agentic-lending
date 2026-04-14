@@ -24,11 +24,10 @@ function CollapsibleSection({ title, defaultOpen = false, children }) {
   );
 }
 
-export default function TechRecap({ elapsedMs, activeFeatures }) {
+export default function TechRecap({ activeFeatures }) {
   const featuresUsed = activeFeatures?.length || 6;
 
   const stats = [
-    { label: 'Total Time', value: `${(elapsedMs / 1000).toFixed(2)}s`, color: 'var(--mongo)' },
     { label: 'Features Used', value: String(featuresUsed), color: 'var(--text-primary)' },
     { label: 'Agent Steps', value: '7', color: 'var(--agent-cyan)' },
     { label: 'Checkpoints', value: '4', color: 'var(--hitl-amber)' },

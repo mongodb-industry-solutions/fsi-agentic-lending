@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+import os
 import re
 import time
 from fastapi import APIRouter, Header, HTTPException, WebSocket, WebSocketDisconnect
@@ -168,7 +169,7 @@ async def stream_status(app_id: str):
             db["applications"].find_one, {"application_id": app_id}
         )
         if app:
-            yield f"data: {json.dumps({'type': 'status', 'status': app.get('status', 'unknown')})}\n\n"
+            yield f"data: {json.dumps({'type': 'status', 'status': app.get('status', 'unknown'), 'status_detail': app.get('status_detail', '')})}\n\n"
 
         pipeline = [
             {
@@ -188,6 +189,7 @@ async def stream_status(app_id: str):
                     event = {
                         "type": "status",
                         "status": doc.get("status", ""),
+                        "status_detail": doc.get("status_detail", ""),
                         "updated_at": doc.get("updated_at", "").isoformat()
                         if hasattr(doc.get("updated_at", ""), "isoformat")
                         else "",
@@ -211,6 +213,110 @@ async def stream_status(app_id: str):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.get("/applications/{app_id}/timeline-context")
+async def get_timeline_context(app_id: str):
+    """Return borrower-safe context for the StatusTracker timeline."""
+    _validate_app_id(app_id)
+    app = await asyncio.to_thread(application_service.get_application, app_id)
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    db = get_db()
+
+    # Borrower-safe intervention data
+    interventions = await asyncio.to_thread(
+        lambda: list(
+            db["interventions"]
+            .find(
+                {"application_id": app_id},
+                {"_id": 0, "type": 1, "status": 1, "borrower_context": 1, "created_at": 1, "resolved_at": 1},
+            )
+            .sort("created_at", 1)
+        )
+    )
+
+    # Activity summary counts
+    activity_counts = await asyncio.to_thread(
+        lambda: list(
+            db["agent_activity"].aggregate([
+                {"$match": {"application_id": app_id}},
+                {"$group": {
+                    "_id": None,
+                    "total": {"$sum": 1},
+                    "by_action": {"$push": "$action"},
+                }},
+            ])
+        )
+    )
+
+    summary = {
+        "total_events": 0,
+        "docs_verified": 0,
+        "issues_detected": len([i for i in interventions if i.get("status") != "superseded"]),
+        "issues_resolved": len([i for i in interventions if i.get("status") == "resolved"]),
+    }
+    if activity_counts:
+        actions = activity_counts[0].get("by_action", [])
+        summary["total_events"] = activity_counts[0].get("total", 0)
+        summary["docs_verified"] = actions.count("verification")
+
+    # Borrower-safe app fields only
+    safe_app = {
+        "application_id": app.get("application_id"),
+        "loan_amount": app.get("loan_amount"),
+        "purchase_price": app.get("purchase_price"),
+        "product": app.get("product"),
+        "risk_score": app.get("risk_score"),
+        "risk_tier": app.get("risk_tier"),
+        "gds_ratio": app.get("gds_ratio"),
+        "tds_ratio": app.get("tds_ratio"),
+        "primary_credit_score": app.get("primary_credit_score"),
+        "decision_reasoning": app.get("decision_reasoning"),
+        "borrower_names": app.get("borrower_names", []),
+        "status": app.get("status"),
+        "doc_count": len(app.get("documents", [])),
+    }
+
+    # Compute loan term details only for approved applications
+    if app.get("status") in ("approved", "closing", "funded", "active"):
+        loan_amount = app.get("loan_amount", 0)
+        _rate_str = os.getenv("CURRENT_5YR_FIXED_RATE", "0.0489")
+        try:
+            approved_rate = float(_rate_str)
+        except (ValueError, TypeError):
+            approved_rate = 0.0489
+        safe_app["approved_rate"] = approved_rate
+        if loan_amount and loan_amount > 0:
+            monthly_rate = approved_rate / 12
+            n_payments = 25 * 12
+            if monthly_rate > 0:
+                safe_app["monthly_payment"] = round(
+                    (loan_amount * monthly_rate * (1 + monthly_rate) ** n_payments)
+                    / ((1 + monthly_rate) ** n_payments - 1)
+                )
+            else:
+                safe_app["monthly_payment"] = round(loan_amount / n_payments) if n_payments > 0 else 0
+
+    # Status history for stage timing
+    status_history = app.get("status_history", [])
+    for entry in status_history:
+        if hasattr(entry.get("timestamp"), "isoformat"):
+            entry["timestamp"] = entry["timestamp"].isoformat()
+
+    # Serialize intervention timestamps
+    for intv in interventions:
+        for key in ("created_at", "resolved_at"):
+            if hasattr(intv.get(key), "isoformat"):
+                intv[key] = intv[key].isoformat()
+
+    return {
+        "application": safe_app,
+        "interventions": interventions,
+        "activity_summary": summary,
+        "status_history": status_history,
+    }
 
 
 @router.get("/applications/{app_id}/risk-pipeline")

@@ -62,7 +62,7 @@ components/
 │   ├── IntentPreview.module.css   # CSS Module for connector pseudo-selectors (::after)
 │   ├── DecisionSummary.js         # ProvenanceChain, audit trail copy, before/after comparison
 │   └── AutonomyDial.js            # Placeholder (not active)
-├── DemoFlow/           # 5-scene scripted walkthrough
+├── DemoFlow/           # 6-scene scripted walkthrough + completion screen (WorkflowCanvas, TechRecap)
 ├── Header/             # App header with Demo Reset button
 ├── educational/        # ContextualBanner, InfoWizard
 ├── visualizations/     # Risk gauge, FICO ring, charts

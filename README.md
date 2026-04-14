@@ -271,7 +271,7 @@ Full-featured officer workspace with real-time data flows and human-in-the-loop 
 6-scene scripted walkthrough demonstrating the full lending lifecycle with a streamlined, enterprise-clarity design.
 
 - **SceneNavBar** — scene navigation pills with progress connectors, capability counter Badge (`N/7 capabilities`), single-click speed cycle button, Play/Pause/Step/Back/Reset controls.
-- **WorkflowCanvas** — animated node graph showing data flow between agents and MongoDB capabilities. Softened glow oscillations, single particle per active edge, no grid lines for a clean backdrop.
+- **WorkflowCanvas** — animated node graph showing data flow between agents and MongoDB capabilities. Softened glow oscillations, single particle per active edge, no grid lines for a clean backdrop. Exports `ALL_NODE_IDS` and `ALL_EDGES` for the completion screen. Uses a `needsAnimation` flag to stop the `requestAnimationFrame` loop when the scene is fully static (all nodes completed, no pulsing) — hover and resize trigger single-frame redraws via `redrawRef`.
 - **AnnotationOverlay** — compact step annotation bar with progress dots, agent name + description, clickable capability badges with educational popovers, and collapsible reasoning text.
 - **PipelineDrawer** — slide-out activity log (right edge toggle, Escape to close, `aria-expanded` for accessibility) replacing the previous always-visible sidebar, freeing full-width for scene content.
 - **Origination Scene** — multi-document extraction (CRA Notice, Bank Statement, Pay Stub) with progressive field reveal, tab switcher with aggregate confidence Badges, Open Banking headline metrics, and collapsible Cross-Validation and Profile Output via ExpandableCards.
@@ -280,6 +280,7 @@ Full-featured officer workspace with real-time data flows and human-in-the-loop 
 - **Closing Scene** — Closing Timeline with workflow canvas: approval detection, closing package (TILA, RESPA), compliance checks (TILA / RESPA / OSFI), and e-sign completion before funding.
 - **Funding Scene** — disbursement timeline with 4-step document evolution overview (colored dots + field counts), collapsible full Document Evolution ExpandableCard, and double-entry accounting table.
 - **Servicing Scene** — portfolio stats grid (4-column), top-3 Early Warning System signals, live event feed (3.5s interval), and 4-step renewal intervention card. Real-time data fetched from `/portfolio/stats`.
+- **Completion Screen** — shown when `engine.allScenesComplete` is true. Renders the full `WorkflowCanvas` with all 21 nodes and edges in their completed state (green edges with checkmarks, no particles/glow). Below, centered title and `TechRecap` card with 5 collapsible sections (Performance Stats, Tech Stack, Cross-Lifecycle Intelligence, By the Numbers).
 - **Design System** — centralized `uiTokens.js` module with surface colors, borders, shadows, and transition curves. All transitions standardized to 150ms (fast) / 220ms (medium) with `cubic-bezier(0.33, 1, 0.68, 1)`. Data visualization transitions use 400–600ms with the same easing. `@media (prefers-reduced-motion: reduce)` respected globally.
 
 ## Prerequisites
