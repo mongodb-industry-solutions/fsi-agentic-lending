@@ -160,7 +160,8 @@ const BORROWER_PROFILES = [
   },
 ];
 
-function ActiveCard({ profile, onClick, colors }) {
+function ActiveCard({ profile, onClick, colors, submissionStatus }) {
+  const isSubmitted = !!submissionStatus;
   return (
     <button
       type="button"
@@ -171,7 +172,7 @@ function ActiveCard({ profile, onClick, colors }) {
         padding: `${spacing[3]}px ${spacing[2]}px`,
         background: 'var(--bg-surface)',
         borderRadius: 10,
-        border: '1px solid var(--border-dim)',
+        border: isSubmitted ? '1px solid var(--mongo)' : '1px solid var(--border-dim)',
         cursor: 'pointer',
         textAlign: 'center',
         display: 'flex',
@@ -187,11 +188,34 @@ function ActiveCard({ profile, onClick, colors }) {
         e.currentTarget.style.transform = 'translateY(-2px)';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = 'var(--border-dim)';
-        e.currentTarget.style.boxShadow = 'none';
+        e.currentTarget.style.borderColor = isSubmitted ? 'var(--mongo)' : 'var(--border-dim)';
+        e.currentTarget.style.boxShadow = isSubmitted ? '0 2px 8px rgba(0, 108, 74, 0.08)' : 'none';
         e.currentTarget.style.transform = 'translateY(0)';
       }}
     >
+      {/* Submission status pill */}
+      {isSubmitted && (() => {
+        const STATUS_PILL = {
+          approved: { label: 'Approved', bg: 'var(--success-dim)', color: 'var(--success)' },
+          declined: { label: 'Declined', bg: 'var(--danger-dim)', color: 'var(--danger)' },
+          review: { label: 'In Review', bg: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)' },
+          action_required: { label: 'Action Req.', bg: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)' },
+          error: { label: 'Error', bg: 'var(--danger-dim)', color: 'var(--danger)' },
+        };
+        const pill = STATUS_PILL[submissionStatus] || { label: 'Tracking', bg: 'var(--mongo-dim)', color: 'var(--mongo)' };
+        return (
+          <div style={{
+            position: 'absolute', top: 6, right: 6,
+            padding: '2px 6px', borderRadius: 4,
+            fontSize: 8, fontWeight: 700, fontFamily: 'var(--font-mono)',
+            textTransform: 'uppercase', letterSpacing: '0.04em',
+            background: pill.bg, color: pill.color,
+          }}>
+            {pill.label}
+          </div>
+        );
+      })()}
+
       {/* Avatar */}
       <Avatar
         size={48}
@@ -578,7 +602,7 @@ function DemoFlowCard() {
   );
 }
 
-export default function BorrowerSelection({ onSelect }) {
+export default function BorrowerSelection({ onSelect, submittedApps = {} }) {
   return (
     <div
       style={{
@@ -636,6 +660,7 @@ export default function BorrowerSelection({ onSelect }) {
             profile={profile}
             onClick={onSelect}
             colors={AVATAR_COLORS[profile.id]}
+            submissionStatus={submittedApps[profile.id]?.lastKnownStatus || null}
           />
         ))}
       </div>

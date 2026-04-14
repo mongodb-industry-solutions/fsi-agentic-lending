@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { palette } from '@leafygreen-ui/palette';
 import { spacing } from '@leafygreen-ui/tokens';
 import Icon from '@leafygreen-ui/icon';
@@ -19,9 +19,17 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
   const [hasSession, setHasSession] = useState(false);
   const [compact, setCompact] = useState(false);
   const [narrow, setNarrow] = useState(false);
+  const cancelBtnRef = useRef(null);
+
+  const checkSession = useCallback(() => {
+    setHasSession(!!sessionStorage.getItem('lendflow_demo_session'));
+  }, []);
 
   useEffect(() => {
-    setHasSession(!!sessionStorage.getItem('lendflow_demo_session'));
+    checkSession();
+    // storage event fires on cross-tab changes; interval catches same-tab writes
+    window.addEventListener('storage', checkSession);
+    const interval = setInterval(checkSession, 2000);
     const mqCompact = window.matchMedia('(max-width: 768px)');
     const mqNarrow = window.matchMedia('(max-width: 640px)');
     setCompact(mqCompact.matches);
@@ -31,27 +39,42 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
     mqCompact.addEventListener('change', onCompact);
     mqNarrow.addEventListener('change', onNarrow);
     return () => {
+      window.removeEventListener('storage', checkSession);
+      clearInterval(interval);
       mqCompact.removeEventListener('change', onCompact);
       mqNarrow.removeEventListener('change', onNarrow);
     };
-  }, []);
+  }, [checkSession]);
+
+  useEffect(() => {
+    if (!showResetModal) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape' && !resetting) setShowResetModal(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showResetModal, resetting]);
+
+  useEffect(() => {
+    if (showResetModal && cancelBtnRef.current) {
+      cancelBtnRef.current.focus();
+    }
+  }, [showResetModal]);
 
   const handleReset = async () => {
     setResetting(true);
-    try {
-      const result = await apiPost('/demo/reset', {}, { 'X-Demo-Reset': 'confirm' });
-      if (!result) {
-        console.warn('[LendFlow] Demo reset API call failed, proceeding with local cleanup');
-      }
-      sessionStorage.removeItem('lendflow_demo_session');
-      sessionStorage.removeItem('lendflow_phase');
-      sessionStorage.removeItem('lendflow_app_id');
-      sessionStorage.removeItem('lendflow_borrower');
-      setShowResetModal(false);
-      window.location.reload();
-    } catch {
-      setResetting(false);
+    const result = await apiPost('/demo/reset', {}, { 'X-Demo-Reset': 'confirm' });
+    if (!result) {
+      console.warn('[LendFlow] Demo reset API call failed, proceeding with local cleanup');
     }
+    sessionStorage.removeItem('lendflow_demo_session');
+    sessionStorage.removeItem('lendflow_phase');
+    sessionStorage.removeItem('lendflow_app_id');
+    sessionStorage.removeItem('lendflow_borrower');
+    sessionStorage.removeItem('lendflow_theatre_tab');
+    sessionStorage.removeItem('lendflow_submitted_apps');
+    setShowResetModal(false);
+    window.location.reload();
   };
 
   return (
@@ -238,6 +261,9 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
           onClick={() => !resetting && setShowResetModal(false)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-modal-title"
             onClick={(e) => e.stopPropagation()}
             style={{
               background: 'var(--bg-base)', borderRadius: 'var(--radius-lg)',
@@ -247,7 +273,7 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
               animation: 'modalEnter 0.25s cubic-bezier(0.33, 1, 0.68, 1) both',
             }}
           >
-            <div style={{
+            <div id="reset-modal-title" style={{
               fontFamily: 'var(--font-display)', fontWeight: 700,
               fontSize: 16, color: 'var(--text-primary)', marginBottom: 8,
             }}>
@@ -273,6 +299,7 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
                 {resetting ? 'Resetting...' : 'Yes, Reset'}
               </button>
               <button
+                ref={cancelBtnRef}
                 type="button"
                 onClick={() => setShowResetModal(false)}
                 disabled={resetting}

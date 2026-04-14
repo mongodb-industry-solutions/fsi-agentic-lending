@@ -265,6 +265,7 @@ export default function BorrowerPortal() {
   const [applicationStatus, setApplicationStatus] =
     useState('submitted');
   const [chatOpen, setChatOpen] = useState(false);
+  const [submittedApps, setSubmittedApps] = useState({});
   const statusSourceRef = useRef(null);
 
   // Restore session state after hydration (avoids SSR/client mismatch)
@@ -279,6 +280,10 @@ export default function BorrowerPortal() {
         try { setBorrowerProfile(JSON.parse(savedBorrower)); } catch { /* ignore */ }
       }
       setPhase('tracking');
+    }
+    const savedApps = sessionStorage.getItem('lendflow_submitted_apps');
+    if (savedApps) {
+      try { setSubmittedApps(JSON.parse(savedApps)); } catch { /* ignore */ }
     }
   }, []);
 
@@ -301,6 +306,26 @@ export default function BorrowerPortal() {
       sessionStorage.removeItem('lendflow_borrower');
     }
   }, [phase, applicationId, borrowerProfile]);
+
+  // Persist submittedApps to sessionStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (Object.keys(submittedApps).length > 0) {
+      sessionStorage.setItem('lendflow_submitted_apps', JSON.stringify(submittedApps));
+    } else {
+      sessionStorage.removeItem('lendflow_submitted_apps');
+    }
+  }, [submittedApps]);
+
+  // Sync current applicationStatus back into submittedApps map
+  useEffect(() => {
+    if (!borrowerProfile?.id || !applicationId) return;
+    setSubmittedApps(prev => {
+      const entry = prev[borrowerProfile.id];
+      if (!entry || entry.applicationId !== applicationId || entry.lastKnownStatus === applicationStatus) return prev;
+      return { ...prev, [borrowerProfile.id]: { ...entry, lastKnownStatus: applicationStatus } };
+    });
+  }, [applicationStatus, borrowerProfile, applicationId]);
 
   useEffect(() => {
     if (!applicationId) return;
@@ -335,14 +360,39 @@ export default function BorrowerPortal() {
     };
   }, [applicationId]);
 
+  const handleResumeTracking = useCallback((profileId) => {
+    const entry = submittedApps[profileId];
+    if (!entry) return;
+    setBorrowerProfile(entry.borrowerProfile);
+    setApplicationId(entry.applicationId);
+    setApplicationStatus(entry.lastKnownStatus || 'submitted');
+    setPhase('tracking');
+  }, [submittedApps]);
+
   const handleBorrowerSelect = useCallback((profile) => {
-    setBorrowerProfile(profile);
-    setPhase('apply');
-  }, []);
+    if (submittedApps[profile.id]) {
+      handleResumeTracking(profile.id);
+    } else {
+      setBorrowerProfile(profile);
+      setPhase('apply');
+    }
+  }, [submittedApps, handleResumeTracking]);
 
   const handleBackToSelect = useCallback(() => {
     setBorrowerProfile(null);
     setApplicationId(null);
+    setPhase('select');
+  }, []);
+
+  const handleChangeBorrower = useCallback(() => {
+    // Close SSE synchronously before nulling applicationId to prevent late-fire status corruption
+    if (statusSourceRef.current) {
+      statusSourceRef.current.close();
+      statusSourceRef.current = null;
+    }
+    setApplicationStatus('submitted');
+    setApplicationId(null);
+    setBorrowerProfile(null);
     setPhase('select');
   }, []);
 
@@ -419,6 +469,12 @@ export default function BorrowerPortal() {
         setSubmitStep(3);
 
         await new Promise((r) => setTimeout(r, 600));
+        if (borrowerProfile?.id) {
+          setSubmittedApps(prev => ({
+            ...prev,
+            [borrowerProfile.id]: { applicationId: result.application_id, borrowerProfile, lastKnownStatus: 'submitted' },
+          }));
+        }
         addToast({
           type: 'info',
           title: 'Application Submitted',
@@ -440,7 +496,7 @@ export default function BorrowerPortal() {
   if (phase === 'select') {
     return (
       <>
-        <BorrowerSelection onSelect={handleBorrowerSelect} />
+        <BorrowerSelection onSelect={handleBorrowerSelect} submittedApps={submittedApps} />
         <NotificationToast toasts={toasts} onDismiss={removeToast} />
       </>
     );
@@ -468,6 +524,36 @@ export default function BorrowerPortal() {
           background: 'var(--bg-void)',
         }}
       >
+        {/* Navigation bar */}
+        <div style={{
+          display: 'flex', alignItems: 'center',
+          padding: '6px 16px',
+          borderBottom: '1px solid var(--border-dim)',
+          background: 'var(--bg-surface)', flexShrink: 0,
+        }}>
+          <button
+            type="button"
+            onClick={handleChangeBorrower}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 11, fontFamily: 'var(--font-display)', fontWeight: 600,
+              color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 4,
+              padding: '2px 0',
+            }}
+          >
+            {'\u2190'} Select Another Borrower
+          </button>
+          {Object.keys(submittedApps).length > 1 && (
+            <span style={{
+              marginLeft: 8, padding: '1px 6px', borderRadius: 8,
+              background: 'var(--mongo-dim)', color: 'var(--mongo)',
+              fontSize: 9, fontWeight: 700, fontFamily: 'var(--font-mono)',
+            }}>
+              {Object.keys(submittedApps).length} apps tracked
+            </span>
+          )}
+        </div>
+
         {/* Upper zone: existing 3-column layout */}
         <div style={{ flex: 1, display: 'flex', minHeight: 280, overflow: 'hidden' }}>
           <StatusTracker

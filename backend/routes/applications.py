@@ -374,7 +374,7 @@ async def applications_ws(websocket: WebSocket):
             change = await asyncio.to_thread(stream.try_next)
             if change:
                 doc = change.get("fullDocument")
-                if doc:
+                if doc and not doc.get("seed_complete"):
                     serialized = application_service.serialize_doc(doc)
                     await websocket.send_json({
                         "type": "change",

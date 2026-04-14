@@ -119,10 +119,10 @@ def get_application(application_id: str) -> dict | None:
 
 
 def list_applications(skip: int = 0, limit: int = 50) -> list[dict]:
-    """List all applications (summary view)."""
+    """List all applications (summary view). Excludes seed template apps."""
     db = _get_db()
     apps = db["applications"].find(
-        {},
+        {"seed_complete": {"$ne": True}},
         {
             "application_id": 1,
             "borrower_names": 1,
@@ -337,7 +337,14 @@ def reset_all_demo_data() -> dict:
         {"application_id": 1, "borrower_ids": 1},
     ))
     if not demo_apps:
-        return {"deleted_applications": 0}
+        return {
+            "deleted_applications": 0,
+            "deleted_documents": 0,
+            "deleted_conversations": 0,
+            "deleted_interventions": 0,
+            "deleted_credit_reports": 0,
+            "deleted_borrowers": 0,
+        }
 
     app_ids = [a["application_id"] for a in demo_apps]
     borrower_ids = []
@@ -345,21 +352,33 @@ def reset_all_demo_data() -> dict:
         for bid in a.get("borrower_ids", []):
             borrower_ids.append(bid if isinstance(bid, ObjectId) else ObjectId(bid))
 
-    db["documents"].delete_many({"application_id": {"$in": app_ids}})
-    db["conversations"].delete_many({"application_id": {"$in": app_ids}})
-    db["interventions"].delete_many({"application_id": {"$in": app_ids}})
+    docs_del = db["documents"].delete_many({"application_id": {"$in": app_ids}})
+    convs_del = db["conversations"].delete_many({"application_id": {"$in": app_ids}})
+    intv_del = db["interventions"].delete_many({"application_id": {"$in": app_ids}})
     db["checkpoints"].delete_many({"thread_id": {"$in": app_ids}})
     db["checkpoint_writes"].delete_many({"thread_id": {"$in": app_ids}})
+    db["pipeline_locks"].delete_many({"_id": {"$in": app_ids}})
     try:
         db["agent_activity"].delete_many({"application_id": {"$in": app_ids}})
     except Exception as e:
         logger.warning(f"Could not delete agent_activity: {e}")
+    cr_del_count = 0
+    br_del_count = 0
     if borrower_ids:
-        db["credit_reports"].delete_many({"borrower_id": {"$in": borrower_ids}})
-        db["borrowers"].delete_many({"_id": {"$in": borrower_ids}})
+        cr_del = db["credit_reports"].delete_many({"borrower_id": {"$in": borrower_ids}})
+        br_del = db["borrowers"].delete_many({"_id": {"$in": borrower_ids}})
+        cr_del_count = cr_del.deleted_count
+        br_del_count = br_del.deleted_count
     result = db["applications"].delete_many({"demo_session_id": {"$exists": True}})
-    logger.info(f"Reset demo: deleted {result.deleted_count} applications")
-    return {"deleted_applications": result.deleted_count}
+    logger.info(f"Reset demo: deleted {result.deleted_count} applications, {docs_del.deleted_count} documents, {convs_del.deleted_count} conversations, {intv_del.deleted_count} interventions")
+    return {
+        "deleted_applications": result.deleted_count,
+        "deleted_documents": docs_del.deleted_count,
+        "deleted_conversations": convs_del.deleted_count,
+        "deleted_interventions": intv_del.deleted_count,
+        "deleted_credit_reports": cr_del_count,
+        "deleted_borrowers": br_del_count,
+    }
 
 
 _VALID_TRANSITIONS = {
