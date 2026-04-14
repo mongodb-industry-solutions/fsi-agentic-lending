@@ -28,13 +28,23 @@ export function useLoanOfficerWorkflow(addToast) {
   const liveApplicationsRef = useRef(liveApplications);
   liveApplicationsRef.current = liveApplications;
 
-  // Real-time application queue via WebSocket + MongoDB Change Stream
+  // Real-time application queue via WebSocket + MongoDB Change Stream,
+  // with REST fallback when WebSocket cannot connect through Next.js proxy.
   useEffect(() => {
     snapshotReceived.current = false;
+    let pollInterval = null;
+
+    apiGet('/applications').then((apps) => {
+      if (Array.isArray(apps) && apps.length > 0 && !snapshotReceived.current) {
+        setLiveApplications(apps);
+      }
+    }).catch(() => {});
+
     const ws = apiWebSocket('/applications/ws', {
       onMessage: (data) => {
         if (data.type === 'snapshot') {
           snapshotReceived.current = true;
+          if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
           setLiveApplications(data.applications ?? []);
         } else if (data.type === 'change' && snapshotReceived.current) {
           const app = data.application;
@@ -58,7 +68,19 @@ export function useLoanOfficerWorkflow(addToast) {
       },
     });
 
-    return () => ws.close();
+    pollInterval = setInterval(() => {
+      if (snapshotReceived.current) { clearInterval(pollInterval); pollInterval = null; return; }
+      apiGet('/applications').then((apps) => {
+        if (Array.isArray(apps) && !snapshotReceived.current) {
+          setLiveApplications(apps);
+        }
+      }).catch(() => {});
+    }, 10000);
+
+    return () => {
+      ws.close();
+      if (pollInterval) clearInterval(pollInterval);
+    };
   }, []);
 
   // Fetch portfolio stats on mount

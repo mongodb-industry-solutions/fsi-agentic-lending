@@ -41,6 +41,7 @@ class LendFlowState(TypedDict):
     autonomy_level: str  # "observe" | "suggest" | "bounded" | "auto"
     last_error: Optional[str]
     retry_count: int
+    gather_attempts: int
 
     # Timestamps
     started_at: Optional[str]
@@ -78,6 +79,7 @@ _STATE_DEFAULTS: dict = {
     "autonomy_level": lambda: "bounded",
     "last_error": lambda: None,
     "retry_count": lambda: 0,
+    "gather_attempts": lambda: 0,
     "started_at": lambda: datetime.now(timezone.utc).isoformat(),
     "completed_at": lambda: None,
     "stress_gds": lambda: None,

@@ -53,11 +53,20 @@ export async function apiUpload(path, file, fields = {}) {
 /**
  * WebSocket client with automatic reconnection.
  * Connects directly to the backend (Next.js rewrites don't support WS).
+ * Derives the WS URL from NEXT_PUBLIC_BACKEND_URL so it bypasses Next.js.
  */
-const WS_BASE = process.env.NEXT_PUBLIC_WS_BASE
-  ?? (typeof window !== 'undefined'
-    ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/backend`
-    : 'ws://localhost:8000/api');
+function deriveWsBase() {
+  if (process.env.NEXT_PUBLIC_WS_BASE) return process.env.NEXT_PUBLIC_WS_BASE;
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+  if (backendUrl) {
+    return backendUrl.replace(/^http/, 'ws').replace(/\/$/, '') + '/api';
+  }
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//localhost:8000/api`;
+  }
+  return 'ws://localhost:8000/api';
+}
+const WS_BASE = deriveWsBase();
 
 export function apiWebSocket(path, { onMessage, onError, onClose, reconnect = true, maxRetries = 5 } = {}) {
   let ws = null;

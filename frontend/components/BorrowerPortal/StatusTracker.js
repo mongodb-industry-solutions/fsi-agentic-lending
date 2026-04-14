@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
-import { apiSSE } from '../../lib/api';
+import { apiSSE, apiGet } from '../../lib/api';
 import { STAGES, STATUS_TO_STAGE, mapEventToStageIdx } from './statusTrackerConstants';
 import { SavingsSummary } from './SavingsSummary';
 import { TimelineStageCard } from './TimelineStageCard';
@@ -23,38 +23,65 @@ export default function StatusTracker({ onNotification, applicationId, applicati
     if (onNotification) onNotification({ stage, time, ...extra });
   }, [onNotification]);
 
-  // SSE connection for real-time backend status
+  const applyStatus = useCallback((status) => {
+    if (!status) return;
+    if (status === 'declined') setIsDeclined(true);
+    const targetIdx = STATUS_TO_STAGE[status];
+    if (targetIdx !== undefined && targetIdx >= 0 && targetIdx > stageIdxRef.current) {
+      const now = new Date();
+      const newTimestamps = [];
+      while (stageIdxRef.current < targetIdx) {
+        stageIdxRef.current++;
+        newTimestamps.push(now);
+        sendNotification(STAGES[stageIdxRef.current], now);
+      }
+      setActiveStage(targetIdx);
+      setTimestamps((prev) => [...prev, ...newTimestamps]);
+    }
+  }, [sendNotification]);
+
+  // SSE connection for real-time backend status, with REST polling fallback
   useEffect(() => {
     if (!applicationId) return;
+    let sseAlive = false;
+    let pollInterval = null;
 
     const source = apiSSE(
       `/applications/${applicationId}/status`,
       (event) => {
+        sseAlive = true;
         setSseConnected(true);
+        if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
 
         if (event.type === 'status' && event.status) {
           if (process.env.NODE_ENV === 'development') console.log('[StatusTracker] Real-time status:', event.status);
-          if (event.status === 'declined') {
-            setIsDeclined(true);
-          }
-          const targetIdx = STATUS_TO_STAGE[event.status];
-          if (targetIdx !== undefined && targetIdx >= 0 && targetIdx > stageIdxRef.current) {
-            const now = new Date();
-            const newTimestamps = [];
-            while (stageIdxRef.current < targetIdx) {
-              stageIdxRef.current++;
-              newTimestamps.push(now);
-              sendNotification(STAGES[stageIdxRef.current], now);
-            }
-            setActiveStage(targetIdx);
-            setTimestamps((prev) => [...prev, ...newTimestamps]);
-          }
+          applyStatus(event.status);
         }
       }
     );
 
-    return () => source?.close();
-  }, [applicationId]); // eslint-disable-line react-hooks/exhaustive-deps
+    apiGet(`/applications/${applicationId}`).then((app) => {
+      if (app?.status) {
+        setSseConnected(true);
+        applyStatus(app.status);
+      }
+    }).catch(() => {});
+
+    pollInterval = setInterval(() => {
+      if (sseAlive) { clearInterval(pollInterval); pollInterval = null; return; }
+      apiGet(`/applications/${applicationId}`).then((app) => {
+        if (app?.status) {
+          setSseConnected(true);
+          applyStatus(app.status);
+        }
+      }).catch(() => {});
+    }, 5000);
+
+    return () => {
+      source?.close();
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [applicationId, applyStatus]);
 
   // SSE: agent activity feed
   useEffect(() => {

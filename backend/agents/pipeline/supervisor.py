@@ -25,7 +25,8 @@ def supervisor_node(state: LendFlowState, **kwargs) -> dict:
         log_agent_activity(app_id, "supervisor", "error", "Max retries exceeded")
         return {"current_agent": "complete", "decision": "error"}
 
-    if not state.get("documents_verified", False) or not state.get("credit_pulled", False):
+    gathered_once = state.get("gather_attempts", 0) >= 1
+    if not gathered_once and (not state.get("documents_verified", False) or not state.get("credit_pulled", False)):
         natural_next = "parallel_gather"
     elif state.get("risk_score") is None:
         natural_next = "underwriter"

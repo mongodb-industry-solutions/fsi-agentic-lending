@@ -42,4 +42,5 @@ def credit_puller_node(state: LendFlowState, **kwargs) -> dict:
         "credit_pulled": credit_pulled,
         "primary_credit_score": primary_score,
         "co_applicant_credit_score": co_score,
+        "gather_attempts": state.get("gather_attempts", 0) + 1,
     }

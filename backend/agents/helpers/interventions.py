@@ -24,6 +24,16 @@ def create_intervention(
     """
     try:
         db = get_db()
+
+        existing = db["interventions"].find_one({
+            "application_id": application_id,
+            "type": intervention_type,
+            "status": "pending",
+        })
+        if existing:
+            logger.info(f"Skipping duplicate {intervention_type} intervention for {application_id}")
+            return True
+
         internal_context = {
             "source_node": source_node,
             "risk_flag": risk_flag,

@@ -51,10 +51,101 @@ function SceneTitleCard({ sceneMeta }) {
   );
 }
 
+function DisclaimerModal({ onDismiss }) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(0, 0, 0, 0.55)',
+        backdropFilter: 'blur(6px)',
+        animation: 'sceneTitleEnter 0.3s ease-out forwards',
+      }}
+      onClick={onDismiss}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--bg-surface, #fff)',
+          borderRadius: 12,
+          padding: `${spacing[600]}px ${spacing[600]}px ${spacing[400]}px`,
+          maxWidth: 520,
+          width: '90%',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.25)',
+          border: '1px solid var(--border-dim, #e8edeb)',
+          position: 'relative',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: spacing[200], marginBottom: spacing[300] }}>
+          <Icon glyph="InfoWithCircle" size="large" fill={palette.blue.base} />
+          <span style={{
+            fontFamily: uiTokens.font,
+            fontWeight: 700,
+            fontSize: 18,
+            color: 'var(--text-primary)',
+          }}>
+            About This View
+          </span>
+        </div>
+
+        <p style={{
+          fontFamily: uiTokens.font,
+          fontSize: 14,
+          lineHeight: 1.7,
+          color: 'var(--text-secondary)',
+          margin: `0 0 ${spacing[200]}px`,
+        }}>
+          This is a <strong style={{ color: 'var(--text-primary)' }}>scripted walkthrough</strong> that
+          illustrates the full mortgage lifecycle powered by MongoDB Atlas &amp; AI agents.
+          It uses pre-built scenes with synthetic data to highlight key technology touchpoints.
+        </p>
+
+        <p style={{
+          fontFamily: uiTokens.font,
+          fontSize: 14,
+          lineHeight: 1.7,
+          color: 'var(--text-secondary)',
+          margin: `0 0 ${spacing[400]}px`,
+        }}>
+          For the <strong style={{ color: 'var(--text-primary)' }}>live, interactive demo</strong> — where
+          AI agents process real applications in real-time — switch to
+          the <strong style={{ color: 'var(--mongo)' }}>Borrower Portal</strong> or <strong style={{ color: 'var(--mongo)' }}>Loan Officer Dashboard</strong> tabs.
+        </p>
+
+        <button
+          onClick={onDismiss}
+          style={{
+            width: '100%',
+            padding: `${spacing[200]}px ${spacing[400]}px`,
+            background: palette.green.dark2,
+            color: '#fff',
+            border: 'none',
+            borderRadius: 8,
+            fontFamily: uiTokens.font,
+            fontWeight: 600,
+            fontSize: 14,
+            cursor: 'pointer',
+            transition: uiTokens.transitionFast,
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = palette.green.dark3}
+          onMouseLeave={(e) => e.currentTarget.style.background = palette.green.dark2}
+        >
+          Got it — explore the walkthrough
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Demo() {
   const engine = useDemoEngine();
   const [showTitleCard, setShowTitleCard] = useState(false);
   const [prevScene, setPrevScene] = useState(engine.currentScene);
+  const [showDisclaimer, setShowDisclaimer] = useState(true);
 
   useEffect(() => {
     if (engine.currentScene !== prevScene) {
@@ -127,6 +218,8 @@ export default function Demo() {
         background: 'var(--bg-void)',
       }}
     >
+      {showDisclaimer && <DisclaimerModal onDismiss={() => setShowDisclaimer(false)} />}
+
       <SceneNavBar
         currentScene={engine.currentScene}
         sceneStep={engine.sceneStep}

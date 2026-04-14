@@ -62,6 +62,7 @@ COLLECTIONS = {
         "description": "Pipeline-to-borrower action items (shared mailbox between pipeline and app agent)",
         "indexes": [
             {"keys": [("application_id", 1), ("status", 1)]},
+            {"keys": [("application_id", 1), ("type", 1), ("status", 1)]},
             {"keys": [("created_at", -1)]},
         ],
     },

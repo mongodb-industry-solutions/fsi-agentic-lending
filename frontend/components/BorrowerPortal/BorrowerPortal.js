@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import BorrowerSelection from './BorrowerSelection';
 import ApplicationForm from './ApplicationForm';
 import DocumentUpload from './DocumentUpload';
@@ -11,7 +12,7 @@ import NotificationToast, {
   useToasts,
 } from '../NotificationToast/NotificationToast';
 import ContextualBanner from '../educational/ContextualBanner';
-import { apiPost, apiSSE } from '../../lib/api';
+import { apiPost, apiGet, apiSSE } from '../../lib/api';
 
 function getDemoSessionId() {
   if (typeof window === 'undefined') return '';
@@ -91,7 +92,9 @@ function FloatingChatDrawer({ open, onToggle }) {
 }
 
 function SubmittingOverlay({ currentStep, applicationId }) {
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div
       style={{
         position: 'fixed',
@@ -246,7 +249,8 @@ function SubmittingOverlay({ currentStep, applicationId }) {
           })}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -268,16 +272,34 @@ export default function BorrowerPortal() {
 
   useEffect(() => {
     if (!applicationId) return;
+    let sseAlive = false;
+    let pollInterval = null;
+
     const source = apiSSE(
       `/applications/${applicationId}/status`,
       (data) => {
+        sseAlive = true;
+        if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
         if (data.status) setApplicationStatus(data.status);
       },
       () => {},
     );
     statusSourceRef.current = source;
+
+    apiGet(`/applications/${applicationId}`).then((app) => {
+      if (app?.status) setApplicationStatus(app.status);
+    }).catch(() => {});
+
+    pollInterval = setInterval(() => {
+      if (sseAlive) { clearInterval(pollInterval); pollInterval = null; return; }
+      apiGet(`/applications/${applicationId}`).then((app) => {
+        if (app?.status) setApplicationStatus(app.status);
+      }).catch(() => {});
+    }, 5000);
+
     return () => {
       if (statusSourceRef.current) statusSourceRef.current.close();
+      if (pollInterval) clearInterval(pollInterval);
     };
   }, [applicationId]);
 
