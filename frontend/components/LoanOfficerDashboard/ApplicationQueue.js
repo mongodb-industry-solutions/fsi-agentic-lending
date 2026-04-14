@@ -67,7 +67,8 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
         const aPri = isReviewStatus(a.status) ? 0 : isProcessingStatus(a.status) ? 1 : 2;
         const bPri = isReviewStatus(b.status) ? 0 : isProcessingStatus(b.status) ? 1 : 2;
         if (aPri !== bPri) return aPri - bPri;
-        return (a.score ?? 999) - (b.score ?? 999);
+        if ((a.score ?? 999) !== (b.score ?? 999)) return (a.score ?? 999) - (b.score ?? 999);
+        return b.createdAt - a.createdAt;
       });
     } else {
       list = [...list].sort((a, b) => b.createdAt - a.createdAt);

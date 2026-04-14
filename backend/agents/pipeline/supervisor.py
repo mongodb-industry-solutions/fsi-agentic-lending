@@ -28,6 +28,10 @@ def supervisor_node(state: LendFlowState, **kwargs) -> dict:
     gathered_once = state.get("gather_attempts", 0) >= 1
     if not gathered_once and (not state.get("documents_verified", False) or not state.get("credit_pulled", False)):
         natural_next = "parallel_gather"
+    elif gathered_once and not state.get("documents_verified", False) and not state.get("credit_pulled", False):
+        log_agent_activity(app_id, "supervisor", "data_gap",
+            "Gather completed with no verified documents and no credit data — proceeding to underwriter with incomplete inputs")
+        natural_next = "underwriter"
     elif state.get("risk_score") is None:
         natural_next = "underwriter"
     elif state.get("decision") in ("approve", "decline", "error"):

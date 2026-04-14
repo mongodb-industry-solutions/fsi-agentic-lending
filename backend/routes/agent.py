@@ -75,6 +75,7 @@ async def run_agent(app_id: str, autonomy_level: str = "bounded"):
 
     def _run_graph(app_id, autonomy_level):
         timed_out = threading.Event()
+        lock_released = threading.Event()
 
         def _on_timeout():
             timed_out.set()
@@ -82,7 +83,9 @@ async def run_agent(app_id: str, autonomy_level: str = "bounded"):
             logger.error(f"{msg} for {app_id}")
             application_service.update_application_status(app_id, "error", msg)
             log_agent_activity(app_id, "supervisor", "pipeline_timeout", msg)
-            _release_pipeline_lock(app_id)
+            if not lock_released.is_set():
+                lock_released.set()
+                _release_pipeline_lock(app_id)
 
         timer = threading.Timer(PIPELINE_TIMEOUT_SECONDS, _on_timeout)
         timer.daemon = True
@@ -102,7 +105,8 @@ async def run_agent(app_id: str, autonomy_level: str = "bounded"):
                 log_agent_activity(app_id, "supervisor", "pipeline_complete", f"Pipeline error: {e}")
         finally:
             timer.cancel()
-            if not timed_out.is_set():
+            if not lock_released.is_set():
+                lock_released.set()
                 _release_pipeline_lock(app_id)
 
     thread = threading.Thread(target=_run_graph, args=(app_id, autonomy_level), daemon=True)
@@ -132,6 +136,28 @@ async def stream_agent(app_id: str):
         yield f"data: {json.dumps({'type': 'connected', 'application_id': app_id})}\n\n"
 
         heartbeat_counter = 0
+
+        # Send recent activity as backlog so client doesn't miss events
+        backlog = await asyncio.to_thread(
+            lambda: list(
+                db["agent_activity"]
+                .find({"application_id": app_id}, {"_id": 0})
+                .sort("timestamp", -1)
+                .limit(50)
+            )
+        )
+        for doc in reversed(backlog):
+            event = {
+                "type": "agent_step",
+                "agent": doc.get("agent", ""),
+                "action": doc.get("action", ""),
+                "detail": doc.get("detail", ""),
+                "checkpoint_id": doc.get("checkpoint_id"),
+                "timestamp": doc.get("timestamp", "").isoformat()
+                if hasattr(doc.get("timestamp", ""), "isoformat") else "",
+                "backlog": True,
+            }
+            yield f"data: {json.dumps(event)}\n\n"
 
         # Stream from agent_activity Change Stream
         pipeline = [{"$match": {"fullDocument.application_id": app_id}}]

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import Badge from '@leafygreen-ui/badge';
 import { apiGet } from '../../lib/api';
+import { formatCurrency, getRiskColor } from './utils';
 
 const POST_APPROVAL_STAGES = [
   { label: 'Closing in progress', icon: '📑', delay: 1500 },
@@ -51,19 +52,6 @@ function PostApprovalProgression({ active, applicationId }) {
       ))}
     </div>
   );
-}
-
-function formatCurrency(amount) {
-  if (amount == null) return 'N/A';
-  return `$${Number(amount).toLocaleString('en-US')}`;
-}
-
-function getRiskColor(score) {
-  if (score == null) return 'var(--text-dim)';
-  if (score <= 30) return 'var(--success)';
-  if (score <= 50) return 'var(--mongo)';
-  if (score <= 65) return 'var(--hitl-amber)';
-  return 'var(--danger)';
 }
 
 function StageTimeline({ trail }) {

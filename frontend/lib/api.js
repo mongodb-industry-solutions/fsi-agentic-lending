@@ -184,8 +184,16 @@ export function apiSSE(path, onEvent, onError, { maxRetries = 5 } = {}) {
 
     source.onerror = (err) => {
       console.warn('[LendFlow SSE] Connection error:', err);
+      const readyState = source.readyState;
       source.close();
       if (closed) return;
+      // readyState CLOSED before our close() means the connection was rejected or dropped;
+      // this covers 4xx errors and permanent failures — skip retry to avoid futile loops
+      if (readyState === EventSource.CLOSED) {
+        console.warn('[LendFlow SSE] Connection closed by server/network, not retrying');
+        if (onError) onError(err);
+        return;
+      }
       if (retries < maxRetries) {
         retries++;
         const delay = Math.min(1000 * Math.pow(2, retries - 1), 15000);

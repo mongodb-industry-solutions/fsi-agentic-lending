@@ -122,4 +122,5 @@ def doc_verifier_node(state: LendFlowState, **kwargs) -> dict:
     return {
         "documents_verified": documents_verified,
         "document_count": doc_count,
+        "gather_attempts": state.get("gather_attempts", 0) + 1,
     }

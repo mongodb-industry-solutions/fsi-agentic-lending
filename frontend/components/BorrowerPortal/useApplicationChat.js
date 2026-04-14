@@ -36,7 +36,7 @@ export function useApplicationChat(applicationId) {
           const resolvedIds = new Set(prev.filter(i => i._resolved).map(i => i._id));
           return data.interventions.map(i => ({
             ...i,
-            _resolved: resolvedIds.has(i._id) || i.status === 'resolved',
+            _resolved: i.status === 'resolved' || resolvedIds.has(i._id),
           }));
         });
       }
@@ -57,6 +57,13 @@ export function useApplicationChat(applicationId) {
     }
     setResolvingId(null);
   }, [applicationId]);
+
+  // Abort any in-flight streaming fetch on unmount
+  useEffect(() => {
+    return () => {
+      if (abortRef.current) abortRef.current.abort();
+    };
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

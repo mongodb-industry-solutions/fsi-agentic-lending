@@ -1,4 +1,5 @@
 """LangGraph workflow assembly with MongoDBSaver checkpointing."""
+import atexit
 import functools
 import logging
 import os
@@ -50,10 +51,14 @@ def safe_node(node_fn, timeout: int | None = None):
                 "messages": [{"role": "assistant", "content": msg}],
             }
         except Exception as e:
-            log_agent_activity(app_id, node_fn.__name__, "error", str(e)[:500])
+            err_str = str(e)[:500]
+            try:
+                log_agent_activity(app_id, node_fn.__name__, "error", err_str)
+            except Exception:
+                pass
             return {
-                "last_error": str(e)[:500],
-                "messages": [{"role": "assistant", "content": f"Error in {node_fn.__name__}: {str(e)[:200]}"}],
+                "last_error": err_str,
+                "messages": [{"role": "assistant", "content": f"Error in {node_fn.__name__}: {err_str[:200]}"}],
             }
     return wrapper
 
@@ -72,6 +77,8 @@ def build_graph():
     graph.add_node("credit_puller", safe_node(credit_puller_node))
     graph.add_node("loan_app", safe_node(loan_app_node))
     graph.add_node("underwriter", safe_node(underwriter_node))
+    # hitl_gate is NOT wrapped with safe_node — it calls interrupt() which raises
+    # GraphInterrupt, and safe_node's try/except would suppress the interrupt mechanism.
     graph.add_node("hitl_gate", hitl_gate)
     graph.add_node("complete", completion_node)
 
@@ -88,6 +95,8 @@ def build_graph():
 
     return compiled
 
+
+atexit.register(lambda: _node_executor.shutdown(wait=False))
 
 _graph = None
 _graph_lock = threading.Lock()

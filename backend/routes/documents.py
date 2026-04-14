@@ -1,5 +1,6 @@
 """Document API routes."""
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -192,6 +193,17 @@ async def upload_document(
     if not content.startswith(b"%PDF"):
         raise HTTPException(status_code=400, detail="File does not appear to be a valid PDF")
 
+    # Check for existing document with same type to avoid duplicate extraction
+    content_hash = hashlib.sha256(content).hexdigest()
+    existing = db["documents"].find_one({
+        "application_id": app_id,
+        "doc_type": doc_type,
+        "content_hash": content_hash,
+        "status": {"$ne": "error"},
+    })
+    if existing:
+        return serialize_doc(existing)
+
     # Sanitize filename and save file to disk
     safe_name = PurePosixPath(file.filename).name  # strips directory components
     safe_name = f"{app_id}_{uuid.uuid4().hex[:8]}_{safe_name}"
@@ -218,6 +230,7 @@ async def upload_document(
     doc_record = {
         "application_id": app_id,
         "doc_type": doc_type,
+        "content_hash": content_hash,
         "filename": safe_name,
         "extracted_text": text_for_display,
         "structured_data": extraction,

@@ -13,7 +13,7 @@ export function InterventionCard({ intervention, onResolve, resolving }) {
     const createdAt = intervention.created_at ? new Date(intervention.created_at).getTime() : Date.now();
     const tick = () => setElapsed(Date.now() - createdAt);
     tick();
-    const interval = setInterval(tick, 5000);
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [intervention.created_at, isResolved]);
 

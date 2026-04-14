@@ -165,6 +165,14 @@ def underwriter_node(state: LendFlowState, **kwargs) -> dict:
 
     monthly_income = combined_income / 12
 
+    # --- Sanity check on income/loan values ---
+    if loan_amount <= 0:
+        log_agent_activity(app_id, "underwriter", "data_gap", f"Loan amount is ${loan_amount:,.0f} — using application value")
+        loan_amount = app.get("loan_amount", 0)
+    if purchase_price <= 0:
+        log_agent_activity(app_id, "underwriter", "data_gap", f"Purchase price is ${purchase_price:,.0f} — using application value")
+        purchase_price = app.get("purchase_price", 0)
+
     # --- Mortgage payment calculation ---
     _rate_str = os.getenv("CURRENT_5YR_FIXED_RATE", "0.0489")
     try:

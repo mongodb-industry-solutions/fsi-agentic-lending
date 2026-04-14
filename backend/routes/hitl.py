@@ -74,8 +74,24 @@ async def submit_hitl_decision(app_id: str, req: HITLDecisionRequest):
         },
     )
 
+    # Validate that there is a pending interrupt before resuming.
+    # StateSnapshot.tasks is a tuple of PregelTask; each has .interrupts.
+    graph = get_graph()
+    graph_state = await asyncio.to_thread(
+        graph.get_state,
+        {"configurable": {"thread_id": app_id}},
+    )
+    pending_interrupts = any(
+        getattr(t, "interrupts", ())
+        for t in getattr(graph_state, "tasks", ())
+    )
+    if not pending_interrupts:
+        raise HTTPException(
+            status_code=409,
+            detail="No pending interrupt for this application — decision may have already been submitted.",
+        )
+
     try:
-        graph = get_graph()
         await asyncio.to_thread(
             graph.invoke,
             Command(resume={

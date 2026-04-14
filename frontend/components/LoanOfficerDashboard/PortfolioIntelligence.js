@@ -14,16 +14,17 @@ export function PortfolioIntelligence() {
   useEffect(() => {
     if (!expanded || loaded) return;
     setLoaded(true);
-    Promise.all([
+    // Fetch individually so one failure doesn't lose all data
+    Promise.allSettled([
       apiGet('/portfolio/payments'),
       apiGet('/portfolio/ews'),
       apiGet('/portfolio/events'),
     ]).then(([p, e, ev]) => {
-      if (p) setPayments(p);
-      if (e) setEws(e);
-      if (ev) setEvents(ev);
-    }).catch(() => {
-      setLoaded(false);
+      if (p.value) setPayments(p.value);
+      if (e.value) setEws(e.value);
+      if (ev.value) setEvents(ev.value);
+      // Allow retry on re-expand if all endpoints failed
+      if (!p.value && !e.value && !ev.value) setLoaded(false);
     });
   }, [expanded, loaded]);
 

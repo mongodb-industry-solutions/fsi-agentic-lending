@@ -176,6 +176,8 @@ export default function DocumentContext({ applicationId }) {
   }, [applicationId]);
 
   useEffect(() => {
+    allParsedRef.current = false;
+    prevStatusMap.current = {};
     setLoading(true);
     fetchDocs();
   }, [fetchDocs]);

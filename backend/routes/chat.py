@@ -117,7 +117,7 @@ async def send_message_stream(application_id: str, req: ChatMessageRequest):
         accumulated = []
         citations = []
         safety_tripped = False
-        queue = asyncio.Queue()
+        queue = asyncio.Queue(maxsize=500)
         sentinel = object()
 
         loop = asyncio.get_running_loop()

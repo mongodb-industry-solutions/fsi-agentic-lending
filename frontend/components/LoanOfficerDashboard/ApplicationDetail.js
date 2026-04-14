@@ -4,19 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import Badge from '@leafygreen-ui/badge';
 import { apiGet, apiPost } from '../../lib/api';
-
-function formatCurrency(amount) {
-  if (amount == null) return 'N/A';
-  return `$${Number(amount).toLocaleString('en-US')}`;
-}
-
-function getRiskColor(score) {
-  if (score == null) return 'var(--text-dim)';
-  if (score <= 30) return 'var(--success)';
-  if (score <= 50) return 'var(--mongo)';
-  if (score <= 65) return 'var(--hitl-amber)';
-  return 'var(--danger)';
-}
+import { formatCurrency, getRiskColor } from './utils';
 
 function MetricBox({ label, value, color, mono = true }) {
   return (

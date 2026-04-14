@@ -52,7 +52,7 @@ def hitl_gate(state: LendFlowState, **kwargs) -> dict:
     if action == "modify_and_continue":
         state_updates["risk_score"] = None
         state_updates["decision"] = None
-        state_updates["hitl_approved_nodes"] = []
+        # Preserve hitl_approved_nodes to avoid re-gating already-approved nodes
 
     if overrides.get("risk_tier"):
         state_updates["risk_tier"] = overrides["risk_tier"]
@@ -60,6 +60,10 @@ def hitl_gate(state: LendFlowState, **kwargs) -> dict:
         state_updates["risk_score"] = None
         state_updates["decision"] = None
         state_updates["decision_reasoning"] = f"Re-underwriting: officer adjusted loan to ${overrides['loan_amount']:,.0f}"
+        # Reset gather flags so supervisor triggers fresh data pull for new loan amount
+        state_updates["documents_verified"] = False
+        state_updates["credit_pulled"] = False
+        state_updates["gather_attempts"] = 0
         from db.mdb import get_db as _get_db
         db = _get_db()
         db["applications"].update_one(

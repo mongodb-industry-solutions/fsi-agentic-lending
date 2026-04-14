@@ -11,6 +11,7 @@ export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove,
   const [fetchingContext, setFetchingContext] = useState(false);
   const [hitlContext, setHitlContext] = useState(null);
   const [modFields, setModFields] = useState({ rate: 4.89, conditions: '', requestDocs: false, loanAmount: '' });
+  const [submitting, setSubmitting] = useState(false);
 
   const app = hitlContext?.application || appDetail || {};
   const activityTrail = hitlContext?.activity_trail || [];
@@ -40,7 +41,9 @@ export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove,
     if (applicationId) fetchContext();
   }, [applicationId, fetchContext]);
 
-  const handleModifySubmit = () => {
+  const handleModifySubmit = async () => {
+    if (submitting) return;
+    setSubmitting(true);
     const loanAmountNum = modFields.loanAmount ? parseFloat(modFields.loanAmount.replace(/[^0-9.]/g, '')) : null;
     const details = {
       mode: 'modified',
@@ -56,11 +59,13 @@ export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove,
       if (modFields.requestDocs) parts.push('Additional docs requested');
       addToast({ type: 'info', title: 'Submitting Modifications', message: parts.join(' · ') });
     }
-    onApprove(details);
+    try { await onApprove(details); } finally { setSubmitting(false); }
   };
 
-  const handleApproveRecommended = () => {
-    onApprove({ mode: 'recommended', rate: recommendation?.detail?.match(/[\d.]+%/)?.[0] || 'as recommended' });
+  const handleApproveRecommended = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try { await onApprove({ mode: 'recommended', rate: recommendation?.detail?.match(/[\d.]+%/)?.[0] || 'as recommended' }); } finally { setSubmitting(false); }
   };
 
   const modSummary = showModify ? (() => {
@@ -420,20 +425,22 @@ export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove,
       {/* Action buttons */}
       <div style={{ display: 'flex', gap: spacing[2], flexWrap: 'wrap' }}>
         {showModify ? (
-          <button type="button" onClick={handleModifySubmit} style={{
+          <button type="button" onClick={handleModifySubmit} disabled={submitting} style={{
             flex: '1 1 auto', padding: 10, borderRadius: 8, border: 'none',
             background: 'var(--agent-cyan)', color: '#fff', fontFamily: 'var(--font-display)',
-            fontWeight: 700, fontSize: 11, cursor: 'pointer',
+            fontWeight: 700, fontSize: 11, cursor: submitting ? 'default' : 'pointer',
+            opacity: submitting ? 0.6 : 1,
           }}>
-            Submit Modified Terms
+            {submitting ? 'Submitting...' : 'Submit Modified Terms'}
           </button>
         ) : (
-          <button type="button" onClick={handleApproveRecommended} style={{
+          <button type="button" onClick={handleApproveRecommended} disabled={submitting} style={{
             flex: '1 1 auto', padding: 10, borderRadius: 8, border: 'none',
             background: 'var(--mongo)', color: '#fff', fontFamily: 'var(--font-display)',
-            fontWeight: 700, fontSize: 11, cursor: 'pointer',
+            fontWeight: 700, fontSize: 11, cursor: submitting ? 'default' : 'pointer',
+            opacity: submitting ? 0.6 : 1,
           }}>
-            Approve as Recommended
+            {submitting ? 'Approving...' : 'Approve as Recommended'}
           </button>
         )}
         <button type="button" onClick={() => setShowModify(!showModify)} style={{
@@ -455,11 +462,12 @@ export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove,
         }}>
           {fetchingContext ? 'Fetching...' : 'Refresh Context'}
         </button>
-        <button type="button" onClick={() => onDecline?.()} style={{
+        <button type="button" onClick={() => onDecline?.()} disabled={submitting} style={{
           flex: '1 1 auto', padding: 10, borderRadius: 8,
           border: '1px solid var(--danger)', background: 'transparent',
           color: 'var(--danger)', fontFamily: 'var(--font-display)',
-          fontWeight: 600, fontSize: 11, cursor: 'pointer',
+          fontWeight: 600, fontSize: 11, cursor: submitting ? 'default' : 'pointer',
+          opacity: submitting ? 0.6 : 1,
         }}>
           Decline
         </button>

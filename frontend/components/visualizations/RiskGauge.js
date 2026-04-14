@@ -11,7 +11,7 @@ export default function RiskGauge({ score = 72, size = 140, strokeWidth = 12 }) 
   const tier = score <= 30 ? 'A' : score <= 50 ? 'B+' : score <= 65 ? 'B' : score <= 80 ? 'C' : 'D';
 
   return (
-    <div style={{ position: 'relative', width: size, height: size * 0.65 }}>
+    <div role="img" aria-label={`Risk score: ${score} out of 100, tier ${tier}`} style={{ position: 'relative', width: size, height: size * 0.65 }}>
       <svg width={size} height={size * 0.65} viewBox={`0 0 ${size} ${size * 0.65}`}>
         {/* Background arc */}
         <path

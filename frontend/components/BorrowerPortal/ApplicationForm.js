@@ -102,7 +102,10 @@ export default function ApplicationForm({ onSubmit, borrowerProfile }) {
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
-    if (borrowerProfile) setForm(borrowerProfile);
+    if (borrowerProfile) {
+      setForm(borrowerProfile);
+      setErrors({});
+    }
   }, [borrowerProfile]);
 
   const validate = () => {

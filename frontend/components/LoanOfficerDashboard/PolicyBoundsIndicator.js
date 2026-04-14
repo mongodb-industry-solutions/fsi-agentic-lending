@@ -21,7 +21,7 @@ export function PolicyBoundsIndicator({ exceeded, policyCitations }) {
         fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
         color: exceeded ? 'var(--hitl-amber)' : 'var(--tool-blue)', marginBottom: 6,
       }}>
-        {exceeded ? 'Boundary Exceeded — Escalating' : 'Active Policy Bounds'}
+        {exceeded ? 'Boundary Exceeded — Escalating' : policyCitations?.length > 0 ? 'Active Policy Bounds' : 'Default Policy Bounds'}
       </div>
       {bounds.map((b, i) => (
         <div key={i} style={{

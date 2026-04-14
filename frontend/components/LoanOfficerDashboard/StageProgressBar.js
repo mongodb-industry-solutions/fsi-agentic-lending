@@ -30,9 +30,10 @@ export function StageProgressBar({ stage, hitlReached, approved, approvalDetails
 
         const elapsed = stageTimestamps?.[i] && (isComplete || isCurrent)
           ? (() => {
-              const end = stageTimestamps[i + 1] || (isComplete ? Date.now() : null);
+              const end = stageTimestamps[i + 1];
               if (!end) return null;
               const ms = end - stageTimestamps[i];
+              if (ms <= 0) return null;
               return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
             })()
           : null;
