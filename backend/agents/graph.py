@@ -43,6 +43,7 @@ def safe_node(node_fn, timeout: int | None = None):
             )
             return result
         except FuturesTimeoutError:
+            future.cancel()
             msg = f"{node_fn.__name__} timed out after {node_timeout}s"
             _logger.error(f"{msg} for {app_id}")
             log_agent_activity(app_id, node_fn.__name__, "timeout", msg)

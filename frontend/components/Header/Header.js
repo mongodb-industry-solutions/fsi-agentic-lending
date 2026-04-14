@@ -38,11 +38,20 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
 
   const handleReset = async () => {
     setResetting(true);
-    await apiPost('/demo/reset', {}, { 'X-Demo-Reset': 'confirm' });
-    sessionStorage.removeItem('lendflow_demo_session');
-    setResetting(false);
-    setShowResetModal(false);
-    window.location.reload();
+    try {
+      const result = await apiPost('/demo/reset', {}, { 'X-Demo-Reset': 'confirm' });
+      if (!result) {
+        console.warn('[LendFlow] Demo reset API call failed, proceeding with local cleanup');
+      }
+      sessionStorage.removeItem('lendflow_demo_session');
+      sessionStorage.removeItem('lendflow_phase');
+      sessionStorage.removeItem('lendflow_app_id');
+      sessionStorage.removeItem('lendflow_borrower');
+      setShowResetModal(false);
+      window.location.reload();
+    } catch {
+      setResetting(false);
+    }
   };
 
   return (

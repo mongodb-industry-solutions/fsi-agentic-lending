@@ -58,27 +58,35 @@ def extract_from_pdf(pdf_path: Path, doc_type: str) -> dict:
         "Extract all structured data from this document. Return JSON with relevant fields and a text_summary field."
     )
 
-    response = client.converse(
-        modelId=model_id,
-        messages=[{
-            "role": "user",
-            "content": [
-                {
-                    "document": {
-                        "format": "pdf",
-                        "name": pdf_path.stem,
-                        "source": {"bytes": pdf_bytes},
+    try:
+        response = client.converse(
+            modelId=model_id,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "document": {
+                            "format": "pdf",
+                            "name": pdf_path.stem,
+                            "source": {"bytes": pdf_bytes},
+                        }
+                    },
+                    {
+                        "text": f"{prompt}\n\nReturn ONLY valid JSON, no markdown formatting."
                     }
-                },
-                {
-                    "text": f"{prompt}\n\nReturn ONLY valid JSON, no markdown formatting."
-                }
-            ]
-        }],
-        inferenceConfig={"maxTokens": 4096, "temperature": 0.0},
-    )
+                ]
+            }],
+            inferenceConfig={"maxTokens": 4096, "temperature": 0.0},
+        )
+    except Exception as e:
+        logger.error(f"Bedrock extraction call failed for {pdf_path.name}: {e}")
+        return {"error": str(e), "text_summary": f"Extraction failed: {str(e)[:200]}"}
 
-    result_text = response["output"]["message"]["content"][0]["text"]
+    try:
+        result_text = response["output"]["message"]["content"][0]["text"]
+    except (KeyError, IndexError, TypeError) as e:
+        logger.warning(f"Unexpected Bedrock response structure for {pdf_path.name}: {e}")
+        return {"error": str(e), "text_summary": "Extraction produced unexpected response format"}
     # Strip markdown code fences if present
     result_text = result_text.strip()
     result_text = re.sub(r"^```[a-z]*\n?", "", result_text)

@@ -76,7 +76,7 @@ function CompactDocCard({ doc, onView, justChanged }) {
       onMouseLeave={() => setHovered(false)}
       onClick={() => onView(doc._id)}
       aria-label={`View ${label}`}
-      onFocus={(e) => { e.currentTarget.style.boxShadow = '0 0 0 2px var(--focus-ring, rgba(0, 124, 173, 0.4))'; }}
+      onFocus={(e) => { e.currentTarget.style.boxShadow = 'var(--focus-ring)'; }}
       onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
     >
       <div style={{
@@ -284,7 +284,7 @@ export default function DocumentContext({ applicationId }) {
             }}
             onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-raised)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-base)'; }}
-            onFocus={(e) => { e.currentTarget.style.boxShadow = '0 0 0 2px var(--focus-ring, rgba(0, 124, 173, 0.4))'; }}
+            onFocus={(e) => { e.currentTarget.style.boxShadow = 'var(--focus-ring)'; }}
             onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
           >
             {collapsed ? '\u25B6' : '\u25C0'}

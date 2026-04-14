@@ -45,6 +45,7 @@ _PROJECT_ROOT = _resolve_project_root()
 UPLOAD_DIR = _PROJECT_ROOT / "docs" / "uploads"
 
 VALID_DOC_TYPES = set(EXTRACTION_PROMPTS.keys()) | {"unknown"}
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB
 
 
 def _validate_doc_id(doc_id: str):
@@ -190,6 +191,8 @@ async def upload_document(
         raise HTTPException(status_code=400, detail="Only PDF uploads are accepted")
 
     content = await file.read()
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail=f"File too large ({len(content) / 1024 / 1024:.1f}MB). Maximum is 50MB.")
     if not content.startswith(b"%PDF"):
         raise HTTPException(status_code=400, detail="File does not appear to be a valid PDF")
 

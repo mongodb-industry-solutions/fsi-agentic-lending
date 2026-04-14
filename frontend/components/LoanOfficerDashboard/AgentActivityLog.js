@@ -154,7 +154,7 @@ export default function AgentActivityLog({ onEvent, applicationId }) {
           <div style={{
             textAlign: 'center', padding: spacing[4],
             border: '2px dashed var(--border-dim)', borderRadius: 8,
-            background: '#FAFBFA',
+            background: 'var(--bg-void)',
           }}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', opacity: 0.5, marginBottom: spacing[2] }}>
               SSE
@@ -385,7 +385,7 @@ export default function AgentActivityLog({ onEvent, applicationId }) {
           <div style={{
             padding: spacing[5], textAlign: 'center',
             border: '2px dashed var(--border-dim)', borderRadius: 8,
-            background: '#FAFBFA', marginTop: spacing[3],
+            background: 'var(--bg-void)', marginTop: spacing[3],
           }}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)', opacity: 0.5, marginBottom: spacing[1] }}>
               ...

@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import BorrowerSelection from './BorrowerSelection';
 import ApplicationForm from './ApplicationForm';
-import DocumentUpload from './DocumentUpload';
 import StatusTracker from './StatusTracker';
 import DocumentContext from './DocumentContext';
 import ApplicationAgent from './ApplicationAgent';
@@ -255,9 +254,19 @@ function SubmittingOverlay({ currentStep, applicationId }) {
 }
 
 export default function BorrowerPortal() {
-  const [phase, setPhase] = useState('select');
-  const [borrowerProfile, setBorrowerProfile] = useState(null);
-  const [applicationId, setApplicationId] = useState(null);
+  const [phase, setPhase] = useState(() => {
+    if (typeof window === 'undefined') return 'select';
+    const saved = sessionStorage.getItem('lendflow_phase');
+    return saved === 'tracking' ? 'tracking' : 'select';
+  });
+  const [borrowerProfile, setBorrowerProfile] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    try { return JSON.parse(sessionStorage.getItem('lendflow_borrower')); } catch { return null; }
+  });
+  const [applicationId, setApplicationId] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    return sessionStorage.getItem('lendflow_app_id') || null;
+  });
   const { toasts, addToast, removeToast } = useToasts();
   const [demoSessionId, setDemoSessionId] = useState('');
   const [submitStep, setSubmitStep] = useState(0);
@@ -269,6 +278,20 @@ export default function BorrowerPortal() {
   useEffect(() => {
     setDemoSessionId(getDemoSessionId());
   }, []);
+
+  // Persist key state to sessionStorage for page refresh resilience
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (phase === 'tracking' && applicationId) {
+      sessionStorage.setItem('lendflow_phase', 'tracking');
+      sessionStorage.setItem('lendflow_app_id', applicationId);
+      if (borrowerProfile) sessionStorage.setItem('lendflow_borrower', JSON.stringify(borrowerProfile));
+    } else if (phase === 'select') {
+      sessionStorage.removeItem('lendflow_phase');
+      sessionStorage.removeItem('lendflow_app_id');
+      sessionStorage.removeItem('lendflow_borrower');
+    }
+  }, [phase, applicationId, borrowerProfile]);
 
   useEffect(() => {
     if (!applicationId) return;
@@ -306,6 +329,12 @@ export default function BorrowerPortal() {
   const handleBorrowerSelect = useCallback((profile) => {
     setBorrowerProfile(profile);
     setPhase('apply');
+  }, []);
+
+  const handleBackToSelect = useCallback(() => {
+    setBorrowerProfile(null);
+    setApplicationId(null);
+    setPhase('select');
   }, []);
 
   const handleSubmit = useCallback(
@@ -455,13 +484,23 @@ export default function BorrowerPortal() {
         Lending Platform processes applications in{' '}
         <strong>minutes</strong> using MongoDB and multi-agent AI.
       </ContextualBanner>
+      <div style={{ padding: '0 64px', paddingTop: 8 }}>
+        <button
+          type="button"
+          onClick={handleBackToSelect}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: 12, fontFamily: 'var(--font-display)', fontWeight: 600,
+            color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 4,
+            padding: '4px 0',
+          }}
+        >
+          {'\u2190'} Change Borrower
+        </button>
+      </div>
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <ApplicationForm
           onSubmit={handleSubmit}
-          borrowerProfile={borrowerProfile}
-        />
-        <DocumentUpload
-          applicationId={applicationId}
           borrowerProfile={borrowerProfile}
         />
       </div>

@@ -155,7 +155,7 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
           <div style={{
             margin: spacing[3], padding: spacing[4], textAlign: 'center',
             border: '2px dashed var(--border-dim)', borderRadius: 8,
-            background: '#FAFBFA',
+            background: 'var(--bg-void)',
           }}>
             <div style={{
               width: 36, height: 36, borderRadius: 8,

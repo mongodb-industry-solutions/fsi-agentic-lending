@@ -248,15 +248,40 @@ def reset_all_demo_data() -> dict:
     return {"deleted_applications": result.deleted_count}
 
 
+_VALID_TRANSITIONS = {
+    "submitted": {"processing", "error"},
+    "processing": {"underwriting", "review", "approved", "declined", "error"},
+    "underwriting": {"review", "approved", "declined", "error"},
+    "review": {"processing", "approved", "declined", "error"},
+    "approved": {"closing", "error"},
+    "closing": {"funded", "error"},
+    "funded": {"active", "error"},
+    "active": {"error"},
+    "declined": {"processing", "error"},  # Allow re-processing after decline override
+    "error": {"processing", "submitted"},  # Allow retry
+}
+
+
 def update_application_status(application_id: str, status: str, detail: str = "") -> bool:
     """Update application status and append to history."""
-    # Validate status
     try:
         ApplicationStatus(status)
     except ValueError:
         raise ValueError(f"Invalid application status: {status}")
-    logger.info(f"Updating application {application_id} status to '{status}'")
+
+    # Validate transition (warn but don't block for demo flexibility)
     db = _get_db()
+    current = db["applications"].find_one({"application_id": application_id}, {"status": 1})
+    current_status = current.get("status") if current else None
+    if current_status and current_status != status:
+        allowed = _VALID_TRANSITIONS.get(current_status, set())
+        if status not in allowed:
+            logger.warning(
+                f"Unusual status transition for {application_id}: {current_status} → {status} "
+                f"(allowed: {allowed}). Proceeding anyway."
+            )
+
+    logger.info(f"Updating application {application_id} status to '{status}'")
     now = datetime.now(timezone.utc)
     result = db["applications"].update_one(
         {"application_id": application_id},

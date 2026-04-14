@@ -232,7 +232,7 @@ export default function LoanOfficerDashboard() {
                 <div style={{
                   textAlign: 'center', padding: spacing[5],
                   border: '2px dashed var(--border-dim)', borderRadius: 12,
-                  background: '#FAFBFA', maxWidth: 380,
+                  background: 'var(--bg-void)', maxWidth: 380,
                 }}>
                   {/* Mini pipeline sketch */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, marginBottom: 16 }}>

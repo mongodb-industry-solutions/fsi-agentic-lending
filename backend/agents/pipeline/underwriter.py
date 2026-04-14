@@ -129,8 +129,8 @@ def underwriter_node(state: LendFlowState, **kwargs) -> dict:
     app = get_application_summary(app_id)
     income = app.get("income_summary", {})
     combined_income = income.get("combined_gross", 0)
-    loan_amount = agg_result["loan_amount"] if agg_result.get("loan_amount") is not None else app.get("loan_amount", 0)
-    purchase_price = agg_result["purchase_price"] if agg_result.get("purchase_price") is not None else app.get("purchase_price", 0)
+    loan_amount = agg_result.get("loan_amount") if agg_result.get("loan_amount") is not None else app.get("loan_amount", 0)
+    purchase_price = agg_result.get("purchase_price") if agg_result.get("purchase_price") is not None else app.get("purchase_price", 0)
 
     # Search for relevant policies via Vector Search
     log_agent_activity(app_id, "underwriter", "policy_search", "Searching underwriting policies via Atlas Vector Search")
@@ -230,8 +230,8 @@ def underwriter_node(state: LendFlowState, **kwargs) -> dict:
     effective_tds = max(tds, stress["stress_tds"])
 
     # --- Risk scoring ---
-    primary_score = agg_result["primary_credit_score"] if agg_result.get("primary_credit_score") is not None else state.get("primary_credit_score")
-    co_score = agg_result["co_credit_score"] if agg_result.get("co_credit_score") is not None else state.get("co_applicant_credit_score")
+    primary_score = agg_result.get("primary_credit_score") if agg_result.get("primary_credit_score") is not None else state.get("primary_credit_score")
+    co_score = agg_result.get("co_credit_score") if agg_result.get("co_credit_score") is not None else state.get("co_applicant_credit_score")
 
     if primary_score is None:
         log_agent_activity(app_id, "underwriter", "error", "Primary credit score unavailable — cannot underwrite")
@@ -254,8 +254,8 @@ def underwriter_node(state: LendFlowState, **kwargs) -> dict:
             "messages": [{"role": "assistant", "content": "Primary credit score unavailable — application declined."}],
         }
 
-    ltv = agg_result["ltv"] if agg_result.get("ltv") is not None else ((loan_amount / purchase_price) * 100 if purchase_price > 0 else 100)
-    doc_count = agg_result["doc_count"] if agg_result.get("doc_count") is not None else 0
+    ltv = agg_result.get("ltv") if agg_result.get("ltv") is not None else ((loan_amount / purchase_price) * 100 if purchase_price > 0 else 100)
+    doc_count = agg_result.get("doc_count") if agg_result.get("doc_count") is not None else 0
 
     log_agent_activity(app_id, "underwriter", "ltv_calc", f"LTV: {ltv:.1f}% ({loan_amount:,.0f} / {purchase_price:,.0f})")
     log_agent_activity(app_id, "underwriter", "agg_data",
