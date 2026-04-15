@@ -183,7 +183,7 @@ export default function AICapabilitiesPanel({ applicationId, activeTools, toolHi
         flexShrink: 0,
       }}>
         <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12 }}>
-          AI Assistant Capabilities
+          Personal Lending Assistant Capabilities
         </span>
         <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
           {CAPABILITIES.length} tools available
@@ -234,7 +234,7 @@ export default function AICapabilitiesPanel({ applicationId, activeTools, toolHi
           marginTop: spacing[3], textAlign: 'center',
           fontSize: 11, color: 'var(--text-dim)',
         }}>
-          Tools activate as you chat with the AI assistant. Try asking:
+          Tools activate as you chat with your Personal Lending Assistant. Try asking:
           <button
             type="button"
             onClick={() => onSendMessage?.(suggestedQuestion)}

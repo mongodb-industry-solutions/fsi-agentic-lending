@@ -80,12 +80,22 @@ function DeclineCard({ stageContext, onOpenChat }) {
   const reasoning = stageContext.decisionReasoning || '';
   const r = reasoning.toLowerCase();
 
-  // Map decline keywords to actionable guidance
+  // Map decline keywords to actionable guidance, enriched with actual metrics when available
   const guidance = [];
-  if (r.includes('stress test')) guidance.push('Consider increasing your down payment or choosing a less expensive property to improve your stress test results.');
+  if (r.includes('stress test')) {
+    guidance.push('Consider increasing your down payment or choosing a less expensive property to improve your stress test results.');
+  }
   if (r.includes('income') || r.includes('zero')) guidance.push('Ensure all income documentation is uploaded and accurate, including employment letters, pay stubs, and tax notices.');
-  if (r.includes('credit')) guidance.push('Review your credit report for errors and consider resolving any outstanding debts before reapplying.');
-  if (r.includes('gds') || r.includes('tds') || r.includes('debt')) guidance.push('Reducing existing monthly debt payments will improve your debt service ratios.');
+  if (r.includes('credit')) {
+    const scoreStr = typeof stageContext.creditScore === 'number' ? ` Your credit score of ${stageContext.creditScore} may need improvement.` : '';
+    guidance.push(`Review your credit report for errors and consider resolving any outstanding debts before reapplying.${scoreStr}`);
+  }
+  if (r.includes('gds') || r.includes('tds') || r.includes('debt')) {
+    const ratioStr = typeof stageContext.gds === 'number' && typeof stageContext.tds === 'number'
+      ? ` Your GDS is ${(stageContext.gds * 100).toFixed(1)}% and TDS is ${(stageContext.tds * 100).toFixed(1)}%.`
+      : '';
+    guidance.push(`Reducing existing monthly debt payments will improve your debt service ratios.${ratioStr}`);
+  }
   if (r.includes('risk') && r.includes('threshold')) guidance.push('Your risk profile exceeded the automated approval threshold. A loan officer may be able to review your case manually.');
   if (guidance.length === 0) guidance.push('Contact a loan officer for personalized guidance on your application.');
 
@@ -175,7 +185,7 @@ function DeclineCard({ stageContext, onOpenChat }) {
             cursor: 'pointer',
           }}
         >
-          Speak with AI Assistant
+          Speak with your Lending Assistant
         </button>
       )}
     </div>
@@ -312,7 +322,7 @@ export default function StatusTracker({ onNotification, applicationId, applicati
     const interventions = timelineCtx?.interventions || [];
     const summary = timelineCtx?.activity_summary || {};
 
-    const docTypes = ['missing_document'];
+    const docTypes = ['missing_document', 'document_processing_error'];
     const creditTypes = ['credit_score_required', 'credit_data_unavailable'];
     const riskTypes = ['stress_test_failure', 'income_data_required'];
     const actionTypes = ['additional_info_required'];
@@ -512,7 +522,7 @@ export default function StatusTracker({ onNotification, applicationId, applicati
               fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12,
               color: assistantColor, marginBottom: 2,
             }}>
-              {isComplete ? 'All Steps Complete' : 'AI Assistant'}
+              {isComplete ? 'All Steps Complete' : 'Personal Lending Assistant'}
             </div>
             {interventionsResolved > 0 && (
               <span style={{

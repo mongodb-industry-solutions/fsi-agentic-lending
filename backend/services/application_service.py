@@ -333,7 +333,7 @@ def reset_all_demo_data() -> dict:
     """Wipe all demo-created applications and related data. Preserves seeded data."""
     db = _get_db()
     demo_apps = list(db["applications"].find(
-        {"demo_session_id": {"$exists": True}},
+        {"seed_complete": {"$ne": True}},
         {"application_id": 1, "borrower_ids": 1},
     ))
     if not demo_apps:
@@ -369,7 +369,7 @@ def reset_all_demo_data() -> dict:
         br_del = db["borrowers"].delete_many({"_id": {"$in": borrower_ids}})
         cr_del_count = cr_del.deleted_count
         br_del_count = br_del.deleted_count
-    result = db["applications"].delete_many({"demo_session_id": {"$exists": True}})
+    result = db["applications"].delete_many({"seed_complete": {"$ne": True}})
     logger.info(f"Reset demo: deleted {result.deleted_count} applications, {docs_del.deleted_count} documents, {convs_del.deleted_count} conversations, {intv_del.deleted_count} interventions")
     return {
         "deleted_applications": result.deleted_count,

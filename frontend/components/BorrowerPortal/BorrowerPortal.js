@@ -37,7 +37,7 @@ function FloatingChatDrawer({ open, onToggle }) {
       <button
         type="button"
         onClick={onToggle}
-        aria-label={open ? 'Close chat' : 'Ask LendFlow'}
+        aria-label={open ? 'Close chat' : 'Ask your Lending Assistant'}
         style={{
           position: 'fixed',
           bottom: 24,
@@ -286,6 +286,9 @@ export default function BorrowerPortal() {
       try { setSubmittedApps(JSON.parse(savedApps)); } catch { /* ignore */ }
     }
   }, []);
+
+  // Trigger immediate DocumentContext refresh after InterventionCard uploads
+  const [docRefreshTrigger, setDocRefreshTrigger] = useState(0);
 
   // Tool activity state lifted from ApplicationAgent for TechnologyTheatre
   const [toolActivity, setToolActivity] = useState({ active: [], history: [] });
@@ -561,12 +564,13 @@ export default function BorrowerPortal() {
             applicationData={borrowerProfile}
             onOpenChat={() => setChatOpen(true)}
           />
-          <DocumentContext applicationId={applicationId} />
+          <DocumentContext applicationId={applicationId} refreshTrigger={docRefreshTrigger} />
           <ApplicationAgent
             applicationId={applicationId}
             applicationStatus={applicationStatus}
             onToolActivity={handleToolActivity}
             borrowerProfile={borrowerProfile}
+            onDocumentUploaded={() => setDocRefreshTrigger(p => p + 1)}
           />
         </div>
 

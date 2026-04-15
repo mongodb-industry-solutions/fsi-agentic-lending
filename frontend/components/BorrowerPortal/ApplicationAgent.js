@@ -66,7 +66,7 @@ function ContextStrip({ applicationId, applicationStatus, borrowerProfile, loadi
   );
 }
 
-export default function ApplicationAgent({ applicationId, applicationStatus, onToolActivity, borrowerProfile }) {
+export default function ApplicationAgent({ applicationId, applicationStatus, onToolActivity, borrowerProfile, onDocumentUploaded }) {
   const {
     messages,
     input, setInput,
@@ -131,10 +131,10 @@ export default function ApplicationAgent({ applicationId, applicationStatus, onT
               fontFamily: 'var(--font-display)', fontWeight: 700,
               fontSize: 14, color: 'var(--text-primary)',
             }}>
-              LendFlow Assistant
+              Personal Lending Assistant
             </div>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>
-              AI-powered application support
+              Personalized mortgage guidance
             </div>
           </div>
         </div>
@@ -184,6 +184,7 @@ export default function ApplicationAgent({ applicationId, applicationStatus, onT
                 onResolve={resolveIntervention}
                 resolving={resolvingId === intv._id}
                 applicationId={applicationId}
+                onDocumentUploaded={onDocumentUploaded}
               />
             ))}
           </div>

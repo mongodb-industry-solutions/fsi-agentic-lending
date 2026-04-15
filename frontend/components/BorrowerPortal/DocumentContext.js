@@ -134,7 +134,7 @@ function CompactDocCard({ doc, onView, justChanged }) {
   );
 }
 
-export default function DocumentContext({ applicationId }) {
+export default function DocumentContext({ applicationId, refreshTrigger = 0 }) {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
@@ -181,6 +181,20 @@ export default function DocumentContext({ applicationId }) {
     setLoading(true);
     fetchDocs();
   }, [fetchDocs]);
+
+  // Immediate refresh when triggered by InterventionCard upload
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      allParsedRef.current = false; // ensure polling continues for new doc
+      fetchDocs();
+      // Restart polling interval if it was previously cleared after all-parsed
+      if (!pollRef.current) {
+        pollRef.current = setInterval(() => {
+          if (!allParsedRef.current) fetchDocs();
+        }, 5000);
+      }
+    }
+  }, [refreshTrigger, fetchDocs]);
 
   useEffect(() => {
     if (!applicationId) return;

@@ -42,17 +42,32 @@ export const STATUS_SUGGESTIONS = {
   ],
 };
 
+const INTERVENTION_QUESTIONS = {
+  missing_document: 'What documents am I missing?',
+  document_processing_error: 'Why couldn\'t my document be processed?',
+  stress_test_failure: 'What is the stress test and how can I pass it?',
+  credit_data_unavailable: 'Why couldn\'t my credit data be retrieved?',
+  credit_score_required: 'How is my credit score used in the application?',
+  income_data_required: 'How do I verify my income?',
+  additional_info_required: 'Why does my application need officer review?',
+};
+
 export function getContextualSuggestions(status, localInterventions) {
   const base = STATUS_SUGGESTIONS[status] || STATUS_SUGGESTIONS.default;
   const contextual = [];
 
   const pending = (localInterventions || []).filter(i => !i._resolved);
   if (pending.length > 0) {
-    const types = pending.map(i => i.type?.replace(/_/g, ' ')).filter(Boolean);
-    if (types.length > 0) {
-      contextual.push(`Why was my ${types[0]} flagged?`);
+    for (const intv of pending) {
+      const q = INTERVENTION_QUESTIONS[intv.type];
+      if (q && !contextual.includes(q)) {
+        contextual.push(q);
+        if (contextual.length >= 2) break;
+      }
     }
-    contextual.push('What action do I need to take?');
+    if (contextual.length === 0) {
+      contextual.push('What action do I need to take?');
+    }
   }
 
   if (status === 'approved') {
@@ -89,7 +104,7 @@ export function getVisibleQuickActions(status) {
 export function createWelcomeMessage() {
   return {
     role: 'assistant',
-    content: 'Welcome! I\'m your LendFlow application assistant. I can help you with document requirements, lending policies, and track your application progress. What would you like to know?',
+    content: 'Welcome! I\'m your Personal Lending Assistant. I can help you with document requirements, lending policies, and track your application progress. What would you like to know?',
     timestamp: new Date().toISOString(),
   };
 }
