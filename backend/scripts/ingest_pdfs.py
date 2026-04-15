@@ -210,6 +210,7 @@ def create_application(db, borrowers: list, extraction_data: dict):
 
     application = {
         "application_id": APPLICATION_ID,
+        "profile_id": "marcus-delgado",
         "borrower_ids": [b["_id"] for b in borrowers],
         "borrower_names": [b["full_name"] for b in borrowers],
         "loan_amount": 700000,
@@ -230,6 +231,7 @@ def create_application(db, borrowers: list, extraction_data: dict):
         "status_history": [
             {"status": "submitted", "timestamp": now, "detail": "Application received"}
         ],
+        "seed_complete": True,
         "created_at": now,
         "updated_at": now,
     }
@@ -564,6 +566,12 @@ def main():
     existing = db["applications"].count_documents({"application_id": APPLICATION_ID})
     if existing > 0:
         print(f"Data already ingested for {APPLICATION_ID}. Skipping PDF extraction.")
+        # Idempotent backfill: ensures profile_id and seed_complete are present
+        # (no-op on already-patched databases, fixes pre-fix ones).
+        db["applications"].update_one(
+            {"application_id": APPLICATION_ID},
+            {"$set": {"profile_id": "marcus-delgado", "seed_complete": True}},
+        )
         print("Checking additional profiles, policies, and payments...\n")
         create_policies(db)
         create_payment_history(db)

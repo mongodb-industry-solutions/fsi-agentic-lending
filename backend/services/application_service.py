@@ -332,8 +332,12 @@ def upsert_demo_application(profile_id: str, demo_session_id: str, data: dict) -
 def reset_all_demo_data() -> dict:
     """Wipe all demo-created applications and related data. Preserves seeded data."""
     db = _get_db()
+    # Single predicate for "non-seed app" — used for both the find and the final
+    # delete so they can't drift out of sync.
+    seed_ids = list(SEED_APPLICATION_IDS.values())
+    non_seed_filter = {"seed_complete": {"$ne": True}, "application_id": {"$nin": seed_ids}}
     demo_apps = list(db["applications"].find(
-        {"seed_complete": {"$ne": True}},
+        non_seed_filter,
         {"application_id": 1, "borrower_ids": 1},
     ))
     if not demo_apps:
@@ -369,7 +373,7 @@ def reset_all_demo_data() -> dict:
         br_del = db["borrowers"].delete_many({"_id": {"$in": borrower_ids}})
         cr_del_count = cr_del.deleted_count
         br_del_count = br_del.deleted_count
-    result = db["applications"].delete_many({"seed_complete": {"$ne": True}})
+    result = db["applications"].delete_many(non_seed_filter)
     logger.info(f"Reset demo: deleted {result.deleted_count} applications, {docs_del.deleted_count} documents, {convs_del.deleted_count} conversations, {intv_del.deleted_count} interventions")
     return {
         "deleted_applications": result.deleted_count,
