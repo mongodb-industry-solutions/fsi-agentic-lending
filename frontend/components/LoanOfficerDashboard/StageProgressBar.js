@@ -1,6 +1,14 @@
 import { WORKFLOW_STAGES } from './constants';
 
 export function StageProgressBar({ stage, hitlReached, approved, approvalDetails, stageTimestamps }) {
+  // When approved, force-render all stages complete. Otherwise clamp to valid range.
+  // `stage = -1` is the preview sentinel — allow it through unchanged so no stage lights up.
+  const effectiveStage = approved
+    ? WORKFLOW_STAGES.length - 1
+    : stage === -1
+      ? -1
+      : Math.max(0, Math.min(stage, WORKFLOW_STAGES.length - 1));
+
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 0,
@@ -9,10 +17,10 @@ export function StageProgressBar({ stage, hitlReached, approved, approvalDetails
       background: 'var(--bg-base)',
     }}>
       {WORKFLOW_STAGES.map((ws, i) => {
-        const isComplete = i < stage || (i === stage && (approved || (i === 2 && hitlReached)));
-        const isCurrent = i === stage && !approved && !(i === 2 && hitlReached);
+        const isComplete = i < effectiveStage || (i === effectiveStage && (approved || (i === 2 && hitlReached)));
+        const isCurrent = i === effectiveStage && !approved && !(i === 2 && hitlReached);
         const isHitlWaiting = i === 2 && hitlReached && !approved;
-        const isFuture = i > stage;
+        const isFuture = i > effectiveStage;
         const isDeclined = approved && approvalDetails?.mode === 'declined';
 
         let nodeColor = 'var(--border-dim)';

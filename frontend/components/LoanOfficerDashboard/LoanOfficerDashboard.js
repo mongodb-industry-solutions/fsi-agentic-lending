@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
-import Modal from '@leafygreen-ui/modal';
 import ApplicationQueue from './ApplicationQueue';
 import AgentActivityLog from './AgentActivityLog';
 import IntentPreview from './IntentPreview';
@@ -105,7 +104,6 @@ export default function LoanOfficerDashboard({ active = true }) {
   const [lastCorrelatedEvent, setLastCorrelatedEvent] = useState(null);
   const [agentStats, setAgentStats] = useState({ totalReceived: 0 });
   const [canvasHighlightNode, setCanvasHighlightNode] = useState(null);
-  const [showWorkflowModal, setShowWorkflowModal] = useState(false);
   const highlightTimerRef = useRef(null);
 
   // Cleanup highlight timer on unmount
@@ -130,6 +128,9 @@ export default function LoanOfficerDashboard({ active = true }) {
     handleApprove,
     handleDecline,
     handleAgentEvent,
+    activityEvents,
+    streamConnected,
+    streamError,
   } = useLoanOfficerWorkflow(addToast, active);
 
   const selectedAppData = liveApplications.find((a) => a.application_id === selectedApp);
@@ -246,142 +247,146 @@ export default function LoanOfficerDashboard({ active = true }) {
             />
           )}
 
-          {/* Intent Preview (pre-action) */}
-          {selectedApp && workflowPhase === 'preview' && (
-            <div style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '60vh' }}>
+          {/* Main scrollable content region */}
+          {selectedApp && workflowPhase === 'preview' ? (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto', background: 'var(--bg-base)' }}>
               {selectedAppDetail && (
                 <ApplicationDetail appDetail={selectedAppDetail} />
               )}
+              {/* Inline rail-mode canvas preview */}
+              <div style={{
+                position: 'relative',
+                height: 280,
+                margin: `${spacing[3]}px`,
+                borderRadius: 8,
+                border: '1px solid var(--border-dim)',
+                background: 'var(--bg-surface)',
+                overflow: 'hidden',
+                flexShrink: 0,
+              }}>
+                <WorkflowCanvas
+                  fit="rail"
+                  activeNodes={[]}
+                  activeEdges={[]}
+                  pulsingNodes={[]}
+                  currentScene="origination"
+                  highlightNode={canvasHighlightNode}
+                  liveAgentOutput={liveAgentOutput}
+                  hitlActive={false}
+                  hitlStartTime={null}
+                  hitlResolution={null}
+                  hitlResolutionTime={null}
+                />
+              </div>
               <div style={{ padding: spacing[3] }}>
                 <IntentPreview applicationId={selectedApp} onProceed={handleProceed} onManual={handleManual} />
               </div>
             </div>
-          )}
-
-          {/* Workflow status bar + modal */}
-          {selectedApp && (workflowPhase === 'executing' || workflowPhase === 'preview') ? (
-            <>
+          ) : selectedApp && workflowPhase === 'executing' ? (() => {
+            // When there's no HITL card and no DecisionSummary below, let the
+            // canvas flex-fill the region so we don't leave a dead band of
+            // empty surface mid-pipeline. When either is present, the canvas
+            // takes its natural height and the panel below scrolls.
+            const hasPanelBelow = (hitlReached && !approved) || approved;
+            return (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto', background: 'var(--bg-base)' }}>
+              {/* Inline rail-mode canvas — syncs to workflowStage */}
               <div style={{
-                padding: '10px 14px',
-                borderBottom: '1px solid var(--border-dim)',
-                background: 'var(--bg-base)',
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                position: 'relative',
+                height: hasPanelBelow ? 320 : undefined,
+                minHeight: 320,
+                flex: hasPanelBelow ? '0 0 auto' : 1,
+                margin: `${spacing[2]}px ${spacing[3]}px`,
+                borderRadius: 8,
+                border: '1px solid var(--border-dim)',
+                background: 'var(--bg-surface)',
+                overflow: 'hidden',
+                flexShrink: 0,
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {workflowPhase === 'executing' && !approved && (
-                    <div style={{
-                      width: 7, height: 7, borderRadius: '50%',
-                      background: hitlReached ? 'var(--hitl-amber)' : 'var(--agent-cyan)',
-                      boxShadow: `0 0 6px ${hitlReached ? 'var(--hitl-amber)' : 'var(--agent-cyan)'}`,
-                      animation: 'pulse 1.5s infinite', flexShrink: 0,
-                    }} />
-                  )}
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
-                    {workflowPhase === 'preview'
-                      ? 'Execution Plan'
-                      : hitlReached
-                        ? 'HITL Gate — Awaiting Decision'
-                        : `Stage: ${currentWorkflow.label}`
-                    }
+                <WorkflowCanvas
+                  fit="rail"
+                  activeNodes={currentWorkflow.activeNodes}
+                  activeEdges={currentWorkflow.activeEdges}
+                  pulsingNodes={hitlReached ? ['hitlGate'] : currentWorkflow.pulsingNodes}
+                  currentScene={currentWorkflow.currentScene}
+                  highlightNode={canvasHighlightNode}
+                  liveAgentOutput={liveAgentOutput}
+                  hitlActive={hitlReached && !approved}
+                  hitlStartTime={hitlStartTime}
+                  hitlResolution={approved && hitlReached ? (approvalDetails?.mode === 'declined' ? 'declined' : 'approved') : null}
+                  hitlResolutionTime={hitlResolutionTime}
+                />
+                <PolicyBoundsIndicator exceeded={hitlReached} />
+                <LiveUnderwritingResults data={liveAgentOutput} />
+                {/* Caption bar */}
+                <div style={{
+                  position: 'absolute', bottom: 8, left: 8, right: 8,
+                  padding: '6px 10px',
+                  background: 'var(--bg-overlay-alpha)',
+                  backdropFilter: 'blur(8px)',
+                  borderRadius: 6,
+                  border: '1px solid var(--border-dim)',
+                  fontSize: 10,
+                  color: 'var(--text-secondary)',
+                  display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+                }}>
+                  <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {hitlReached ? 'HITL Gate' : `Stage: ${currentWorkflow.label}`}
                   </span>
-                  {workflowPhase === 'executing' && (() => {
+                  {(() => {
                     const parts = [];
                     if (liveAgentOutput.primary_credit_score) parts.push(`Credit ${liveAgentOutput.primary_credit_score}`);
                     if (liveAgentOutput.document_count) parts.push(`${liveAgentOutput.document_count} docs`);
                     if (liveAgentOutput.risk_score != null) parts.push(`Risk ${liveAgentOutput.risk_score}/100`);
                     if (liveAgentOutput.gds_ratio != null) parts.push(`GDS ${(liveAgentOutput.gds_ratio * 100).toFixed(1)}%`);
                     return parts.length > 0 ? (
-                      <span style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-                        {parts.join(' \u00b7 ')}
-                      </span>
+                      <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>{parts.join(' \u00b7 ')}</span>
                     ) : null;
                   })()}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowWorkflowModal(true)}
-                  style={{
-                    padding: '4px 12px', borderRadius: 6,
-                    border: '1px solid var(--border-base)',
-                    background: 'var(--bg-surface)',
-                    color: 'var(--text-secondary)',
-                    fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-display)',
-                    cursor: 'pointer',
-                    transition: 'all var(--transition-fast)',
-                  }}
-                >
-                  View Workflow
-                </button>
               </div>
 
-              {/* Workflow Canvas Modal */}
-              <Modal
-                open={showWorkflowModal}
-                setOpen={setShowWorkflowModal}
-                size="large"
-              >
-                {showWorkflowModal && <div style={{ position: 'relative', height: '70vh', minHeight: 400 }}>
-                  <WorkflowCanvas
-                    activeNodes={workflowPhase === 'preview' ? [] : currentWorkflow.activeNodes}
-                    activeEdges={workflowPhase === 'preview' ? [] : currentWorkflow.activeEdges}
-                    pulsingNodes={workflowPhase === 'preview' ? [] : hitlReached ? ['hitlGate'] : currentWorkflow.pulsingNodes}
-                    currentScene={workflowPhase === 'preview' ? 'origination' : currentWorkflow.currentScene}
-                    highlightNode={canvasHighlightNode}
+              {/* HITL Review panel — inside scroll container, no maxHeight clip */}
+              {hitlReached && !approved && (
+                <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)' }}>
+                  <HITLReviewCard
+                    applicationId={selectedApp}
+                    appDetail={selectedAppDetail}
+                    queueData={selectedAppData}
+                    onApprove={handleApprove}
+                    onDecline={handleDecline}
+                    addToast={addToast}
                     liveAgentOutput={liveAgentOutput}
-                    hitlActive={hitlReached && !approved}
-                    hitlStartTime={hitlStartTime}
-                    hitlResolution={approved && hitlReached ? (approvalDetails?.mode === 'declined' ? 'declined' : 'approved') : null}
-                    hitlResolutionTime={hitlResolutionTime}
                   />
+                </div>
+              )}
 
-                  {workflowPhase === 'executing' && (
-                    <PolicyBoundsIndicator exceeded={hitlReached} />
-                  )}
-
-                  {workflowPhase === 'executing' && (
-                    <LiveUnderwritingResults data={liveAgentOutput} />
-                  )}
-
-                  <div style={{
-                    position: 'absolute', bottom: 12, left: 12, right: 12,
-                    padding: '10px 14px',
-                    background: 'var(--bg-overlay-alpha)',
-                    backdropFilter: 'blur(8px)',
-                    borderRadius: 8,
-                    border: '1px solid var(--border-dim)',
-                    fontSize: 11,
-                    color: 'var(--text-secondary)',
-                  }}>
-                    <span style={{ fontWeight: 700, color: 'var(--text-primary)', marginRight: 6 }}>
-                      {workflowPhase === 'preview'
-                        ? 'Execution Plan'
-                        : hitlReached
-                          ? 'HITL Gate'
-                          : `Stage: ${currentWorkflow.label}`
-                      }
-                    </span>
-                    {workflowPhase === 'preview'
-                      ? 'Agent has generated an execution plan. Review and approve above to begin processing.'
-                      : hitlReached && !approved
-                        ? 'Agent workflow paused. All state persisted to MongoDB via MongoDBSaver. Awaiting officer decision.'
-                        : approved
-                          ? 'Decision recorded. Workflow resuming from checkpoint.'
-                          : `Agents are processing this application through the ${currentWorkflow.label.toLowerCase()} stage.`
-                    }
-                  </div>
-                </div>}
-              </Modal>
-            </>
-          ) : selectedApp && workflowPhase === 'manual' ? (
+              {/* Decision Summary */}
+              {approved && (
+                <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)' }}>
+                  <DecisionSummary
+                    applicationId={selectedApp}
+                    appDetail={selectedAppDetail}
+                    approvalDetails={approvalDetails}
+                    appName={appName}
+                    onClose={() => setSelectedApp(null)}
+                  />
+                </div>
+              )}
+            </div>
+            );
+          })() : selectedApp && workflowPhase === 'manual' ? (
             <div style={{ flex: 1, overflow: 'hidden' }}>
               <ManualWorkspace appDetail={selectedAppDetail} queueData={selectedAppData} onApprove={handleApprove} onDecline={handleDecline} addToast={addToast} />
             </div>
           ) : !selectedApp ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: spacing[4], flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: spacing[4], flex: 1, minHeight: 0, overflowY: 'auto' }}>
               <div style={{
-                padding: spacing[4], maxWidth: 560,
+                padding: spacing[4], maxWidth: 720, width: '100%',
                 border: '1px solid var(--border-dim)', borderRadius: 12,
                 background: 'var(--bg-surface)',
+                display: 'flex', flexDirection: 'column',
+                marginTop: spacing[3],
               }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15, color: 'var(--text-primary)', marginBottom: 4 }}>
                   Agentic Lending Pipeline
@@ -483,34 +488,6 @@ export default function LoanOfficerDashboard({ active = true }) {
               </div>
             </div>
           ) : null}
-
-          {/* HITL Review panel */}
-          {selectedApp && hitlReached && !approved && (
-            <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '40vh' }}>
-              <HITLReviewCard
-                applicationId={selectedApp}
-                appDetail={selectedAppDetail}
-                queueData={selectedAppData}
-                onApprove={handleApprove}
-                onDecline={handleDecline}
-                addToast={addToast}
-                liveAgentOutput={liveAgentOutput}
-              />
-            </div>
-          )}
-
-          {/* Decision Summary */}
-          {selectedApp && approved && (
-            <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)', background: 'var(--bg-base)', overflowY: 'auto', maxHeight: '40vh' }}>
-              <DecisionSummary
-                applicationId={selectedApp}
-                appDetail={selectedAppDetail}
-                approvalDetails={approvalDetails}
-                appName={appName}
-                onClose={() => setSelectedApp(null)}
-              />
-            </div>
-          )}
         </div>
 
         {/* Agent Rail — "What the AI is doing" */}
@@ -548,6 +525,9 @@ export default function LoanOfficerDashboard({ active = true }) {
             onStatsChange={setAgentStats}
             hitlReached={hitlReached && !approved}
             liveAgentOutput={liveAgentOutput}
+            activityEvents={activityEvents}
+            streamConnected={streamConnected}
+            streamError={streamError}
           />
           <PolicyExplorer autoQuery={hitlReached && !approved ? 'GDS TDS stress test mortgage thresholds' : ''} />
           <PortfolioIntelligence />
@@ -558,6 +538,8 @@ export default function LoanOfficerDashboard({ active = true }) {
           applicationId={selectedApp}
           liveAgentOutput={liveAgentOutput}
           lastCorrelatedEvent={lastCorrelatedEvent}
+          activityEvents={activityEvents}
+          streamConnected={streamConnected}
         />
       </div>
 

@@ -86,7 +86,7 @@ function TechRailHeader({ onCollapse }) {
   );
 }
 
-export default function TechRail({ applicationId, liveAgentOutput, lastCorrelatedEvent }) {
+export default function TechRail({ applicationId, liveAgentOutput, lastCorrelatedEvent, activityEvents, streamConnected }) {
   const [expanded, setExpanded] = useState(true);
   const [pipelineExpanded, setPipelineExpanded] = useState(false);
   const [docModelExpanded, setDocModelExpanded] = useState(false);
@@ -115,6 +115,8 @@ export default function TechRail({ applicationId, liveAgentOutput, lastCorrelate
         <OfficerChangeStreamConsole
           applicationId={applicationId}
           lastCorrelatedEvent={lastCorrelatedEvent}
+          activityEvents={activityEvents}
+          streamConnected={streamConnected}
         />
       </div>
 

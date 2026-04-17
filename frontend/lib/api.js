@@ -174,27 +174,59 @@ export function apiWebSocket(path, { onMessage, onError, onClose, reconnect = tr
   };
 }
 
-export function apiSSE(path, onEvent, onError, { maxRetries = 5 } = {}) {
+/**
+ * Server-Sent Events client.
+ *
+ * Signature (new):   apiSSE(path, onEvent, { onConnect, onError, onClose, maxRetries, autoCloseOn })
+ * Signature (legacy): apiSSE(path, onEvent, onErrorFn, { maxRetries })
+ *
+ * - `autoCloseOn` is the list of event `type` values that cause the stream to close
+ *   after delivery. Defaults to ['complete', 'error']. NOTE: `hitl_waiting` is NOT
+ *   in the default list — the activity stream must stay open through HITL so the
+ *   Activity Log continues to receive events while the officer is reviewing.
+ * - `onConnect` is called once when the first event (any event) arrives.
+ * - `onClose` is called when the stream gives up retrying.
+ */
+export function apiSSE(path, onEvent, onErrorOrOpts, legacyOpts = {}) {
+  const isOptsObj = onErrorOrOpts && typeof onErrorOrOpts === 'object';
+  const onError = typeof onErrorOrOpts === 'function' ? onErrorOrOpts : (isOptsObj ? onErrorOrOpts.onError : null);
+  const onConnect = isOptsObj ? onErrorOrOpts.onConnect : null;
+  const onClose = isOptsObj ? onErrorOrOpts.onClose : null;
+  const maxRetries = (isOptsObj ? onErrorOrOpts.maxRetries : null) ?? legacyOpts.maxRetries ?? 5;
+  const autoCloseOn = new Set(
+    (isOptsObj && onErrorOrOpts.autoCloseOn) || ['complete', 'error']
+  );
+
   const url = `${API_BASE}${path}`;
   let source = null;
   let lastEventId = null;
   let retries = 0;
   let closed = false;
+  let connected = false;
 
   function connect() {
     if (closed) return;
     const connectUrl = lastEventId ? `${url}${url.includes('?') ? '&' : '?'}after=${encodeURIComponent(lastEventId)}` : url;
     source = new EventSource(connectUrl);
 
+    source.onopen = () => {
+      // Reset retry count on successful open; onConnect fires on first message below
+      retries = 0;
+    };
+
     source.onmessage = (event) => {
       retries = 0;
       if (event.lastEventId) lastEventId = event.lastEventId;
+      if (!connected) {
+        connected = true;
+        if (onConnect) { try { onConnect(); } catch (_) {} }
+      }
       try {
         const data = JSON.parse(event.data);
         onEvent(data);
-        if (data.type === 'complete' || data.type === 'error' || data.type === 'hitl_waiting') {
-          source.close();
+        if (data?.type && autoCloseOn.has(data.type)) {
           closed = true;
+          source.close();
         }
       } catch (err) {
         console.warn('[LendFlow SSE] Parse error:', err);
@@ -205,21 +237,21 @@ export function apiSSE(path, onEvent, onError, { maxRetries = 5 } = {}) {
       console.warn('[LendFlow SSE] Connection error:', err);
       const readyState = source.readyState;
       source.close();
-      if (closed) return;
+      if (closed) { if (onClose) onClose(); return; }
       // readyState CLOSED before our close() means the connection was rejected or dropped;
-      // this covers 4xx errors and permanent failures — skip retry to avoid futile loops
-      if (readyState === EventSource.CLOSED) {
-        console.warn('[LendFlow SSE] Connection closed by server/network, not retrying');
-        if (onError) onError(err);
-        return;
-      }
+      // surface the error but also retry (the activity stream needs to survive transient
+      // failures like a brief backend restart). Only give up after maxRetries.
+      if (onError) { try { onError(err); } catch (_) {} }
       if (retries < maxRetries) {
         retries++;
-        const delay = Math.min(1000 * Math.pow(2, retries - 1), 15000);
+        // Longer backoff when the server actively closed — likely 4xx or cold backend.
+        const base = readyState === EventSource.CLOSED ? 2000 : 1000;
+        const delay = Math.min(base * Math.pow(2, retries - 1), 15000);
         console.info(`[LendFlow SSE] Reconnecting in ${delay}ms (attempt ${retries}/${maxRetries})`);
         setTimeout(connect, delay);
       } else {
-        if (onError) onError(err);
+        closed = true;
+        if (onClose) { try { onClose(); } catch (_) {} }
       }
     };
   }

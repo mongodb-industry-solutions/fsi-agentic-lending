@@ -206,7 +206,6 @@ End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangG
 | **Change Streams**        | Real-time WebSocket queue + SSE status/activity feeds, labeled in UI                                                              | A     |
 | **Time Series**           | Payment history with $setWindowFields (rolling 90-day analysis), EWS signals                                                      | A-    |
 | **MongoDBSaver**          | LangGraph checkpoint persistence for HITL interrupt/resume across restarts                                                        | A     |
-| **$graphLookup**          | Fraud network visualization (visual demo in Underwriting Scene)                                                                    | B     |
 
 ## Tech Stack
 
@@ -276,12 +275,19 @@ Context-aware conversational assistant with **Generative UI** — the agent rend
   - **ScenarioComparison** — side-by-side what-if with diff highlighting
   - **ClosingTimeline** — post-approval 4-step timeline
 - **Architecture** — Backend detects components via keyword matching (`UI_TRIGGERS`) with status gates, emits `ui_component` SSE events with structured data, frontend maps to React via `ComponentRegistry`. LLM context injection tells the model which visuals are shown so text complements rather than duplicates.
+- **Unified capability catalog** — single `COMPONENTS_CATALOG` (in `chatConstants.js`) drives welcome tiles, capability bar, capabilities panel, pre-render announcement and trigger keywords. Adding a component is one catalog entry.
+- **WelcomeCard** — first-message greeting surface with capability tiles (varies for pre-app vs. submitted app), dismissible.
+- **Capability Bar** — CSS-grid quick-action tiles with mini SVG icons; newly-unlocked actions animate in (`capabilityUnlock`) as status progresses.
+- **Typing-ahead suggestions** — debounced 120ms ranked matcher (`getTypeAheadSuggestions`) surfaces best-matching catalog entries as you type.
+- **Proactive "Try" pills** — when the last assistant message references a capability but didn't render it, a suggestion pill invites the borrower to open that component (`getProactiveComponentSuggestion`).
+- **Stop button** — send button swaps to Stop while streaming; `abort()` cancels in-flight request via AbortController.
+- **Component Announcement** — pre-render strip fades/morphs into the inline component using the `announcementMorph` keyframe.
 - **Stage-aware prompt** — response tone and content calibrated by application status (pre-submission, processing, underwriting, review, approved, declined)
 - **Tool transparency** — per-tool latency, result counts, source badges ("Your application", "Lending policies"), expandable reasoning disclosure
-- **Quick action pills** — context-aware buttons (Calculator, Documents, Rates) that trigger generative UI
 - **Context strip** — persistent bar showing borrower name, app ID, status, mortgage amount
 - **Proactive system messages** — status change notifications injected as centered banners
-- Streaming markdown responses via SSE, intervention cards with document upload, policy RAG citations, conversation persistence, safety filter, floating pre-application drawer
+- **Categorized suggested questions** — `{text, category}` pills with progressive decay (3 → 2 → 1 as conversation grows); intervention-driven questions persist
+- Streaming markdown responses via SSE (fenced code blocks + safe `[text](url)` links), intervention cards with document upload, policy RAG citations, conversation persistence, safety filter
 
 ### Officer Overrides (HITL)
 
@@ -318,7 +324,7 @@ Phase-based flow: **profile selection → application form → real-time trackin
 - **Application Form** — co-applicant fields, amortization calculator, validation with LeafyGreen `TextInput`.
 - **Status Tracker** — SSE-driven 10-stage timeline with live ThinkingStrip, confidence badges, metric reveals.
 - **Outcome Cards** — ApprovalContextCard ("Why This Was Approved"), DeclineCard (structured reasons + actionable guidance), SavingsSummary (animated count-up metrics), approval details with closing timeline.
-- **AI Chat with Generative UI** — streaming markdown with inline interactive components (affordability calculator, document checklist, rate comparison, payment schedule, application strength, scenario comparison, closing timeline). Tool transparency with per-tool timing, source badges, reasoning disclosure. Quick action pills, context strip, proactive status notifications. Policy RAG citations, intervention cards with document upload. Floating pre-application drawer.
+- **AI Chat with Generative UI** — streaming markdown with inline interactive components (affordability calculator, document checklist, rate comparison, payment schedule, application strength, scenario comparison, closing timeline). Unified `COMPONENTS_CATALOG` drives welcome tiles, capability bar, capabilities popover and trigger keywords. WelcomeCard, typing-ahead suggestions, proactive "Try" pills, Stop/abort, component pre-announcement morph. Tool transparency with per-tool timing, source badges, reasoning disclosure. Context strip, proactive status notifications. Policy RAG citations, intervention cards with document upload.
 - **Technology Theatre** — collapsible "glass floor" with Change Stream console, Document Model viewer, AI Capabilities panel (tool cards glow when invoked).
 
 ### 2. Loan Officer Dashboard
@@ -327,13 +333,14 @@ Full-featured officer workspace with real-time data flows and human-in-the-loop 
 
 - **Application Queue** — real-time via WebSocket + Change Stream, filterable and sortable, amber accent on review-needed apps.
 - **Application Detail** — borrower info, risk assessment, credit reports, documents. Includes **Pipeline Explorer** (7-stage aggregation viz) and **Document Search** (Atlas Vector Search).
-- **Workflow Canvas** — Canvas 2D engine (21 nodes, 5 shape types) with multi-particle comet trails, layered glow, rich tooltips with technology context. HITL drama: amber barrier line, particle freeze, downstream dimming, resolution pulse.
+- **Compact Status Bar + Workflow Modal** — single-line stage/pulse/metrics strip with a "View Workflow" action that opens the full **Workflow Canvas** (Canvas 2D engine, parallel `doc_verifier`/`credit_puller` nodes, comet trails, HITL barrier drama) in a LeafyGreen Modal.
+- **Empty-state Architecture Card** — when no application is selected, a 3-column (Origination / Underwriting / Decision) card lists each stage's agents with capability badges.
 - **Live Underwriting Results** — real-time metrics overlay (risk score, GDS/TDS, credit score, stress test).
-- **Agent Activity Log** — SSE feed with color-coded left-borders by action type, metric summary strip, HITL gate entry, agent transition dividers, pause/resume.
+- **Agent Activity Log** — SSE feed with color-coded left-borders by action type, noise-action filter, deferred status-gated REST fallback, multi-line markdown-aware reasoning, metric summary strip, HITL gate entry, agent transition dividers, pause/resume.
 - **Policy Explorer** — Atlas Vector Search with relevance bars, search provenance, term highlighting, HITL auto-search.
 - **Portfolio Intelligence** — Payment trends (SVG trend line), severity-tiered EWS cards, events timeline.
-- **Intent Preview** — agent's planned execution steps with dependency connectors and data readiness badges.
-- **HITL Review** — risk metrics from LangGraph checkpoint, approve/decline/modify with officer overrides and re-underwriting.
+- **Intent Preview** — agent's planned execution steps with dependency connectors and data readiness badges, aligned to the real pipeline (doc verify, credit pull, synthesis, risk score, policy RAG, decision gate).
+- **HITL Review** — risk metrics from LangGraph checkpoint, explicit **Threshold Analysis** panel (price / effective GDS / effective TDS / risk tier vs. policy limits), approve/decline/modify with officer overrides and re-underwriting. GDS/TDS limits centralized in `LoanOfficerDashboard/utils.js` (`GDS_LIMIT`, `TDS_LIMIT`).
 - **Decision Summary** — provenance chain, audit trail, before/after comparison for modified decisions.
 - **Agent Rail** (320px) — branded "AI Agent Layer" header with live pulse and stats, cyan-to-amber border on HITL. Agent events highlight corresponding canvas nodes.
 - **Tech Rail** (340px, collapsible) — Change Stream console (ops/sec, cross-rail correlation), Aggregation Pipeline visualizer, Document Model inspector.
@@ -347,11 +354,11 @@ Full-featured officer workspace with real-time data flows and human-in-the-loop 
 - **AnnotationOverlay** — compact step annotation bar with progress dots, agent name, clickable capability badges with educational popovers, collapsible reasoning text.
 - **PipelineDrawer** — slide-out activity log (right edge toggle, Escape to close, `aria-expanded`).
 - **Origination** — multi-document extraction (CRA Notice, Bank Statement, Pay Stub) with progressive field reveal, tab switcher with aggregate confidence Badges, Open Banking headline metrics.
-- **Underwriting** — risk ring SVG gauge, top-5 factor bars with positive/negative layout, counterfactual explainer, fraud network visualization via `$graphLookup` with FraudGraph takeover.
+- **Underwriting** — risk ring SVG gauge, top-5 factor bars with positive/negative layout, counterfactual explainer, policy-RAG citations panel.
 - **Approval** — HITL review card with Badge-based tier indicator, Approve/Modify/Decline controls, collapsible Repayment Schedule and Regulatory Disclosures.
 - **Closing** — closing timeline with workflow canvas: approval detection, closing package (TILA, RESPA), compliance checks, e-sign completion.
 - **Funding** — disbursement timeline with 4-step document evolution, double-entry accounting table.
-- **Servicing** — portfolio stats grid, top-3 Early Warning System signals, live event feed, 4-step renewal intervention card. Real-time data from `/portfolio/stats`.
+- **Servicing** — portfolio stats grid, top-3 Early Warning System signals, live event feed, 4-step renewal intervention card. Real-time data from `/portfolio/stats`. Focus nodes: `timeSeries`, `changeStream`, `vectorSearch`, `mongoAtlas` (servicingAgent node retired from canvas).
 - **Completion Screen** — full WorkflowCanvas with all nodes completed (green edges, checkmarks), `TechRecap` card with 5 collapsible sections (Performance Stats, Tech Stack, Cross-Lifecycle Intelligence, By the Numbers).
 
 ## Demo Borrower Profiles

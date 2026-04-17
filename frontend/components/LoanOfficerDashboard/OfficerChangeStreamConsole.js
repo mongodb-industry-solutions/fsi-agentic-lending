@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import { apiSSE } from '../../lib/api';
 
@@ -13,28 +13,43 @@ const OP_COLORS = {
 
 const COLLECTION_FILTERS = ['All', 'applications', 'documents', 'agent_activity', 'interventions'];
 
-function synthesizeEvent(sseEvent) {
-  const ts = sseEvent.timestamp || new Date().toISOString();
-  const base = { id: `cs-${Date.now()}-${Math.random()}`, timestamp: ts };
+function synthesizeFromActivityEvent(evt) {
+  const ts = evt._ts ? new Date(evt._ts).toISOString() : new Date().toISOString();
+  const base = { id: `cs-${evt.id || `${Date.now()}-${Math.random()}`}`, timestamp: ts };
 
-  if (sseEvent.type === 'status' || sseEvent.status) {
-    return { ...base, operation: 'UPDATE', collection: 'applications', summary: `status: "${sseEvent.status}"`, detail: 'updatedFields.status' };
+  if (evt.kind === 'activity' || !evt.kind) {
+    return { ...base, operation: 'INSERT', collection: 'agent_activity',
+      summary: `${evt.agent || 'agent'} / ${evt.action || 'step'}`,
+      detail: evt.reasoning || evt.detail || '' };
   }
-  if (sseEvent.type === 'agent_step') {
-    return { ...base, operation: 'INSERT', collection: 'agent_activity', summary: `${sseEvent.agent || 'agent'} / ${sseEvent.action || 'step'}`, detail: sseEvent.detail || '' };
+  if (evt.kind === 'node_start') {
+    return { ...base, operation: 'UPDATE', collection: 'applications',
+      summary: `node_start: ${evt.agent || 'node'}`, detail: '' };
   }
-  if (sseEvent.type === 'node_start') {
-    return { ...base, operation: 'UPDATE', collection: 'applications', summary: `node_start: ${sseEvent.agent || sseEvent.name || 'node'}`, detail: '' };
+  if (evt.kind === 'node_complete') {
+    const fields = evt.output ? Object.keys(evt.output).slice(0, 4).join(', ') : '';
+    return { ...base, operation: 'UPDATE', collection: 'applications',
+      summary: `node_complete: ${evt.agent || 'node'}`,
+      detail: fields ? `fields: ${fields}` : '' };
   }
-  if (sseEvent.type === 'node_complete') {
-    const fields = sseEvent.output ? Object.keys(sseEvent.output).slice(0, 4).join(', ') : '';
-    return { ...base, operation: 'UPDATE', collection: 'applications', summary: `node_complete: ${sseEvent.agent || 'node'}`, detail: fields ? `fields: ${fields}` : '' };
+  if (evt.kind === 'hitl') {
+    return { ...base, operation: 'INSERT', collection: 'interventions',
+      summary: 'HITL gate — awaiting officer decision',
+      detail: 'status: "pending"' };
   }
-  if (sseEvent.type === 'hitl_waiting') {
-    return { ...base, operation: 'INSERT', collection: 'interventions', summary: 'HITL gate — awaiting officer decision', detail: 'status: "pending"' };
+  if (evt.kind === 'complete') {
+    return { ...base, operation: 'UPDATE', collection: 'applications',
+      summary: 'Pipeline complete', detail: '' };
   }
-  if (sseEvent.type === 'complete') {
-    return { ...base, operation: 'UPDATE', collection: 'applications', summary: 'Pipeline complete', detail: '' };
+  return null;
+}
+
+function synthesizeStatusEvent(sseEvent) {
+  const ts = sseEvent.timestamp || new Date().toISOString();
+  const base = { id: `cs-status-${Date.now()}-${Math.random()}`, timestamp: ts };
+  if (sseEvent.type === 'status' && sseEvent.status) {
+    return { ...base, operation: 'UPDATE', collection: 'applications',
+      summary: `status: "${sseEvent.status}"`, detail: 'updatedFields.status' };
   }
   return null;
 }
@@ -47,19 +62,69 @@ function formatTs(ts) {
   } catch { return '\u2014'; }
 }
 
-export default function OfficerChangeStreamConsole({ applicationId, lastCorrelatedEvent }) {
-  const [events, setEvents] = useState([]);
+const MAX_DISPLAY = 60;
+
+/**
+ * Change Stream Console — renders change events derived from the hoisted
+ * activity stream (no separate SSE to /agent/{id}/stream). Also opens a thin
+ * SSE to /applications/{id}/status so status transitions show up here even
+ * if they're driven by HITL / queue actions rather than the pipeline.
+ */
+export default function OfficerChangeStreamConsole({
+  applicationId,
+  lastCorrelatedEvent,
+  activityEvents = [],
+  streamConnected = false,
+}) {
   const [paused, setPaused] = useState(false);
   const [filter, setFilter] = useState('All');
-  const [connected, setConnected] = useState(false);
-  const pausedRef = useRef(false);
-  const bufferRef = useRef([]);
-  const [bufferCount, setBufferCount] = useState(0);
+  const [statusEvents, setStatusEvents] = useState([]);
+  const [clearedBefore, setClearedBefore] = useState(0);
+  const [frozenAt, setFrozenAt] = useState(null);
   const eventTimesRef = useRef([]);
+  const lastAppIdRef = useRef(null);
 
-  pausedRef.current = paused;
+  // Reset on app change
+  useEffect(() => {
+    if (lastAppIdRef.current !== applicationId) {
+      lastAppIdRef.current = applicationId;
+      setStatusEvents([]);
+      setClearedBefore(0);
+      setFrozenAt(null);
+      eventTimesRef.current = [];
+    }
+  }, [applicationId]);
 
-  // Ops/sec counter
+  // Status SSE — light, emits a single UPDATE row per status change
+  useEffect(() => {
+    if (!applicationId) return;
+    const handle = apiSSE(
+      `/applications/${applicationId}/status`,
+      (sseEvent) => {
+        const synth = synthesizeStatusEvent(sseEvent);
+        if (synth) {
+          eventTimesRef.current.push(Date.now());
+          setStatusEvents((prev) => [synth, ...prev].slice(0, 50));
+        }
+      },
+      { autoCloseOn: ['error'] },
+    );
+    return () => handle?.close();
+  }, [applicationId]);
+
+  // Merge activity-derived events + status events
+  const allEvents = useMemo(() => {
+    const activityDerived = [];
+    for (const evt of activityEvents) {
+      const synth = synthesizeFromActivityEvent(evt);
+      if (synth) activityDerived.push(synth);
+    }
+    const merged = [...activityDerived, ...statusEvents];
+    merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return merged.filter((e) => new Date(e.timestamp).getTime() > clearedBefore);
+  }, [activityEvents, statusEvents, clearedBefore]);
+
+  // Ops/sec rolling 5-second window
   const [opsPerSec, setOpsPerSec] = useState(0);
   useEffect(() => {
     const interval = setInterval(() => {
@@ -70,69 +135,39 @@ export default function OfficerChangeStreamConsole({ applicationId, lastCorrelat
     return () => clearInterval(interval);
   }, []);
 
-  const addEvent = useCallback((evt) => {
-    if (!evt) return;
-    eventTimesRef.current.push(Date.now());
-    if (pausedRef.current) {
-      bufferRef.current = [evt, ...bufferRef.current].slice(0, 50);
-      setBufferCount(bufferRef.current.length);
-    } else {
-      setEvents((prev) => [evt, ...prev].slice(0, 50));
-    }
-  }, []);
-
-  const handleResume = useCallback(() => {
-    setPaused(false);
-    const buffered = bufferRef.current;
-    bufferRef.current = [];
-    setBufferCount(0);
-    setEvents((prev) => [...buffered, ...prev].slice(0, 50));
-  }, []);
-
+  // Track activity event arrivals in ops/sec
+  const activityCountRef = useRef(0);
   useEffect(() => {
-    if (!applicationId) { setEvents([]); setConnected(false); return; }
-    setEvents([]);
-    setConnected(false);
+    const next = activityEvents.length;
+    const delta = next - activityCountRef.current;
+    const now = Date.now();
+    for (let i = 0; i < delta; i++) eventTimesRef.current.push(now);
+    activityCountRef.current = next;
+  }, [activityEvents.length]);
 
-    let gotFirstEvent = false;
-    const markConnected = () => { if (!gotFirstEvent) { gotFirstEvent = true; setConnected(true); } };
+  const displayed = useMemo(() => {
+    const base = paused && frozenAt != null
+      ? allEvents.filter((e) => new Date(e.timestamp).getTime() <= frozenAt)
+      : allEvents;
+    const capped = base.slice(0, MAX_DISPLAY);
+    if (filter === 'All') return capped;
+    return capped.filter((e) => e.collection === filter);
+  }, [allEvents, paused, frozenAt, filter]);
 
-    const source = apiSSE(
-      `/agent/${applicationId}/stream`,
-      (sseEvent) => {
-        markConnected();
-        if (sseEvent.type === 'connected') return;
-        addEvent(synthesizeEvent(sseEvent));
-      },
-      () => setConnected(false),
-    );
-    const statusSource = apiSSE(
-      `/applications/${applicationId}/status`,
-      (sseEvent) => { markConnected(); addEvent(synthesizeEvent(sseEvent)); },
-    );
-    return () => { source?.close(); statusSource?.close(); };
-  }, [applicationId, addEvent]);
+  const bufferCount = paused && frozenAt != null
+    ? allEvents.filter((e) => new Date(e.timestamp).getTime() > frozenAt).length
+    : 0;
 
-  // Collection counts
   const collectionCounts = useMemo(() => {
     const counts = {};
-    for (const e of events) {
-      counts[e.collection] = (counts[e.collection] || 0) + 1;
-    }
+    for (const e of displayed) counts[e.collection] = (counts[e.collection] || 0) + 1;
     return counts;
-  }, [events]);
+  }, [displayed]);
 
-  const filtered = useMemo(() => {
-    if (filter === 'All') return events;
-    return events.filter((e) => e.collection === filter);
-  }, [events, filter]);
-
-  // Cross-rail correlation
   const correlatedTs = lastCorrelatedEvent?._correlationTs || 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
       <div style={{
         padding: `${spacing[2]}px ${spacing[2]}px`,
         borderBottom: '1px solid var(--border-dim)',
@@ -146,7 +181,6 @@ export default function OfficerChangeStreamConsole({ applicationId, lastCorrelat
             MongoDB Change Streams
           </span>
           <div style={{ flex: 1 }} />
-          {/* Ops/sec */}
           <span style={{
             fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
             color: opsPerSec > 2 ? 'var(--mongo)' : 'var(--text-dim)',
@@ -154,18 +188,17 @@ export default function OfficerChangeStreamConsole({ applicationId, lastCorrelat
           }}>
             {opsPerSec.toFixed(1)} ops/s
           </span>
-          {/* Live indicator */}
-          <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 8, fontWeight: 700, color: connected ? 'var(--mongo-bright)' : 'var(--text-dim)' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 8, fontWeight: 700,
+            color: streamConnected ? 'var(--mongo-bright)' : 'var(--text-dim)' }}>
             <span style={{
               width: 6, height: 6, borderRadius: '50%',
-              background: connected ? 'var(--mongo-bright)' : 'var(--text-dim)',
-              animation: connected ? 'pulse 1.5s infinite' : 'none',
+              background: streamConnected ? 'var(--mongo-bright)' : 'var(--text-dim)',
+              animation: streamConnected ? 'pulse 1.5s infinite' : 'none',
             }} />
-            {connected ? 'LIVE' : 'OFF'}
+            {streamConnected ? 'LIVE' : 'OFF'}
           </span>
         </div>
 
-        {/* Collection counts + controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
           {Object.entries(collectionCounts).map(([col, count]) => (
             <span key={col} style={{
@@ -177,17 +210,23 @@ export default function OfficerChangeStreamConsole({ applicationId, lastCorrelat
             </span>
           ))}
           <div style={{ flex: 1 }} />
-          <button type="button" onClick={() => paused ? handleResume() : setPaused(true)} style={{
-            padding: '1px 6px', borderRadius: 4, border: 'none', fontSize: 9, fontWeight: 600, cursor: 'pointer',
-            background: paused ? 'var(--hitl-amber-dim)' : 'transparent', color: paused ? 'var(--hitl-amber)' : 'var(--text-dim)',
-            fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center', gap: 3,
-          }}>
+          <button type="button"
+            onClick={() => {
+              if (paused) { setPaused(false); setFrozenAt(null); }
+              else { setPaused(true); setFrozenAt(Date.now()); }
+            }}
+            style={{
+              padding: '1px 6px', borderRadius: 4, border: 'none', fontSize: 9, fontWeight: 600, cursor: 'pointer',
+              background: paused ? 'var(--hitl-amber-dim)' : 'transparent',
+              color: paused ? 'var(--hitl-amber)' : 'var(--text-dim)',
+              fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center', gap: 3,
+            }}>
             {paused ? '\u25B6' : '\u23F8'}
             {paused && bufferCount > 0 && (
               <span style={{ background: 'var(--hitl-amber)', color: '#fff', fontSize: 7, fontWeight: 700, padding: '0 3px', borderRadius: 4 }}>{bufferCount}</span>
             )}
           </button>
-          <button type="button" onClick={() => setEvents([])} style={{
+          <button type="button" onClick={() => setClearedBefore(Date.now())} style={{
             padding: '1px 6px', borderRadius: 4, border: 'none', fontSize: 9, fontWeight: 600,
             cursor: 'pointer', background: 'transparent', color: 'var(--text-dim)', fontFamily: 'var(--font-display)',
           }}>Clear</button>
@@ -200,15 +239,16 @@ export default function OfficerChangeStreamConsole({ applicationId, lastCorrelat
         </div>
       </div>
 
-      {/* Event list */}
       <div style={{ flex: 1, overflowY: 'auto', padding: `0 ${spacing[2]}px` }}>
-        {filtered.length === 0 && (
+        {displayed.length === 0 && (
           <div style={{ padding: spacing[4], textAlign: 'center', color: 'var(--text-dim)', fontSize: 10 }}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, opacity: 0.2, marginBottom: 4 }}>{'{ }'}</div>
-            Waiting for change stream events...
+            {applicationId
+              ? (streamConnected ? 'Waiting for change stream events...' : 'Connecting to change stream...')
+              : 'Select an application to view change events'}
           </div>
         )}
-        {filtered.map((evt) => {
+        {displayed.map((evt) => {
           const style = OP_COLORS[evt.operation] || OP_COLORS.UPDATE;
           const isCorrelated = correlatedTs && Math.abs(new Date(evt.timestamp).getTime() - correlatedTs) < 500;
           return (

@@ -29,17 +29,25 @@ export const NODE_TO_STAGE = {};
 WORKFLOW_STAGES.forEach((s, i) => { NODE_TO_STAGE[s.nodeKey] = i; });
 NODE_TO_STAGE['doc_verifier'] = 0;
 NODE_TO_STAGE['credit_puller'] = 0;
+NODE_TO_STAGE['complete'] = WORKFLOW_STAGES.length - 1;
 
 /**
- * Map a backend agent name to its workflow stage index (0, 1, or 2).
- * Handles exact matches + common substring variants. Returns null if unknown.
+ * Map a backend agent name to its workflow stage index.
+ *
+ * Returns null for `supervisor` and unknown agents — callers should use
+ * `setWorkflowStage((prev) => Math.max(prev, idx))` to preserve monotonic
+ * progression. Supervisor runs between every stage, so if it advanced the
+ * stage forward/backward it would cause the Stage Progress Bar to flicker.
  */
 export function agentToStageIdx(agent) {
   if (!agent) return null;
+  if (agent === 'supervisor') return null; // never advance/regress on supervisor
   if (NODE_TO_STAGE[agent] !== undefined) return NODE_TO_STAGE[agent];
   const a = agent.toLowerCase();
+  if (a === 'supervisor' || a.includes('supervisor')) return null;
   if (a.includes('doc_verifier') || a.includes('credit_puller') || a.includes('loan_app')) return 0;
   if (a.includes('underwriter')) return 1;
   if (a.includes('hitl')) return 2;
+  if (a === 'complete') return WORKFLOW_STAGES.length - 1;
   return null;
 }

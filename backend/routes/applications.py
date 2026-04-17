@@ -111,7 +111,16 @@ async def get_application(app_id: str):
 
 @router.get("/applications/{app_id}/activity")
 async def stream_activity(app_id: str):
-    """SSE endpoint — streams agent activity via MongoDB Change Stream."""
+    """SSE endpoint — streams agent activity via MongoDB Change Stream.
+
+    Resilience:
+    - Change stream is reopened with `resume_after` on transient cursor failures.
+    - Falls back to polling when change streams are unavailable (non-replica-set
+      Mongo) or after repeated reopen failures.
+    - Heartbeat every ~15s keeps the connection alive through proxy idle timeouts.
+    - Never emits `{type: 'error'}` for transient issues — the frontend auto-closes
+      on that, which would defeat EventSource's native retry.
+    """
     _validate_app_id(app_id)
 
     async def event_generator():
@@ -119,12 +128,136 @@ async def stream_activity(app_id: str):
         yield f"data: {json.dumps({'type': 'connected', 'application_id': app_id})}\n\n"
 
         pipeline = [{"$match": {"fullDocument.application_id": app_id}}]
-        stream = db["agent_activity"].watch(pipeline, full_document="updateLookup")
+        stream = None
+        last_resume_token = None
+        resume_retries = 0
+        MAX_RESUME_RETRIES = 3
+        heartbeat_counter = 0
+        use_polling = False
+        last_poll_ts = None
+        seen_poll_ids: set = set()
+
+        # Initial open; if the cluster can't serve change streams, degrade to polling
+        try:
+            stream = await asyncio.to_thread(
+                lambda: db["agent_activity"].watch(pipeline, full_document="updateLookup")
+            )
+        except Exception:
+            use_polling = True
+            # Seed polling high-water mark so we don't replay history every reconnect
+            latest = await asyncio.to_thread(
+                lambda: list(
+                    db["agent_activity"]
+                    .find({"application_id": app_id})
+                    .sort("timestamp", -1)
+                    .limit(1)
+                )
+            )
+            # Only seed HWM if the latest doc actually has a timestamp —
+            # otherwise `last_poll_ts` stays None, the $gte filter is skipped,
+            # and every untimestamped doc gets re-emitted every tick.
+            if latest and latest[0].get("timestamp"):
+                last_poll_ts = latest[0]["timestamp"]
+                if latest[0].get("_id") is not None:
+                    seen_poll_ids.add(latest[0]["_id"])
 
         try:
             while True:
-                change = await asyncio.to_thread(stream.try_next)
+                if use_polling:
+                    query = {"application_id": app_id}
+                    if last_poll_ts is not None:
+                        query["timestamp"] = {"$gte": last_poll_ts}
+                    new_docs = await asyncio.to_thread(
+                        lambda q=query: list(
+                            db["agent_activity"].find(q).sort("timestamp", 1).limit(100)
+                        )
+                    )
+                    for doc in new_docs:
+                        doc_id = doc.get("_id")
+                        if doc_id is not None and doc_id in seen_poll_ids:
+                            continue
+                        ts = doc.get("timestamp")
+                        if ts:
+                            if last_poll_ts is None or ts > last_poll_ts:
+                                # New tick — reset seen_ids for this new timestamp bucket
+                                last_poll_ts = ts
+                                seen_poll_ids = set()
+                            if doc_id is not None:
+                                seen_poll_ids.add(doc_id)
+                        event = {
+                            "type": "activity",
+                            "agent": doc.get("agent", ""),
+                            "action": doc.get("action", ""),
+                            "detail": doc.get("detail", ""),
+                            "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else str(ts or ""),
+                        }
+                        yield f"data: {json.dumps(event)}\n\n"
+                    await asyncio.sleep(0.75)
+                    heartbeat_counter += 1
+                    if heartbeat_counter % 20 == 0:  # ~15s at 0.75s cadence
+                        yield ": heartbeat\n\n"
+                    continue
+
+                if stream is None:
+                    if resume_retries >= MAX_RESUME_RETRIES:
+                        logger.warning(
+                            f"Activity stream for {app_id} exceeded resume retries; "
+                            "falling back to polling"
+                        )
+                        use_polling = True
+                        # Seed polling HWM so we don't replay history
+                        latest = await asyncio.to_thread(
+                            lambda: list(
+                                db["agent_activity"]
+                                .find({"application_id": app_id})
+                                .sort("timestamp", -1)
+                                .limit(1)
+                            )
+                        )
+                        if latest:
+                            last_poll_ts = latest[0].get("timestamp")
+                            if latest[0].get("_id") is not None:
+                                seen_poll_ids.add(latest[0]["_id"])
+                        continue
+                    try:
+                        stream = await asyncio.to_thread(
+                            lambda: db["agent_activity"].watch(
+                                pipeline,
+                                full_document="updateLookup",
+                                resume_after=last_resume_token,
+                            )
+                        )
+                        resume_retries = 0
+                    except Exception as reopen_err:
+                        resume_retries += 1
+                        logger.warning(
+                            f"Activity stream reopen failed for {app_id} "
+                            f"(retry {resume_retries}/{MAX_RESUME_RETRIES}): {reopen_err}"
+                        )
+                        await asyncio.sleep(min(0.5 * resume_retries, 5.0))
+                        continue
+
+                try:
+                    change = await asyncio.to_thread(stream.try_next)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as cursor_err:
+                    resume_retries += 1
+                    logger.warning(
+                        f"Activity change-cursor error for {app_id} "
+                        f"(retry {resume_retries}/{MAX_RESUME_RETRIES}): {cursor_err}"
+                    )
+                    try:
+                        stream.close()
+                    except Exception:
+                        pass
+                    stream = None
+                    await asyncio.sleep(min(0.5 * resume_retries, 5.0))
+                    continue
+
                 if change:
+                    resume_retries = 0
+                    last_resume_token = change.get("_id")
                     doc = change.get("fullDocument", {})
                     event = {
                         "type": "activity",
@@ -138,12 +271,21 @@ async def stream_activity(app_id: str):
                     yield f"data: {json.dumps(event)}\n\n"
                 else:
                     await asyncio.sleep(0.5)
+                    heartbeat_counter += 1
+                    if heartbeat_counter % 30 == 0:  # ~15s at 0.5s cadence
+                        yield ": heartbeat\n\n"
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            # See note in agent.py /stream: don't emit {type: 'error'} — client
+            # auto-closes on that, breaking EventSource's native retry loop.
+            logger.error(f"Unhandled error in activity stream for {app_id}: {e}")
         finally:
-            stream.close()
+            if stream is not None:
+                try:
+                    stream.close()
+                except Exception:
+                    pass
 
     return StreamingResponse(
         event_generator(),
@@ -158,13 +300,22 @@ async def stream_activity(app_id: str):
 
 @router.get("/applications/{app_id}/status")
 async def stream_status(app_id: str):
-    """SSE endpoint — streams application status changes via Change Stream."""
+    """SSE endpoint — streams application status changes via Change Stream.
+
+    Resilience:
+    - Change stream reopened with `resume_after` on transient cursor failures.
+    - Polling fallback (diff against last_status + last_updated_at) for clusters
+      that can't serve change streams, and as a last resort after repeated reopen
+      failures.
+    - Heartbeat every ~15-20s keeps the connection alive.
+    - No `{type: 'error'}` on transient failure — EventSource retries on its own.
+    """
     _validate_app_id(app_id)
 
     async def event_generator():
         db = get_db()
 
-        # Send current status first
+        # Snapshot-on-connect: send current status first
         app = await asyncio.to_thread(
             db["applications"].find_one, {"application_id": app_id}
         )
@@ -179,12 +330,94 @@ async def stream_status(app_id: str):
                 }
             }
         ]
-        stream = db["applications"].watch(pipeline, full_document="updateLookup")
+        stream = None
+        last_resume_token = None
+        resume_retries = 0
+        MAX_RESUME_RETRIES = 3
+        heartbeat_counter = 0
+        use_polling = False
+        last_status = app.get("status") if app else None
+        last_updated_at = app.get("updated_at") if app else None
+
+        try:
+            stream = await asyncio.to_thread(
+                lambda: db["applications"].watch(pipeline, full_document="updateLookup")
+            )
+        except Exception:
+            use_polling = True
 
         try:
             while True:
-                change = await asyncio.to_thread(stream.try_next)
+                if use_polling:
+                    current = await asyncio.to_thread(
+                        db["applications"].find_one, {"application_id": app_id}
+                    )
+                    if current:
+                        cur_status = current.get("status")
+                        cur_updated = current.get("updated_at")
+                        if cur_status != last_status or cur_updated != last_updated_at:
+                            last_status = cur_status
+                            last_updated_at = cur_updated
+                            event = {
+                                "type": "status",
+                                "status": cur_status or "",
+                                "status_detail": current.get("status_detail", ""),
+                                "updated_at": cur_updated.isoformat() if hasattr(cur_updated, "isoformat") else "",
+                            }
+                            yield f"data: {json.dumps(event)}\n\n"
+                    await asyncio.sleep(1.0)
+                    heartbeat_counter += 1
+                    if heartbeat_counter % 20 == 0:  # ~20s at 1.0s cadence
+                        yield ": heartbeat\n\n"
+                    continue
+
+                if stream is None:
+                    if resume_retries >= MAX_RESUME_RETRIES:
+                        logger.warning(
+                            f"Status stream for {app_id} exceeded resume retries; "
+                            "falling back to polling"
+                        )
+                        use_polling = True
+                        continue
+                    try:
+                        stream = await asyncio.to_thread(
+                            lambda: db["applications"].watch(
+                                pipeline,
+                                full_document="updateLookup",
+                                resume_after=last_resume_token,
+                            )
+                        )
+                        resume_retries = 0
+                    except Exception as reopen_err:
+                        resume_retries += 1
+                        logger.warning(
+                            f"Status stream reopen failed for {app_id} "
+                            f"(retry {resume_retries}/{MAX_RESUME_RETRIES}): {reopen_err}"
+                        )
+                        await asyncio.sleep(min(0.5 * resume_retries, 5.0))
+                        continue
+
+                try:
+                    change = await asyncio.to_thread(stream.try_next)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as cursor_err:
+                    resume_retries += 1
+                    logger.warning(
+                        f"Status change-cursor error for {app_id} "
+                        f"(retry {resume_retries}/{MAX_RESUME_RETRIES}): {cursor_err}"
+                    )
+                    try:
+                        stream.close()
+                    except Exception:
+                        pass
+                    stream = None
+                    await asyncio.sleep(min(0.5 * resume_retries, 5.0))
+                    continue
+
                 if change:
+                    resume_retries = 0
+                    last_resume_token = change.get("_id")
                     doc = change.get("fullDocument", {})
                     event = {
                         "type": "status",
@@ -195,14 +428,23 @@ async def stream_status(app_id: str):
                         else "",
                     }
                     yield f"data: {json.dumps(event)}\n\n"
+                    last_status = doc.get("status")
+                    last_updated_at = doc.get("updated_at")
                 else:
                     await asyncio.sleep(0.5)
+                    heartbeat_counter += 1
+                    if heartbeat_counter % 30 == 0:  # ~15s at 0.5s cadence
+                        yield ": heartbeat\n\n"
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            logger.error(f"Unhandled error in status stream for {app_id}: {e}")
         finally:
-            stream.close()
+            if stream is not None:
+                try:
+                    stream.close()
+                except Exception:
+                    pass
 
     return StreamingResponse(
         event_generator(),
@@ -355,50 +597,204 @@ async def applications_ws(websocket: WebSocket):
     await websocket.accept()
     db = get_db()
     stream = None
-    last_client_msg = time.monotonic()
+    stop_event = asyncio.Event()
+    # Single send-queue so only the sender task ever calls websocket.send_json.
+    # Starlette WebSockets are NOT safe for concurrent sends from multiple tasks.
+    send_queue: asyncio.Queue = asyncio.Queue(maxsize=500)
 
-    try:
-        # Open Change Stream FIRST (before snapshot) to avoid missed-update window
+    async def enqueue(msg):
+        # Non-blocking put: if the queue is full (slow client), drop the oldest
+        # queued message to make room for the newest. Blocking with `await
+        # send_queue.put` would stall the producer behind a slow/dead client and
+        # delay disconnect detection until the queue drained. For a change-stream
+        # feed, freshness matters more than completeness — a dropped stale event
+        # is preferable to a wedged producer.
+        try:
+            send_queue.put_nowait(msg)
+        except asyncio.QueueFull:
+            try:
+                dropped = send_queue.get_nowait()
+                logger.warning(
+                    f"Application queue WS send queue full; dropped oldest "
+                    f"(type={dropped.get('type') if isinstance(dropped, dict) else '?'})"
+                )
+            except asyncio.QueueEmpty:
+                pass
+            try:
+                send_queue.put_nowait(msg)
+            except asyncio.QueueFull:
+                # Should not happen (we just drained one), but stay defensive.
+                logger.warning("Application queue WS send queue still full after drop")
+        except Exception as e:
+            logger.warning(f"Application queue WS enqueue error: {e}")
+
+    async def client_reader():
+        """Reads client messages concurrently so disconnects surface immediately."""
+        try:
+            while not stop_event.is_set():
+                msg = await websocket.receive_text()
+                if msg == "ping":
+                    await enqueue({"type": "pong"})
+        except WebSocketDisconnect:
+            logger.info("Application queue WS client disconnected")
+        except Exception as e:
+            logger.warning(f"Application queue WS reader error: {e}")
+        finally:
+            stop_event.set()
+
+    async def change_producer():
+        """Enqueues DB changes via Change Stream, with resume_after recovery and polling fallback.
+
+        Mirrors the resilience pattern used by the SSE endpoints: transient cursor
+        failures (primary stepdown, idle timeout) trigger a reopen with
+        `resume_after=last_token`. After MAX_RESUME_RETRIES the producer degrades
+        to polling rather than killing the whole WebSocket.
+        """
+        nonlocal stream
+        MAX_RESUME_RETRIES = 3
         pipeline = [
             {"$match": {"operationType": {"$in": ["insert", "update", "replace"]}}}
         ]
-        stream = db["applications"].watch(pipeline, full_document="updateLookup")
+        last_resume_token = None
+        resume_retries = 0
+        use_polling = False
 
-        # THEN send initial snapshot — any changes between stream open and snapshot
-        # read will be captured by the stream and delivered after the snapshot
+        try:
+            # Initial open; degrade to polling if change streams are unavailable
+            try:
+                stream = await asyncio.to_thread(
+                    lambda: db["applications"].watch(pipeline, full_document="updateLookup")
+                )
+            except Exception:
+                stream = None
+                use_polling = True
+
+            # Change-stream loop with resume-on-error
+            while not use_polling and not stop_event.is_set():
+                if stream is None:
+                    if resume_retries >= MAX_RESUME_RETRIES:
+                        logger.warning(
+                            "Application queue WS change stream exceeded resume "
+                            "retries; falling back to polling"
+                        )
+                        use_polling = True
+                        break
+                    try:
+                        stream = await asyncio.to_thread(
+                            lambda: db["applications"].watch(
+                                pipeline,
+                                full_document="updateLookup",
+                                resume_after=last_resume_token,
+                            )
+                        )
+                        resume_retries = 0
+                    except Exception as reopen_err:
+                        resume_retries += 1
+                        logger.warning(
+                            f"Application queue WS change stream reopen failed "
+                            f"(retry {resume_retries}/{MAX_RESUME_RETRIES}): {reopen_err}"
+                        )
+                        await asyncio.sleep(min(0.5 * resume_retries, 5.0))
+                        continue
+
+                try:
+                    change = await asyncio.to_thread(stream.try_next)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as cursor_err:
+                    resume_retries += 1
+                    logger.warning(
+                        f"Application queue WS change-cursor error "
+                        f"(retry {resume_retries}/{MAX_RESUME_RETRIES}): {cursor_err}"
+                    )
+                    try:
+                        stream.close()
+                    except Exception:
+                        pass
+                    stream = None
+                    await asyncio.sleep(min(0.5 * resume_retries, 5.0))
+                    continue
+
+                if change:
+                    resume_retries = 0
+                    last_resume_token = change.get("_id")
+                    doc = change.get("fullDocument")
+                    if doc and not doc.get("seed_complete"):
+                        serialized = application_service.serialize_doc(doc)
+                        await enqueue({
+                            "type": "change",
+                            "operation": change.get("operationType", "unknown"),
+                            "application": serialized,
+                        })
+                else:
+                    await asyncio.sleep(0.5)
+
+            # Polling fallback (initial unavailability or mid-stream degradation)
+            if use_polling:
+                seen: dict = {}
+                while not stop_event.is_set():
+                    apps = await asyncio.to_thread(application_service.list_applications)
+                    for app in apps:
+                        app_id = app.get("application_id")
+                        updated = app.get("updated_at") or app.get("created_at")
+                        if not app_id:
+                            continue
+                        prev = seen.get(app_id)
+                        if prev != updated:
+                            op = "insert" if prev is None else "update"
+                            seen[app_id] = updated
+                            await enqueue({
+                                "type": "change",
+                                "operation": op,
+                                "application": app,
+                            })
+                    await asyncio.sleep(1.0)
+        except Exception as e:
+            logger.warning(f"Application queue WS producer error: {e}")
+            await enqueue({"type": "error", "message": str(e)})
+        finally:
+            stop_event.set()
+
+    async def sender():
+        """Single task that owns websocket.send_json. Serializes all outbound frames."""
+        try:
+            while not stop_event.is_set():
+                try:
+                    msg = await asyncio.wait_for(send_queue.get(), timeout=0.5)
+                except asyncio.TimeoutError:
+                    continue
+                try:
+                    await websocket.send_json(msg)
+                except WebSocketDisconnect:
+                    break
+                except Exception as e:
+                    logger.warning(f"Application queue WS send error: {e}")
+                    break
+        finally:
+            stop_event.set()
+
+    try:
+        # Initial snapshot BEFORE we start the tasks so clients see it
+        # synchronously on connect.
         apps = await asyncio.to_thread(application_service.list_applications)
         await websocket.send_json({"type": "snapshot", "applications": apps})
 
-        while True:
-            # Poll for MongoDB changes (non-blocking via thread)
-            change = await asyncio.to_thread(stream.try_next)
-            if change:
-                doc = change.get("fullDocument")
-                if doc and not doc.get("seed_complete"):
-                    serialized = application_service.serialize_doc(doc)
-                    await websocket.send_json({
-                        "type": "change",
-                        "operation": change.get("operationType", "unknown"),
-                        "application": serialized,
-                    })
+        reader_task = asyncio.create_task(client_reader())
+        producer_task = asyncio.create_task(change_producer())
+        sender_task = asyncio.create_task(sender())
 
-            # Check for client messages (keepalive ping/pong)
+        # Wait for any task to end — whichever finishes first triggers shutdown
+        done, pending = await asyncio.wait(
+            {reader_task, producer_task, sender_task},
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        stop_event.set()
+        for t in pending:
+            t.cancel()
             try:
-                msg = await asyncio.wait_for(websocket.receive_text(), timeout=0.01)
-                last_client_msg = time.monotonic()
-                if msg == "ping":
-                    await websocket.send_json({"type": "pong"})
-            except asyncio.TimeoutError:
+                await t
+            except (asyncio.CancelledError, Exception):
                 pass
-
-            # Dead client detection — close if no message for 60s
-            if time.monotonic() - last_client_msg > 60:
-                logger.info("Application queue WS: client silent for 60s, closing")
-                await websocket.close(code=1001)
-                break
-
-            if not change:
-                await asyncio.sleep(0.5)
 
     except WebSocketDisconnect:
         logger.info("Application queue WS client disconnected")
@@ -411,4 +807,11 @@ async def applications_ws(websocket: WebSocket):
             pass
     finally:
         if stream:
-            stream.close()
+            try:
+                stream.close()
+            except Exception:
+                pass
+        try:
+            await websocket.close()
+        except Exception:
+            pass

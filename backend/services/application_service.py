@@ -143,6 +143,7 @@ def list_applications(skip: int = 0, limit: int = 50) -> list[dict]:
             "product": 1,
             "status": 1,
             "created_at": 1,
+            "updated_at": 1,
         },
     ).sort("created_at", -1).skip(skip).limit(limit)
     result = [serialize_doc(a) for a in apps]

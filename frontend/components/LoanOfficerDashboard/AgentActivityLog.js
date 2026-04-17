@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
-import { apiSSE, apiGet } from '../../lib/api';
 import styles from './AgentActivityLog.module.css';
 
 const NOISE_ACTIONS = ['tool_parse_warning', 'heartbeat', 'ping', 'noop'];
@@ -25,7 +24,6 @@ const ACTION_BADGE_MAP = {
   alert: { actions: ['error', 'intervention', 'data_gap', 'escalat', 'interrupt', 'fail'], color: 'var(--danger)', bg: 'var(--danger-dim)', label: 'ALERT' },
 };
 
-// Left-border + background treatment per badge type
 const BADGE_ACCENTS = {
   ALERT:   { border: 'var(--danger)',     bg: 'var(--danger-dim)' },
   DECIDE:  { border: 'var(--hitl-amber)', bg: 'var(--hitl-amber-dim)' },
@@ -54,10 +52,32 @@ function relativeTime(ts) {
   return `${Math.floor(diff / 3600)}h ago`;
 }
 
-const HITL_FALLBACK_STATUSES = new Set(['review', 'pending_review', 'processing', 'underwriting']);
+function categoryFor(agentName) {
+  const a = (agentName || '').toLowerCase();
+  if (a.includes('underwrit')) return 'underwriting';
+  if (a.includes('supervisor')) return 'supervisor';
+  if (a.includes('hitl')) return 'hitl';
+  return 'loanapp';
+}
 
-export default function AgentActivityLog({ onEvent, applicationId, applicationStatus, onStatsChange, hitlReached, liveAgentOutput }) {
-  const [entries, setEntries] = useState([]);
+/**
+ * AgentActivityLog — prop-driven log of pipeline events.
+ *
+ * Events come from the hoisted activity SSE in useLoanOfficerWorkflow; this
+ * component is purely presentational (no network). This avoids spawning a
+ * second SSE connection to /agent/{id}/stream which — given the Next.js proxy
+ * and SSE auto-close semantics — was a major source of "nothing shows up".
+ */
+export default function AgentActivityLog({
+  onEvent,
+  applicationId,
+  activityEvents = [],
+  streamConnected = false,
+  streamError = false,
+  onStatsChange,
+  hitlReached,
+  liveAgentOutput,
+}) {
   const [expandedId, setExpandedId] = useState(null);
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -65,154 +85,98 @@ export default function AgentActivityLog({ onEvent, applicationId, applicationSt
   const [paused, setPaused] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const pausedRef = useRef(false);
-  const bufferedEntriesRef = useRef([]);
-  const sseEventCountRef = useRef(0);
-  const [bufferCount, setBufferCount] = useState(0);
-  const [totalReceived, setTotalReceived] = useState(0);
-  const hitlInjectedRef = useRef(false);
+  const [frozenAt, setFrozenAt] = useState(null);
+  const seenIdsRef = useRef(new Set());
 
   pausedRef.current = paused;
 
-  // Lift stats to parent for rail header
-  useEffect(() => {
-    if (onStatsChange) onStatsChange({ totalReceived });
-  }, [totalReceived, onStatsChange]);
-
-  // Inject synthetic HITL gate entry
-  useEffect(() => {
-    if (hitlReached && !hitlInjectedRef.current) {
-      hitlInjectedRef.current = true;
-      const hitlEntry = {
-        id: `hitl-gate-${Date.now()}`,
-        agent: 'HITL Gate',
-        category: 'hitl',
-        action: 'Human-in-the-Loop Gate Reached',
-        reasoning: 'Agent pipeline paused. All state checkpointed to MongoDB via MongoDBSaver. Awaiting officer review and decision.',
-        time: new Date().toLocaleTimeString(),
-        _ts: Date.now(),
-        isLive: true,
-        isGate: true,
-      };
-      setEntries((prev) => {
-        if (prev.some(e => e.isGate)) return prev; // dedup
-        return [hitlEntry, ...prev];
+  // Transform raw events from the hook into display entries
+  const allEntries = useMemo(() => {
+    // Accept any kind of activity (agent_step, node_start, node_complete,
+    // hitl_waiting, complete). Filter noise and map to display shape.
+    const entries = [];
+    for (const evt of activityEvents) {
+      if (!evt) continue;
+      // Skip run-stream node_start when an agent_step of the same agent already
+      // provided a more informative action — but only if we have a choice.
+      entries.push({
+        id: evt.id,
+        agent: evt.agent || 'System',
+        category: categoryFor(evt.agent),
+        action: evt.action || '',
+        reasoning: evt.detail || '',
+        time: new Date(evt._ts || Date.now()).toLocaleTimeString(),
+        _ts: evt._ts || Date.now(),
+        isLive: evt.isLive,
+        isGate: evt.kind === 'hitl',
       });
     }
-    if (!hitlReached) {
-      hitlInjectedRef.current = false;
-    }
-  }, [hitlReached]);
+    return entries;
+  }, [activityEvents]);
 
-  const flushBuffer = useCallback(() => {
-    const buffered = bufferedEntriesRef.current;
-    if (buffered.length === 0) return;
-    bufferedEntriesRef.current = [];
-    setBufferCount(0);
-    setEntries((prev) => {
-      const next = [...buffered, ...prev];
-      return next.length > MAX_ENTRIES ? next.slice(0, MAX_ENTRIES) : next;
-    });
-  }, []);
+  // Inject synthetic HITL gate card when hitlReached
+  const entries = useMemo(() => {
+    if (!hitlReached) return allEntries;
+    const hasHitlInList = allEntries.some((e) => e.isGate);
+    if (hasHitlInList) return allEntries;
+    const hitlEntry = {
+      id: 'hitl-gate-synthetic',
+      agent: 'HITL Gate',
+      category: 'hitl',
+      action: 'Human-in-the-Loop Gate Reached',
+      reasoning: 'Agent pipeline paused. All state checkpointed to MongoDB via MongoDBSaver. Awaiting officer review and decision.',
+      time: new Date().toLocaleTimeString(),
+      _ts: Date.now(),
+      isLive: true,
+      isGate: true,
+    };
+    return [hitlEntry, ...allEntries];
+  }, [allEntries, hitlReached]);
+
+  // While paused, hold the rendered set at the frozen-at timestamp.
+  const renderedEntries = useMemo(() => {
+    if (!paused || frozenAt == null) return entries;
+    return entries.filter((e) => (e._ts || 0) <= frozenAt);
+  }, [entries, paused, frozenAt]);
+
+  const bufferCount = paused && frozenAt != null
+    ? entries.filter((e) => (e._ts || 0) > frozenAt).length
+    : 0;
+
+  // Fire onEvent for newly-seen entries (preserves canvas highlight sync)
+  useEffect(() => {
+    if (!onEvent) return;
+    for (const e of allEntries) {
+      if (!seenIdsRef.current.has(e.id)) {
+        seenIdsRef.current.add(e.id);
+        try { onEvent(e); } catch (_) {}
+      }
+    }
+    // Cap the seen set
+    if (seenIdsRef.current.size > 500) {
+      seenIdsRef.current = new Set(Array.from(seenIdsRef.current).slice(-300));
+    }
+  }, [allEntries, onEvent]);
+
+  // Reset seen tracking when application changes
+  useEffect(() => {
+    seenIdsRef.current = new Set();
+    setExpandedId(null);
+    setPaused(false);
+    setFrozenAt(null);
+  }, [applicationId]);
+
+  useEffect(() => {
+    if (onStatsChange) onStatsChange({ totalReceived: allEntries.length });
+  }, [allEntries.length, onStatsChange]);
 
   const handleResume = useCallback(() => {
     setPaused(false);
-    flushBuffer();
-  }, [flushBuffer]);
-
-  useEffect(() => {
-    if (!applicationId) {
-      setEntries([]);
-      setTotalReceived(0);
-      setBufferCount(0);
-      bufferedEntriesRef.current = [];
-      hitlInjectedRef.current = false;
-      return;
-    }
-
-    setEntries([]);
-    setTotalReceived(0);
-    setPaused(false);
-    setBufferCount(0);
-    bufferedEntriesRef.current = [];
-    hitlInjectedRef.current = false;
-    sseEventCountRef.current = 0;
-
-    const source = apiSSE(
-      `/agent/${applicationId}/stream`,
-      (event) => {
-        if (event.type === 'agent_step') {
-          const liveEntry = {
-            id: `live-${Date.now()}-${Math.random()}`,
-            agent: event.agent || 'System',
-            category: (event.agent || '').toLowerCase().includes('underwrit') ? 'underwriting'
-              : (event.agent || '').toLowerCase().includes('supervisor') ? 'supervisor'
-              : (event.agent || '').toLowerCase().includes('hitl') ? 'hitl'
-              : 'loanapp',
-            action: event.action || '',
-            reasoning: event.detail || '',
-            time: new Date(event.timestamp || Date.now()).toLocaleTimeString(),
-            _ts: event.timestamp ? new Date(event.timestamp).getTime() : Date.now(),
-            isLive: true,
-          };
-
-          sseEventCountRef.current += 1;
-          setTotalReceived((prev) => prev + 1);
-
-          if (pausedRef.current) {
-            bufferedEntriesRef.current = [liveEntry, ...bufferedEntriesRef.current];
-            setBufferCount((prev) => prev + 1);
-          } else {
-            setEntries((prev) => {
-              const next = [liveEntry, ...prev];
-              return next.length > MAX_ENTRIES ? next.slice(0, MAX_ENTRIES) : next;
-            });
-          }
-          if (onEvent) onEvent(liveEntry);
-        }
-        if (event.type === 'complete') {
-          // Pipeline complete
-        }
-      }
-    );
-
-    // REST fallback: fetch activity trail for apps whose status implies there
-    // should be prior activity. Gated by status + a 2s timer so SSE has a
-    // chance to populate first before we hit the fallback endpoint.
-    let fallbackTimer = null;
-    if (applicationStatus && HITL_FALLBACK_STATUSES.has(applicationStatus)) {
-      fallbackTimer = setTimeout(() => {
-        // Skip if SSE already produced events for this app.
-        if (sseEventCountRef.current > 0) return;
-        apiGet(`/hitl/${applicationId}/context`).then((ctx) => {
-          if (ctx?.activity_trail?.length > 0) {
-            const trailEntries = ctx.activity_trail.map((a, i) => ({
-              id: `trail-${i}-${Date.now()}`,
-              agent: a.agent || 'System',
-              category: (a.agent || '').toLowerCase().includes('underwrit') ? 'underwriting'
-                : (a.agent || '').toLowerCase().includes('supervisor') ? 'supervisor'
-                : (a.agent || '').toLowerCase().includes('hitl') ? 'hitl'
-                : 'loanapp',
-              action: a.action || '',
-              reasoning: a.detail || '',
-              time: a.timestamp ? new Date(a.timestamp).toLocaleTimeString() : '',
-              _ts: a.timestamp ? new Date(a.timestamp).getTime() : Date.now(),
-              isLive: false,
-            }));
-            setEntries((prev) => prev.length === 0 ? trailEntries : prev);
-            setTotalReceived((prev) => prev === 0 ? trailEntries.length : prev);
-          }
-        }).catch(() => {});
-      }, 2000);
-    }
-
-    return () => {
-      if (fallbackTimer) clearTimeout(fallbackTimer);
-      source?.close();
-    };
-  }, [applicationId, applicationStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+    setFrozenAt(null);
+  }, []);
 
   const filtered = useMemo(() => {
-    let result = entries.filter((e) => !NOISE_ACTIONS.includes(e.action));
+    let result = renderedEntries.filter((e) => !NOISE_ACTIONS.includes(e.action));
     if (activeFilter !== 'all') {
       result = result.filter((e) => e.category === activeFilter);
     }
@@ -223,9 +187,8 @@ export default function AgentActivityLog({ onEvent, applicationId, applicationSt
       );
     }
     return result;
-  }, [entries, activeFilter, searchQuery]);
+  }, [renderedEntries, activeFilter, searchQuery]);
 
-  // Metric pills from liveAgentOutput
   const metricPills = useMemo(() => {
     if (!liveAgentOutput) return [];
     const pills = [];
@@ -256,7 +219,6 @@ export default function AgentActivityLog({ onEvent, applicationId, applicationSt
           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: spacing[5],
         }}>
-          {/* Anticipatory pipeline preview */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 220 }}>
             {[
               { label: 'Document Collection', color: 'var(--agent-cyan)' },
@@ -300,6 +262,16 @@ export default function AgentActivityLog({ onEvent, applicationId, applicationSt
     );
   }
 
+  // Status label for the live indicator
+  const statusLabel = streamError && !streamConnected ? 'Reconnecting'
+    : paused ? 'Paused'
+    : streamConnected ? 'Live'
+    : 'Connecting';
+  const statusColor = statusLabel === 'Reconnecting' ? 'var(--danger)'
+    : statusLabel === 'Paused' ? 'var(--hitl-amber)'
+    : statusLabel === 'Live' ? 'var(--success)'
+    : 'var(--text-dim)';
+
   return (
     <div style={{
       flex: '1 1 0',
@@ -309,17 +281,15 @@ export default function AgentActivityLog({ onEvent, applicationId, applicationSt
       flexDirection: 'column',
       overflow: 'hidden',
     }}>
-      {/* Header */}
       <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--border-dim)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 'var(--text-sm)' }}>
             Agent Activity Log
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* Pause/Resume */}
             <button
               type="button"
-              onClick={() => paused ? handleResume() : setPaused(true)}
+              onClick={() => paused ? handleResume() : (setPaused(true), setFrozenAt(Date.now()))}
               style={{
                 padding: '2px 8px', borderRadius: 8, border: 'none',
                 background: paused ? 'var(--hitl-amber-dim)' : 'transparent',
@@ -341,24 +311,22 @@ export default function AgentActivityLog({ onEvent, applicationId, applicationSt
               )}
             </button>
 
-            {/* Live indicator */}
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 600, color: paused ? 'var(--hitl-amber)' : 'var(--success)' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 600, color: statusColor }}>
               <span style={{
                 width: 5, height: 5, borderRadius: '50%',
-                background: paused ? 'var(--hitl-amber)' : 'var(--success)',
-                boxShadow: paused ? 'none' : '0 0 6px var(--success)',
-                animation: paused ? 'none' : 'pulse 1.5s infinite',
+                background: statusColor,
+                boxShadow: statusLabel === 'Live' ? '0 0 6px var(--success)' : 'none',
+                animation: statusLabel === 'Live' ? 'pulse 1.5s infinite' : 'none',
               }} />
-              {paused ? 'Paused' : 'Live'}
+              {statusLabel}
             </span>
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2, marginBottom: spacing[2] }}>
           <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-            {entries.length}{totalReceived > entries.length ? ` / ${totalReceived}` : ''} actions {'\u00b7'} {filtered.length} shown
+            {entries.length} actions {'\u00b7'} {filtered.length} shown
           </span>
 
-          {/* View mode toggle */}
           <div style={{ display: 'flex', gap: 0, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-dim)' }}>
             {['compact', 'detailed'].map((mode) => (
               <button
@@ -429,7 +397,6 @@ export default function AgentActivityLog({ onEvent, applicationId, applicationSt
         </div>
       </div>
 
-      {/* Metric Summary Strip */}
       {metricPills.length > 0 && (
         <div style={{
           display: 'flex', gap: 4, flexWrap: 'wrap',
@@ -454,7 +421,6 @@ export default function AgentActivityLog({ onEvent, applicationId, applicationSt
         </div>
       )}
 
-      {/* Entries */}
       <div style={{ flex: 1, overflowY: 'auto', padding: `${spacing[2]}px 12px` }}>
         {filtered.map((entry, idx) => {
           const isExpanded = expandedId === entry.id || viewMode === 'detailed';
@@ -465,7 +431,6 @@ export default function AgentActivityLog({ onEvent, applicationId, applicationSt
 
           return (
             <div key={entry.id}>
-              {/* Agent transition divider */}
               {showDivider && (
                 <div role="separator" aria-label={`Agent: ${entry.agent}`} style={{
                   position: 'relative', height: 16, display: 'flex', alignItems: 'center',
@@ -484,7 +449,6 @@ export default function AgentActivityLog({ onEvent, applicationId, applicationSt
                 </div>
               )}
 
-              {/* HITL Gate special entry */}
               {entry.isGate ? (
                 <div
                   aria-live="assertive"
@@ -519,7 +483,6 @@ export default function AgentActivityLog({ onEvent, applicationId, applicationSt
                   </div>
                 </div>
               ) : (
-                /* Standard entry */
                 <div
                   className={styles.entryCard}
                   style={{
@@ -536,13 +499,11 @@ export default function AgentActivityLog({ onEvent, applicationId, applicationSt
                     style={{ padding: '8px 10px', cursor: 'pointer' }}
                     onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
                   >
-                    {/* Row 1: Action (primary) + time + chevron */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 3 }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.3 }}>
                           {entry.action}
                         </div>
-                        {/* Row 2: Agent name (metadata) + badge */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                           <span style={{
                             width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
@@ -581,7 +542,6 @@ export default function AgentActivityLog({ onEvent, applicationId, applicationSt
                       </div>
                     </div>
 
-                    {/* Reasoning preview in compact mode */}
                     {viewMode === 'compact' && !isExpanded && entry.reasoning && (
                       <div style={{
                         fontSize: 9, color: 'var(--text-dim)', fontStyle: 'italic',
@@ -642,10 +602,12 @@ export default function AgentActivityLog({ onEvent, applicationId, applicationSt
             background: 'var(--bg-void)', marginTop: spacing[3],
           }}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)', opacity: 0.5, marginBottom: spacing[1] }}>
-              SSE
+              {streamError && !streamConnected ? 'RECONNECTING' : streamConnected ? 'SSE · LIVE' : 'CONNECTING'}
             </div>
             <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>
-              Waiting for agent activity...
+              {streamError && !streamConnected
+                ? 'Retrying connection to activity stream…'
+                : 'Waiting for agent activity...'}
             </div>
           </div>
         )}
@@ -655,7 +617,6 @@ export default function AgentActivityLog({ onEvent, applicationId, applicationSt
           </div>
         )}
       </div>
-
     </div>
   );
 }

@@ -101,6 +101,13 @@ const STAGE_COLUMNS = [
   { key: 'funding',      label: 'FUNDING',      px: 0.72 },
 ];
 
+// Rail-mode stage columns (3 columns across, origination → underwriting → approval)
+const STAGE_COLUMNS_RAIL = [
+  { key: 'origination',  label: 'ORIGINATION',  px: 0.16 },
+  { key: 'underwriting', label: 'UNDERWRITING', px: 0.50 },
+  { key: 'approval',     label: 'APPROVAL',     px: 0.84 },
+];
+
 const PIPELINE_LAYOUT = {
   supervisor:    { px: 0.08, py: 0.18 },
   docVerifier:   { px: 0.03, py: 0.42 },
@@ -129,6 +136,37 @@ const PIPELINE_LAYOUT = {
   memory:        { px: 0.34, py: 0.50 },
 };
 
+// Compact layout for rail mode: only officer-relevant nodes, spread across
+// the full width since closing/funding columns aren't shown.
+const PIPELINE_LAYOUT_RAIL = {
+  // Origination cluster
+  supervisor:    { px: 0.16, py: 0.18 },
+  docVerifier:   { px: 0.08, py: 0.45 },
+  creditPuller:  { px: 0.24, py: 0.45 },
+  appAgent:      { px: 0.16, py: 0.70 },
+  voyageEmbed:   { px: 0.08, py: 0.85 },
+  creditAPI:     { px: 0.24, py: 0.85 },
+
+  // Underwriting cluster
+  underwriter:   { px: 0.50, py: 0.18 },
+  aggregation:   { px: 0.42, py: 0.48 },
+  vectorSearch:  { px: 0.58, py: 0.48 },
+
+  // Approval cluster
+  hitlGate:      { px: 0.84, py: 0.18 },
+  checkpoint:    { px: 0.84, py: 0.48 },
+  decision:      { px: 0.84, py: 0.70 },
+
+  // Data layer at bottom
+  mongoAtlas:    { px: 0.50, py: 0.92 },
+};
+
+// Rail-mode excludes closing/funding nodes entirely.
+const RAIL_EXCLUDED_NODES = new Set([
+  'closingEngine', 'eSign', 'fundingEngine', 'ledger', 'changeStream',
+  'timeSeries', 'memory',
+]);
+
 if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
   CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
     r = Math.min(r, Math.min(w, h) / 2);
@@ -141,9 +179,9 @@ if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D
   };
 }
 
-function layoutNodes(W, H) {
+function layoutNodes(W, H, layout = PIPELINE_LAYOUT) {
   const result = {};
-  for (const [id, pos] of Object.entries(PIPELINE_LAYOUT)) {
+  for (const [id, pos] of Object.entries(layout)) {
     result[id] = { x: pos.px * W, y: pos.py * H };
   }
   return result;
@@ -259,7 +297,12 @@ export default function WorkflowCanvas({
   hitlStartTime = null,
   hitlResolution = null,
   hitlResolutionTime = null,
+  // Layout mode: 'modal' (full 5-column, all nodes) or 'rail' (compact 3-column, officer-only)
+  fit = 'modal',
 }) {
+  const isRail = fit === 'rail';
+  const activeLayout = isRail ? PIPELINE_LAYOUT_RAIL : PIPELINE_LAYOUT;
+  const activeStageColumns = isRail ? STAGE_COLUMNS_RAIL : STAGE_COLUMNS;
   const canvasRef = useRef(null);
   const redrawRef = useRef(null);
   const stateRef = useRef({
@@ -352,7 +395,7 @@ export default function WorkflowCanvas({
       canvas.style.width = W + 'px';
       canvas.style.height = H + 'px';
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      state.nodePositions = layoutNodes(W, H);
+      state.nodePositions = layoutNodes(W, H, activeLayout);
       readTheme();
       if (redrawRef.current) redrawRef.current();
     };
@@ -390,7 +433,7 @@ export default function WorkflowCanvas({
       }
 
       // Stage column labels
-      STAGE_COLUMNS.forEach((col) => {
+      activeStageColumns.forEach((col) => {
         const cx = col.px * W;
         const isCurrentStage = currentScene === col.key;
         ctx.font = `700 8px "Euclid Circular A", Manrope, sans-serif`;
@@ -416,6 +459,7 @@ export default function WorkflowCanvas({
 
       // Draw all edges
       EDGES.forEach(([a, b]) => {
+        if (isRail && (RAIL_EXCLUDED_NODES.has(a) || RAIL_EXCLUDED_NODES.has(b))) return;
         const pa = nodePositions[a];
         const pb = nodePositions[b];
         if (!pa || !pb) return;
@@ -868,7 +912,7 @@ export default function WorkflowCanvas({
       canvas.removeEventListener('mouseleave', handleMouseLeave);
       cancelAnimationFrame(animId);
     };
-  }, [activeNodes, activeEdges, pulsingNodes, completedNodes, currentScene, highlightNode, hitlActive, hitlStartTime, hitlResolution, hitlResolutionTime, handleMouseMove, handleClick, handleMouseLeave]);
+  }, [activeNodes, activeEdges, pulsingNodes, completedNodes, currentScene, highlightNode, hitlActive, hitlStartTime, hitlResolution, hitlResolutionTime, fit, activeLayout, activeStageColumns, isRail, handleMouseMove, handleClick, handleMouseLeave]);
 
   return <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />;
 }

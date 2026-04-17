@@ -2,7 +2,97 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { apiPost, apiGet, apiSSE, apiWebSocket } from '../../lib/api';
-import { agentToStageIdx } from './constants';
+import { agentToStageIdx, WORKFLOW_STAGES } from './constants';
+
+const MAX_ACTIVITY_EVENTS = 200;
+
+/**
+ * Pure helper: derive workflow UI state from the live queue status.
+ * Used both when the selected app changes and when the queue WS pushes
+ * a status change for the already-selected app.
+ */
+function deriveWorkflowStateFromStatus(status) {
+  if (!status) return { phase: 'preview', stage: 0, hitl: false, approved: false, approvalMode: null };
+  if (status === 'review' || status === 'pending_review') {
+    return { phase: 'executing', stage: 2, hitl: true, approved: false, approvalMode: null };
+  }
+  if (status === 'processing') {
+    return { phase: 'executing', stage: 0, hitl: false, approved: false, approvalMode: null };
+  }
+  if (status === 'underwriting') {
+    return { phase: 'executing', stage: 1, hitl: false, approved: false, approvalMode: null };
+  }
+  if (status === 'approved' || status === 'closing' || status === 'funded' || status === 'active') {
+    return { phase: 'executing', stage: WORKFLOW_STAGES.length - 1, hitl: false, approved: true, approvalMode: 'auto' };
+  }
+  if (status === 'declined') {
+    return { phase: 'executing', stage: WORKFLOW_STAGES.length - 1, hitl: false, approved: true, approvalMode: 'declined' };
+  }
+  return { phase: 'preview', stage: 0, hitl: false, approved: false, approvalMode: null };
+}
+
+function activityFromSseEvent(event, source) {
+  const ts = event.timestamp ? new Date(event.timestamp).getTime() : Date.now();
+  // Stable dedup key: backend _id if present, else content-hash. SSE backlog
+  // and polling-fallback can re-deliver the same event; random-suffixed ids
+  // defeat Set dedup, so we key on something deterministic instead.
+  const backendId = event._id || event.id || null;
+  const dedupKey = backendId
+    ? `id:${backendId}`
+    : `c:${ts}|${event.type || ''}|${event.agent || ''}|${event.action || ''}|${event.name || ''}|${(event.detail || '').slice(0, 64)}`;
+  const base = { id: `${source}-${ts}-${Math.random()}`, _dedupKey: dedupKey, _ts: ts, isLive: source !== 'backlog' };
+
+  if (event.type === 'agent_step') {
+    return {
+      ...base,
+      kind: 'activity',
+      agent: event.agent || 'System',
+      action: event.action || '',
+      detail: event.detail || '',
+      isLive: !event.backlog,
+    };
+  }
+  if (event.type === 'node_start') {
+    return {
+      ...base,
+      kind: 'node_start',
+      agent: event.agent || event.name || 'node',
+      action: 'node_start',
+      detail: '',
+    };
+  }
+  if (event.type === 'node_complete') {
+    const output = event.output || {};
+    const fieldKeys = Object.keys(output).slice(0, 4).join(', ');
+    return {
+      ...base,
+      kind: 'node_complete',
+      agent: event.agent || event.name || 'node',
+      action: 'node_complete',
+      detail: fieldKeys ? `fields: ${fieldKeys}` : '',
+      output,
+    };
+  }
+  if (event.type === 'hitl_waiting') {
+    return {
+      ...base,
+      kind: 'hitl',
+      agent: 'hitl_gate',
+      action: 'hitl_waiting',
+      detail: 'Pipeline paused — awaiting officer decision',
+    };
+  }
+  if (event.type === 'complete') {
+    return {
+      ...base,
+      kind: 'complete',
+      agent: 'supervisor',
+      action: 'pipeline_complete',
+      detail: 'Pipeline complete',
+    };
+  }
+  return null;
+}
 
 export function useLoanOfficerWorkflow(addToast, active = true) {
   const [selectedApp, setSelectedApp] = useState(null);
@@ -15,9 +105,17 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
   const [planSettings, setPlanSettings] = useState(null);
   const [approvalDetails, setApprovalDetails] = useState(null);
   const [liveAgentOutput, setLiveAgentOutput] = useState({});
-  const sseRef = useRef(null);
+  const [activityEvents, setActivityEvents] = useState([]);
+  const [streamConnected, setStreamConnected] = useState(false);
+  const [streamError, setStreamError] = useState(false);
+  const activitySSERef = useRef(null);
+  const runStreamSSERef = useRef(null);
   const stageTimestampsRef = useRef({});
   const [stageTimestamps, setStageTimestamps] = useState({});
+  // Mirror of workflowStage for synchronous reads inside event handlers so
+  // we don't have to do side-effects (setStageTimestamps) inside a setState
+  // updater. StrictMode double-invokes updaters; keeping them pure is safer.
+  const currentStageRef = useRef(0);
   const executingStartRef = useRef(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [liveApplications, setLiveApplications] = useState([]);
@@ -30,6 +128,52 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
   selectedAppRef.current = selectedApp;
   const liveApplicationsRef = useRef(liveApplications);
   liveApplicationsRef.current = liveApplications;
+  // Keep currentStageRef aligned with the committed state.
+  currentStageRef.current = workflowStage;
+
+  // Advance the stage pointer and record its entry timestamp. All side
+  // effects happen outside setState updaters to stay StrictMode-safe.
+  const advanceStage = useCallback((stageIdx, markNext = false) => {
+    if (stageIdx == null || stageIdx < 0) return;
+    const prev = currentStageRef.current;
+    const tsMap = stageTimestampsRef.current;
+    let changed = false;
+    if (stageIdx > prev && tsMap[stageIdx] == null) {
+      tsMap[stageIdx] = Date.now();
+      changed = true;
+    }
+    if (markNext && stageIdx >= prev && tsMap[stageIdx + 1] == null) {
+      tsMap[stageIdx + 1] = Date.now();
+      changed = true;
+    }
+    if (changed) setStageTimestamps({ ...tsMap });
+    if (stageIdx > prev) {
+      currentStageRef.current = stageIdx;
+      setWorkflowStage(stageIdx);
+    }
+  }, []);
+
+  // ── Activity event fan-out ─────────────────────────────────────────────
+  const appendActivityEvents = useCallback((entries) => {
+    if (!entries || entries.length === 0) return;
+    setActivityEvents((prev) => {
+      // Cap and dedupe by stable content/id key. `id` itself carries a random
+      // suffix for React list keys; dedup must use `_dedupKey` instead, else
+      // the same backend event re-delivered via backlog + polling fallback
+      // renders twice.
+      const merged = [...entries, ...prev];
+      const seen = new Set();
+      const out = [];
+      for (const e of merged) {
+        const key = e._dedupKey || e.id;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(e);
+        if (out.length >= MAX_ACTIVITY_EVENTS) break;
+      }
+      return out;
+    });
+  }, []);
 
   // Real-time application queue via WebSocket + MongoDB Change Stream,
   // with REST fallback when WebSocket cannot connect through Next.js proxy.
@@ -89,7 +233,6 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     };
   }, [active]);
 
-  // Fetch portfolio stats when tab becomes active
   useEffect(() => {
     if (!active) return;
     apiGet('/portfolio/stats').then((data) => {
@@ -97,7 +240,6 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     }).catch(() => {});
   }, [active]);
 
-  // Fetch selected application detail from backend
   useEffect(() => {
     if (!selectedApp) {
       setSelectedAppDetail(null);
@@ -108,7 +250,6 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     });
   }, [selectedApp]);
 
-  // Dashboard stats derived from real data + portfolio stats
   const dashboardStats = useMemo(() => {
     const pendingCount = liveApplications.filter(
       (a) => ['review', 'pending_review'].includes(a.status)
@@ -151,52 +292,78 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     prevStatsRef.current = { total: liveApplications.length, processing: processingCount, approved: approvedCount, pending: pendingCount };
   }, [liveApplications]);
 
-  // Clean up SSE on unmount
+  // Cleanup on unmount. activitySSERef is managed by its per-app effect
+  // (closed + nulled in that effect's teardown) — only runStreamSSERef
+  // needs an unmount-scoped close here.
   useEffect(() => {
-    return () => { if (sseRef.current) { sseRef.current.close(); sseRef.current = null; } };
+    return () => {
+      if (runStreamSSERef.current) { runStreamSSERef.current.close(); runStreamSSERef.current = null; }
+    };
   }, []);
 
-  // Reconnect to activity stream for apps already processing
-  const reconnectActivitySSE = useCallback((appId) => {
-    if (sseRef.current) sseRef.current.close();
+  // ── Single persistent activity SSE per selected app ────────────────────
+  useEffect(() => {
+    // Close any prior stream first
+    if (activitySSERef.current) { activitySSERef.current.close(); activitySSERef.current = null; }
+    setStreamConnected(false);
+    setStreamError(false);
 
-    const source = apiSSE(
-      `/agent/${appId}/stream`,
+    if (!selectedApp) return;
+
+    const handle = apiSSE(
+      `/agent/${selectedApp}/stream`,
       (event) => {
-        if (event.type === 'agent_step') {
-          const agentName = event.agent || '';
-          const stageIdx = agentToStageIdx(agentName);
-          if (stageIdx != null) {
-            setWorkflowStage(stageIdx);
-          }
-          if (agentName === 'hitl_gate' && event.action === 'interrupt') {
-            setHitlReached(true); setHitlStartTime(Date.now());
-            addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
-          }
+        if (event.type === 'connected') {
+          setStreamConnected(true);
+          setStreamError(false);
+          return;
         }
-        if (event.type === 'complete') {
-          setApproved(true); setHitlResolutionTime(Date.now());
-          setApprovalDetails({ mode: 'auto' });
-          addToast({ type: 'success', title: 'Pipeline Complete', message: `Agent pipeline completed for ${appId}.` });
+
+        const entry = activityFromSseEvent(event, 'activity');
+        if (!entry) return;
+        appendActivityEvents([entry]);
+
+        // Drive workflow stage from backlog+live events
+        const stageIdx = agentToStageIdx(entry.agent);
+        if (stageIdx != null) advanceStage(stageIdx);
+
+        if (entry.agent === 'hitl_gate' && (entry.action === 'interrupt' || entry.action === 'hitl_waiting')) {
+          setHitlReached(true);
+          setHitlStartTime((prev) => prev || Date.now());
         }
-      }
+        if (entry.action === 'pipeline_complete' || entry.kind === 'complete') {
+          setApproved((prev) => prev || true);
+          setHitlResolutionTime((prev) => prev || Date.now());
+          setApprovalDetails((prev) => prev || { mode: 'auto' });
+        }
+      },
+      {
+        onConnect: () => { setStreamConnected(true); setStreamError(false); },
+        onError: () => setStreamError(true),
+        onClose: () => { setStreamConnected(false); },
+        autoCloseOn: [], // never auto-close; we manage the lifetime per-app
+      },
     );
 
-    sseRef.current = source;
-  }, [addToast]);
+    activitySSERef.current = handle;
 
-  const reconnectActivitySSERef = useRef(reconnectActivitySSE);
-  reconnectActivitySSERef.current = reconnectActivitySSE;
+    return () => {
+      if (handle) handle.close();
+      activitySSERef.current = null;
+    };
+  }, [selectedApp, appendActivityEvents, advanceStage]);
 
-  // Status-aware reset when selected app changes
+  // ── Reset everything when selected app changes ─────────────────────────
   useEffect(() => {
-    if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
+    // Clear per-app state first
     setWorkflowStage(0);
+    currentStageRef.current = 0;
     setHitlReached(false); setHitlStartTime(null); setHitlResolutionTime(null);
     setApproved(false);
     setPlanSettings(null);
     setApprovalDetails(null);
     setLiveAgentOutput({});
+    setActivityEvents([]);
     stageTimestampsRef.current = {};
     setStageTimestamps({});
 
@@ -207,33 +374,55 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
 
     const queueApp = liveApplicationsRef.current.find((a) => a.application_id === selectedApp);
     const status = queueApp?.status || 'submitted';
+    const derived = deriveWorkflowStateFromStatus(status);
 
-    if (status === 'review' || status === 'pending_review') {
-      setWorkflowPhase('executing');
-      setWorkflowStage(2);
-      setHitlReached(true); setHitlStartTime(Date.now());
-    } else if (status === 'processing' || status === 'underwriting') {
-      setWorkflowPhase('executing');
-      setWorkflowStage(status === 'underwriting' ? 1 : 0);
-      reconnectActivitySSERef.current(selectedApp);
-    } else if (status === 'approved' || status === 'closing') {
-      setWorkflowPhase('executing');
-      setApproved(true); setHitlResolutionTime(Date.now());
-      setApprovalDetails({ mode: 'auto' });
-    } else if (status === 'funded' || status === 'active') {
-      setWorkflowPhase('executing');
-      setApproved(true); setHitlResolutionTime(Date.now());
-      setApprovalDetails({ mode: 'auto' });
-    } else if (status === 'declined') {
-      setWorkflowPhase('executing');
-      setApproved(true); setHitlResolutionTime(Date.now());
-      setApprovalDetails({ mode: 'declined' });
-    } else if (status === 'error') {
+    // "submitted" is the only state that starts in preview; everything else
+    // starts in executing so the activity stream has a surface to render into.
+    if (status === 'submitted' || status === 'error') {
       setWorkflowPhase('preview');
-    } else {
-      setWorkflowPhase('preview');
+      return;
+    }
+
+    setWorkflowPhase(derived.phase);
+    setWorkflowStage(derived.stage);
+    currentStageRef.current = derived.stage;
+    if (derived.hitl) {
+      setHitlReached(true);
+      setHitlStartTime(Date.now());
+    }
+    if (derived.approved) {
+      setApproved(true);
+      setHitlResolutionTime(Date.now());
+      setApprovalDetails({ mode: derived.approvalMode });
     }
   }, [selectedApp]);
+
+  // ── Phase follows live queue status transitions ────────────────────────
+  // When the WS pushes a status change for the already-selected app (e.g.
+  // processing → underwriting → review → approved), re-derive phase/stage
+  // without blowing away liveAgentOutput or activityEvents.
+  const selectedQueueStatus = liveApplications.find((a) => a.application_id === selectedApp)?.status;
+  useEffect(() => {
+    if (!selectedApp || !selectedQueueStatus) return;
+    const derived = deriveWorkflowStateFromStatus(selectedQueueStatus);
+
+    if (selectedQueueStatus === 'submitted' || selectedQueueStatus === 'error') {
+      // Don't force "preview" if the user already started the pipeline locally
+      return;
+    }
+
+    setWorkflowPhase((prev) => (prev === 'manual' ? 'manual' : derived.phase));
+    advanceStage(derived.stage);
+    if (derived.hitl) {
+      setHitlReached(true);
+      setHitlStartTime((prev) => prev || Date.now());
+    }
+    if (derived.approved) {
+      setApproved(true);
+      setHitlResolutionTime((prev) => prev || Date.now());
+      setApprovalDetails((prev) => prev || { mode: derived.approvalMode });
+    }
+  }, [selectedApp, selectedQueueStatus, advanceStage]);
 
   // Elapsed processing timer
   useEffect(() => {
@@ -251,11 +440,12 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     return () => clearInterval(interval);
   }, [workflowPhase, approved, selectedApp]);
 
-  // SSE-driven workflow stage progression via run-stream
+  // SSE-driven workflow run via run-stream endpoint ("Proceed" action)
   const startWorkflowSSE = useCallback((appId) => {
-    if (sseRef.current) sseRef.current.close();
+    if (runStreamSSERef.current) runStreamSSERef.current.close();
 
     setWorkflowStage(0);
+    currentStageRef.current = 0;
     setHitlReached(false); setHitlStartTime(null); setHitlResolutionTime(null);
     setApproved(false);
     setWorkflowPhase('executing');
@@ -263,64 +453,58 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     stageTimestampsRef.current = { 0: Date.now() };
     setStageTimestamps({ ...stageTimestampsRef.current });
 
-    const source = apiSSE(
+    const handle = apiSSE(
       `/agent/${appId}/run-stream?autonomy_level=bounded`,
       (event) => {
+        // Synthesize an activity log entry from each pipeline event so the
+        // Activity Log shows graph transitions even before any agent_activity
+        // document is written.
+        const entry = activityFromSseEvent(event, 'run');
+        if (entry) appendActivityEvents([entry]);
+
         if (event.type === 'node_start') {
           const agentName = event.agent || event.name || '';
           const stageIdx = agentToStageIdx(agentName);
-          if (stageIdx != null) {
-            setWorkflowStage((prev) => {
-              if (stageIdx > prev) {
-                stageTimestampsRef.current[stageIdx] = Date.now();
-                setStageTimestamps({ ...stageTimestampsRef.current });
-              }
-              return Math.max(prev, stageIdx);
-            });
-          }
+          if (stageIdx != null) advanceStage(stageIdx);
         }
 
         if (event.type === 'node_complete') {
           const agentName = event.agent || '';
           const stageIdx = agentToStageIdx(agentName);
-          if (stageIdx != null) {
-            setWorkflowStage((prev) => {
-              if (stageIdx >= prev) {
-                stageTimestampsRef.current[stageIdx + 1] = stageTimestampsRef.current[stageIdx + 1] || Date.now();
-                setStageTimestamps({ ...stageTimestampsRef.current });
-              }
-              return Math.max(prev, stageIdx);
-            });
-          }
+          if (stageIdx != null) advanceStage(stageIdx, /* markNext */ true);
 
           if (event.output && typeof event.output === 'object') {
             setLiveAgentOutput((prev) => ({ ...prev, ...event.output }));
           }
 
           if (agentName === 'hitl_gate') {
-            setHitlReached(true); setHitlStartTime(Date.now());
+            setHitlReached(true); setHitlStartTime((prev) => prev || Date.now());
             addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
           }
         }
 
         if (event.type === 'hitl_waiting') {
-          setHitlReached(true); setHitlStartTime(Date.now());
-          setWorkflowStage(2);
-          stageTimestampsRef.current[2] = stageTimestampsRef.current[2] || Date.now();
-          setStageTimestamps({ ...stageTimestampsRef.current });
+          setHitlReached(true); setHitlStartTime((prev) => prev || Date.now());
+          advanceStage(2);
           addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
         }
 
         if (event.type === 'complete') {
-          setApproved(true); setHitlResolutionTime(Date.now());
-          setApprovalDetails({ mode: 'auto' });
+          setApproved(true);
+          advanceStage(WORKFLOW_STAGES.length - 1);
+          setHitlResolutionTime(Date.now());
+          setApprovalDetails((prev) => prev || { mode: 'auto' });
           addToast({ type: 'success', title: 'Pipeline Complete', message: `Agent pipeline completed for ${appId}.` });
         }
-      }
+      },
+      {
+        autoCloseOn: ['complete', 'error', 'hitl_waiting'],
+        onError: () => {},
+      },
     );
 
-    sseRef.current = source;
-  }, [addToast]);
+    runStreamSSERef.current = handle;
+  }, [addToast, appendActivityEvents, advanceStage]);
 
   const handleProceed = useCallback((settings) => {
     if (!selectedApp) return;
@@ -357,7 +541,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
         setHitlReached(false); setHitlStartTime(null); setHitlResolutionTime(null);
         setApproved(false);
         setApprovalDetails(null);
-        reconnectActivitySSERef.current(selectedApp);
+        // Activity SSE stays open — no need to reconnect
         addToast({ type: 'info', title: 'Modifications Applied', message: 'Agent re-running underwriting with updated terms.' });
       } else {
         addToast({ type: 'error', title: 'Modification Failed', message: 'Could not apply modified terms. Please try again.' });
@@ -375,7 +559,10 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     });
 
     if (result) {
-      setApproved(true); setHitlResolutionTime(Date.now());
+      setApproved(true);
+      setWorkflowStage(WORKFLOW_STAGES.length - 1);
+      currentStageRef.current = WORKFLOW_STAGES.length - 1;
+      setHitlResolutionTime(Date.now());
       setApprovalDetails(details || { mode: 'recommended' });
       addToast({ type: 'success', title: 'Loan Approved', message: `${rate ? `@ ${rate} ` : ''}for ${appName}.${suffix}` });
     } else {
@@ -396,7 +583,10 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       });
 
       if (result) {
-        setApproved(true); setHitlResolutionTime(Date.now());
+        setApproved(true);
+        setWorkflowStage(WORKFLOW_STAGES.length - 1);
+        currentStageRef.current = WORKFLOW_STAGES.length - 1;
+        setHitlResolutionTime(Date.now());
         setApprovalDetails({ mode: 'declined' });
         addToast({ type: 'warning', title: 'Application Declined', message: `${appName} — declined after manual review.` });
       } else {
@@ -405,16 +595,14 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     }
   }, [addToast, selectedApp, selectedAppDetail, selectedAppData]);
 
+  // Compatibility shim — LoanOfficerDashboard calls this on each activity entry
+  // render. Stage progression is now handled in the hoisted SSE effect, so this
+  // only needs to set HITL state on gate events for good measure.
   const handleAgentEvent = useCallback((entry) => {
     if (!entry) return;
-    const agentName = entry.agent || '';
-    const stageIdx = agentToStageIdx(agentName);
-    if (stageIdx != null) {
-      setWorkflowStage(stageIdx);
-    }
     if (entry.agent === 'hitl_gate' && entry.action === 'interrupt') {
-      // setHitlReached is idempotent — OK to call multiple times
-      setHitlReached(true); setHitlStartTime((prev) => prev || Date.now());
+      setHitlReached(true);
+      setHitlStartTime((prev) => prev || Date.now());
     }
   }, []);
 
@@ -437,6 +625,9 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     portfolioStats,
     dashboardStats,
     stageTimestamps,
+    activityEvents,
+    streamConnected,
+    streamError,
 
     handleProceed,
     handleManual,

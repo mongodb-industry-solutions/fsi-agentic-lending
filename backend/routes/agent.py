@@ -105,8 +105,18 @@ async def run_agent(app_id: str, autonomy_level: str = "bounded"):
 
 
 @router.get("/agent/{app_id}/stream")
-async def stream_agent(app_id: str):
-    """SSE endpoint — streams agent reasoning and actions in real time."""
+async def stream_agent(app_id: str, after: str | None = None):
+    """SSE endpoint — streams agent reasoning and actions in real time.
+
+    Query params:
+    - after: Client-supplied lastEventId from a prior connection. When present,
+      the 50-event backlog is skipped so reconnects don't duplicate events the
+      client has already seen. NOTE: this only suppresses backlog replay — the
+      live change-stream/polling path opens at the current position, so events
+      that landed between the client's disconnect and reconnect may be missed.
+      Gap-free resume would require parsing `after` back into a resume token
+      and passing it to `.watch(resume_after=...)`, which is not implemented.
+    """
     _validate_app_id(app_id)
 
     async def event_generator():
@@ -122,66 +132,207 @@ async def stream_agent(app_id: str):
 
         heartbeat_counter = 0
 
-        # Send recent activity as backlog so client doesn't miss events
-        backlog = await asyncio.to_thread(
-            lambda: list(
-                db["agent_activity"]
-                .find({"application_id": app_id}, {"_id": 0})
-                .sort("timestamp", -1)
-                .limit(50)
+        # Send recent activity as backlog so fresh clients don't miss events.
+        # Skipped when `after` is provided — the client is reconnecting and
+        # already has these events; re-sending would just duplicate in the UI.
+        last_timestamp = None
+        seen_ids: set = set()
+        backlog: list = []
+        if not after:
+            # Keep _id so we can seed seen_ids for the polling fallback (avoids
+            # re-emitting backlog docs that share the same millisecond timestamp
+            # as newer docs when using $gte).
+            backlog = await asyncio.to_thread(
+                lambda: list(
+                    db["agent_activity"]
+                    .find({"application_id": app_id})
+                    .sort("timestamp", -1)
+                    .limit(50)
+                )
             )
-        )
-        for doc in reversed(backlog):
-            event = {
-                "type": "agent_step",
-                "agent": doc.get("agent", ""),
-                "action": doc.get("action", ""),
-                "detail": doc.get("detail", ""),
-                "checkpoint_id": doc.get("checkpoint_id"),
-                "timestamp": doc.get("timestamp", "").isoformat()
-                if hasattr(doc.get("timestamp", ""), "isoformat") else "",
-                "backlog": True,
-            }
-            yield f"data: {json.dumps(event)}\n\n"
+            for doc in reversed(backlog):
+                event = {
+                    "type": "agent_step",
+                    "agent": doc.get("agent", ""),
+                    "action": doc.get("action", ""),
+                    "detail": doc.get("detail", ""),
+                    "checkpoint_id": doc.get("checkpoint_id"),
+                    "timestamp": doc.get("timestamp", "").isoformat()
+                    if hasattr(doc.get("timestamp", ""), "isoformat") else "",
+                    "backlog": True,
+                }
+                yield f"data: {json.dumps(event)}\n\n"
 
-        # Stream from agent_activity Change Stream
+            # Track the latest timestamp we've emitted so the polling fallback
+            # can resume without dupes. seen_ids holds the _ids of docs that share
+            # `last_timestamp` — needed because two log writes can land inside the
+            # same millisecond, and `$gt` would silently drop the second one.
+            if backlog:
+                last_ts = backlog[0].get("timestamp")  # `backlog` is desc-sorted
+                if last_ts:
+                    last_timestamp = last_ts
+                    for d in backlog:
+                        if d.get("timestamp") == last_timestamp and d.get("_id") is not None:
+                            seen_ids.add(d["_id"])
+
+        # Try MongoDB Change Stream first; fall back to polling if unavailable
+        # (e.g. standalone Mongo without replica set → OperationFailure).
         pipeline = [{"$match": {"fullDocument.application_id": app_id}}]
-        stream = db["agent_activity"].watch(pipeline, full_document="updateLookup")
-
+        stream = None
         try:
-            event_counter = 0
-            while True:
-                change = await asyncio.to_thread(stream.try_next)
-                if change:
-                    doc = change.get("fullDocument", {})
-                    event_counter += 1
-                    resume_token = str(change.get("_id", {}).get("_data", event_counter))
-                    event = {
-                        "type": "agent_step",
-                        "agent": doc.get("agent", ""),
-                        "action": doc.get("action", ""),
-                        "detail": doc.get("detail", ""),
-                        "checkpoint_id": doc.get("checkpoint_id"),
-                        "timestamp": doc.get("timestamp", "").isoformat()
-                        if hasattr(doc.get("timestamp", ""), "isoformat")
-                        else "",
-                    }
-                    yield f"id: {resume_token}\ndata: {json.dumps(event)}\n\n"
+            stream = await asyncio.to_thread(
+                lambda: db["agent_activity"].watch(pipeline, full_document="updateLookup")
+            )
+        except Exception:
+            stream = None  # Fall through to polling
 
-                    if doc.get("action") == "pipeline_complete":
-                        yield f"id: {resume_token}\ndata: {json.dumps({'type': 'complete', 'application_id': app_id})}\n\n"
+        event_counter = 0
+        try:
+            if stream is not None:
+                # Change Stream path — survives transient cursor failures (primary
+                # stepdown, network blip, 10-min idle-cursor timeout) by reopening
+                # the watch with resume_after=last_token. We track `last_resume_token`
+                # as the raw Mongo _id dict; the SSE event id remains the string
+                # `_data` field for EventSource compatibility.
+                last_resume_token = None
+                resume_retries = 0
+                MAX_RESUME_RETRIES = 3
+                terminated = False
+                while not terminated:
+                    if stream is None:
+                        # Reopen after a transient error
+                        if resume_retries >= MAX_RESUME_RETRIES:
+                            logger.error(f"Agent stream for {app_id} exceeded resume retries — giving up")
+                            break
+                        try:
+                            stream = await asyncio.to_thread(
+                                lambda: db["agent_activity"].watch(
+                                    pipeline,
+                                    full_document="updateLookup",
+                                    resume_after=last_resume_token,
+                                )
+                            )
+                            resume_retries = 0
+                        except Exception as reopen_err:
+                            resume_retries += 1
+                            logger.warning(
+                                f"Agent stream reopen failed for {app_id} "
+                                f"(retry {resume_retries}/{MAX_RESUME_RETRIES}): {reopen_err}"
+                            )
+                            await asyncio.sleep(min(0.5 * resume_retries, 5.0))
+                            continue
+
+                    try:
+                        change = await asyncio.to_thread(stream.try_next)
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as cursor_err:
+                        resume_retries += 1
+                        logger.warning(
+                            f"Agent stream change-cursor error for {app_id} "
+                            f"(retry {resume_retries}/{MAX_RESUME_RETRIES}): {cursor_err}"
+                        )
+                        try:
+                            stream.close()
+                        except Exception:
+                            pass
+                        stream = None
+                        await asyncio.sleep(min(0.5 * resume_retries, 5.0))
+                        continue
+
+                    if change:
+                        resume_retries = 0
+                        last_resume_token = change.get("_id")
+                        doc = change.get("fullDocument", {})
+                        event_counter += 1
+                        resume_token = str(change.get("_id", {}).get("_data", event_counter))
+                        ts = doc.get("timestamp", "")
+                        event = {
+                            "type": "agent_step",
+                            "agent": doc.get("agent", ""),
+                            "action": doc.get("action", ""),
+                            "detail": doc.get("detail", ""),
+                            "checkpoint_id": doc.get("checkpoint_id"),
+                            "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else "",
+                        }
+                        yield f"id: {resume_token}\ndata: {json.dumps(event)}\n\n"
+
+                        if doc.get("action") == "pipeline_complete":
+                            yield f"id: {resume_token}\ndata: {json.dumps({'type': 'complete', 'application_id': app_id})}\n\n"
+                            terminated = True
+                    else:
+                        await asyncio.sleep(0.5)
+                        heartbeat_counter += 1
+                        if heartbeat_counter % 30 == 0:
+                            yield ": heartbeat\n\n"
+            else:
+                # Polling fallback — query for docs with timestamp >= last_timestamp
+                # every 750ms, deduping by _id via seen_ids. Uses $gte (not $gt) so
+                # ties-at-millisecond are picked up; seen_ids prevents re-emission
+                # of rows already yielded from backlog or a prior poll tick.
+                while True:
+                    query = {"application_id": app_id}
+                    if last_timestamp is not None:
+                        query["timestamp"] = {"$gte": last_timestamp}
+                    new_docs = await asyncio.to_thread(
+                        lambda q=query: list(
+                            db["agent_activity"]
+                            .find(q)
+                            .sort("timestamp", 1)
+                            .limit(100)
+                        )
+                    )
+
+                    terminated = False
+                    for doc in new_docs:
+                        doc_id = doc.get("_id")
+                        if doc_id is not None and doc_id in seen_ids:
+                            continue
+                        event_counter += 1
+                        ts = doc.get("timestamp", "")
+                        if ts:
+                            if last_timestamp is None or ts > last_timestamp:
+                                # New-tick timestamp — reset seen_ids
+                                last_timestamp = ts
+                                seen_ids = set()
+                            if doc_id is not None:
+                                seen_ids.add(doc_id)
+                        event = {
+                            "type": "agent_step",
+                            "agent": doc.get("agent", ""),
+                            "action": doc.get("action", ""),
+                            "detail": doc.get("detail", ""),
+                            "checkpoint_id": doc.get("checkpoint_id"),
+                            "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else "",
+                        }
+                        yield f"id: {event_counter}\ndata: {json.dumps(event)}\n\n"
+                        if doc.get("action") == "pipeline_complete":
+                            yield f"id: {event_counter}\ndata: {json.dumps({'type': 'complete', 'application_id': app_id})}\n\n"
+                            terminated = True
+                            break
+
+                    if terminated:
                         break
-                else:
-                    await asyncio.sleep(0.5)
+
+                    await asyncio.sleep(0.75)
                     heartbeat_counter += 1
-                    if heartbeat_counter % 30 == 0:
+                    if heartbeat_counter % 40 == 0:
                         yield ": heartbeat\n\n"
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            # Intentionally do NOT yield {type: 'error'} here. The frontend's
+            # apiSSE auto-closes the stream when it receives a 'error' event —
+            # which would turn any transient backend hiccup into a permanent UI
+            # disconnect. Log and let the generator exit normally; EventSource
+            # will then reconnect via onerror and resume from lastEventId.
+            logger.error(f"Unhandled error in agent stream for {app_id}: {e}")
         finally:
-            stream.close()
+            if stream is not None:
+                try:
+                    stream.close()
+                except Exception:
+                    pass
 
     return StreamingResponse(
         event_generator(),
