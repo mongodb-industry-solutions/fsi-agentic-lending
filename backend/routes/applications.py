@@ -194,7 +194,8 @@ async def stream_activity(app_id: str):
                         yield f"data: {json.dumps(event)}\n\n"
                     await asyncio.sleep(0.75)
                     heartbeat_counter += 1
-                    if heartbeat_counter % 20 == 0:  # ~15s at 0.75s cadence
+                    # Emit heartbeat ~every 1.5s to defeat Envoy/Istio buffering.
+                    if heartbeat_counter % 2 == 0:
                         yield ": heartbeat\n\n"
                     continue
 
@@ -272,7 +273,8 @@ async def stream_activity(app_id: str):
                 else:
                     await asyncio.sleep(0.5)
                     heartbeat_counter += 1
-                    if heartbeat_counter % 30 == 0:  # ~15s at 0.5s cadence
+                    # Emit heartbeat every 1s to defeat Envoy/Istio SSE buffering.
+                    if heartbeat_counter % 2 == 0:
                         yield ": heartbeat\n\n"
         except asyncio.CancelledError:
             pass
@@ -291,9 +293,10 @@ async def stream_activity(app_id: str):
         event_generator(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+            "Content-Encoding": "identity",
         },
     )
 
@@ -367,7 +370,9 @@ async def stream_status(app_id: str):
                             yield f"data: {json.dumps(event)}\n\n"
                     await asyncio.sleep(1.0)
                     heartbeat_counter += 1
-                    if heartbeat_counter % 20 == 0:  # ~20s at 1.0s cadence
+                    # Emit heartbeat every 2s to defeat Envoy/Istio buffering
+                    # without generating excessive traffic on long-running polls.
+                    if heartbeat_counter % 2 == 0:
                         yield ": heartbeat\n\n"
                     continue
 
@@ -433,7 +438,8 @@ async def stream_status(app_id: str):
                 else:
                     await asyncio.sleep(0.5)
                     heartbeat_counter += 1
-                    if heartbeat_counter % 30 == 0:  # ~15s at 0.5s cadence
+                    # Emit heartbeat every 1s to defeat Envoy/Istio buffering.
+                    if heartbeat_counter % 2 == 0:
                         yield ": heartbeat\n\n"
         except asyncio.CancelledError:
             pass
@@ -450,9 +456,10 @@ async def stream_status(app_id: str):
         event_generator(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+            "Content-Encoding": "identity",
         },
     )
 

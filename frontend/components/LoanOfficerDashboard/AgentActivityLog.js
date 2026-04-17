@@ -545,11 +545,16 @@ export default function AgentActivityLog({
                     {viewMode === 'compact' && !isExpanded && entry.reasoning && (
                       <div style={{
                         fontSize: 9, color: 'var(--text-dim)', fontStyle: 'italic',
-                        marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        marginTop: 2,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        lineHeight: 1.5,
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
                       }}>
-                        {entry.reasoning.length > 120
-                          ? entry.reasoning.slice(0, entry.reasoning.lastIndexOf(' ', 120) || 120) + '...'
-                          : entry.reasoning}
+                        {entry.reasoning}
                       </div>
                     )}
                   </div>

@@ -280,7 +280,10 @@ export default function OfficerChangeStreamConsole({
                 </span>
               </div>
               {evt.detail && (
-                <div style={{ paddingLeft: 74, fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>
+                <div style={{
+                  paddingLeft: 74, fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginTop: 1,
+                  wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap', maxWidth: '100%',
+                }}>
                   {evt.detail}
                 </div>
               )}

@@ -467,10 +467,10 @@ export default function DecisionSummary({ applicationId, appDetail, approvalDeta
             const agentColors = AGENT_TIMELINE_COLORS;
             return (
               <div style={{
-                padding: '8px 10px', background: 'var(--bg-surface)',
+                padding: '10px 12px', background: 'var(--bg-surface)',
                 border: '1px solid var(--border-dim)', borderTop: 'none',
                 borderRadius: '0 0 6px 6px', marginBottom: spacing[2],
-                maxHeight: 240, overflowY: 'auto',
+                maxHeight: '70vh', overflowY: 'auto',
               }}>
                 {groups.map((group, gi) => {
                   const colors = agentColors[group.agent] || { color: 'var(--text-dim)', bg: 'var(--bg-raised)' };
@@ -484,26 +484,70 @@ export default function DecisionSummary({ applicationId, appDetail, approvalDeta
                       }}>
                         {group.agent} ({group.entries.length})
                       </div>
-                      {group.entries.map((entry, i) => (
-                        <div key={i} style={{
-                          display: 'flex', gap: 6, padding: '2px 0 2px 8px',
-                          fontSize: 9, lineHeight: 1.5,
-                          borderLeft: `2px solid ${colors.color}30`,
-                          background: i % 2 === 0 ? 'transparent' : 'var(--bg-raised)',
-                        }}>
-                          <span style={{
-                            width: 5, height: 5, borderRadius: '50%',
-                            background: colors.color, flexShrink: 0, marginTop: 5,
-                            opacity: 0.6,
-                          }} />
-                          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-dim)', minWidth: 55, flexShrink: 0 }}>
-                            {entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}
-                          </span>
-                          <span style={{ color: 'var(--text-secondary)' }}>
-                            {entry.detail || entry.action}
-                          </span>
-                        </div>
-                      ))}
+                      {group.entries.map((entry, i) => {
+                        const text = entry.detail || entry.action || '';
+                        const lines = String(text).split('\n');
+                        return (
+                          <div key={i} style={{
+                            display: 'flex', gap: 8, padding: '6px 0 6px 10px',
+                            fontSize: 10, lineHeight: 1.55,
+                            borderLeft: `2px solid ${colors.color}30`,
+                            background: i % 2 === 0 ? 'transparent' : 'var(--bg-raised)',
+                            alignItems: 'flex-start',
+                          }}>
+                            <span style={{
+                              width: 5, height: 5, borderRadius: '50%',
+                              background: colors.color, flexShrink: 0, marginTop: 7,
+                              opacity: 0.6,
+                            }} />
+                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-dim)', minWidth: 60, flexShrink: 0, fontSize: 9, marginTop: 1 }}>
+                              {entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}
+                            </span>
+                            <div style={{
+                              color: 'var(--text-secondary)', flex: 1, minWidth: 0,
+                              wordBreak: 'break-word', overflowWrap: 'anywhere',
+                            }}>
+                              {lines.map((line, li) => {
+                                if (line.length === 0) {
+                                  return <div key={li} style={{ height: 6 }} />;
+                                }
+                                const isHeader = line.startsWith('# ') || line.startsWith('## ');
+                                // Single-span bold: entire line wrapped in ** with no inner occurrences.
+                                const isWholeBold = line.startsWith('**') && line.endsWith('**') &&
+                                  line.length >= 4 && line.slice(2, -2).indexOf('**') === -1;
+                                // Render **bold** segments inline while preserving the rest.
+                                const renderInline = (text) => {
+                                  const parts = [];
+                                  const re = /\*\*([^*]+)\*\*/g;
+                                  let last = 0; let m; let idx = 0;
+                                  while ((m = re.exec(text)) !== null) {
+                                    if (m.index > last) parts.push(text.slice(last, m.index));
+                                    parts.push(<strong key={idx++}>{m[1]}</strong>);
+                                    last = m.index + m[0].length;
+                                  }
+                                  if (last < text.length) parts.push(text.slice(last));
+                                  return parts.length ? parts : text;
+                                };
+                                return (
+                                  <div key={li} style={{
+                                    marginBottom: 2,
+                                    fontWeight: (isHeader || isWholeBold) ? 700 : 400,
+                                    fontSize: isHeader ? 11 : 10,
+                                    color: isHeader ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                    whiteSpace: 'pre-wrap',
+                                  }}>
+                                    {isHeader
+                                      ? line.replace(/^#+\s*/, '')
+                                      : isWholeBold
+                                        ? line.slice(2, -2)
+                                        : renderInline(line)}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })}

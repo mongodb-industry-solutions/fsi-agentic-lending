@@ -263,7 +263,9 @@ async def stream_agent(app_id: str, after: str | None = None):
                     else:
                         await asyncio.sleep(0.5)
                         heartbeat_counter += 1
-                        if heartbeat_counter % 30 == 0:
+                        # Emit heartbeat every 1s (2 ticks) to defeat Envoy/Istio
+                        # SSE frame buffering on K8s staging.
+                        if heartbeat_counter % 2 == 0:
                             yield ": heartbeat\n\n"
             else:
                 # Polling fallback — query for docs with timestamp >= last_timestamp
@@ -316,7 +318,8 @@ async def stream_agent(app_id: str, after: str | None = None):
 
                     await asyncio.sleep(0.75)
                     heartbeat_counter += 1
-                    if heartbeat_counter % 40 == 0:
+                    # Emit heartbeat ~every 1.5s to defeat Envoy/Istio buffering.
+                    if heartbeat_counter % 2 == 0:
                         yield ": heartbeat\n\n"
         except asyncio.CancelledError:
             pass
@@ -338,9 +341,10 @@ async def stream_agent(app_id: str, after: str | None = None):
         event_generator(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+            "Content-Encoding": "identity",
         },
     )
 
@@ -379,8 +383,44 @@ async def run_and_stream(app_id: str, autonomy_level: str = "bounded"):
         yield f"data: {json.dumps({'type': 'started', 'application_id': app_id, 'autonomy_level': autonomy_level})}\n\n"
 
         _known_nodes = frozenset(("supervisor", "doc_verifier", "credit_puller", "loan_app", "underwriter", "hitl_gate", "complete"))
+
+        # Producer/consumer pattern: the graph iterator runs in its own task
+        # and pushes events onto a queue. We use `asyncio.wait_for` on the
+        # QUEUE (not on the iterator), so timeouts don't cancel the graph
+        # generator. On queue timeout we emit a heartbeat comment to defeat
+        # Envoy/Istio SSE frame buffering on K8s.
+        # Sentinels on the queue:
+        #   _DONE  -> producer finished cleanly
+        #   _ERROR -> producer raised; payload is the exception instance
+        _DONE = object()
+        _ERROR = object()
+        queue: asyncio.Queue = asyncio.Queue()
+
+        async def _producer():
+            try:
+                async for ev in graph.astream_events(initial_state, config=config, version="v2"):
+                    await queue.put(ev)
+            except BaseException as exc:  # noqa: BLE001 — need to forward GraphInterrupt
+                await queue.put((_ERROR, exc))
+                return
+            await queue.put(_DONE)
+
+        producer_task = asyncio.create_task(_producer())
+
         try:
-            async for event in graph.astream_events(initial_state, config=config, version="v2"):
+            while True:
+                try:
+                    item = await asyncio.wait_for(queue.get(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    yield ": heartbeat\n\n"
+                    continue
+
+                if item is _DONE:
+                    break
+                if isinstance(item, tuple) and len(item) == 2 and item[0] is _ERROR:
+                    raise item[1]
+
+                event = item
                 kind = event.get("event", "")
                 name = event.get("name", "")
 
@@ -408,12 +448,24 @@ async def run_and_stream(app_id: str, autonomy_level: str = "bounded"):
                 logger.error(f"Stream error for {app_id}: {e}")
                 yield f"data: {json.dumps({'type': 'error', 'message': str(e)[:500]})}\n\n"
         finally:
+            # Ensure producer is cleaned up before releasing the pipeline lock.
+            if not producer_task.done():
+                producer_task.cancel()
+                try:
+                    await producer_task
+                except (asyncio.CancelledError, Exception):
+                    pass
             _release_pipeline_lock(app_id)
 
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "Content-Encoding": "identity",
+        },
     )
 
 

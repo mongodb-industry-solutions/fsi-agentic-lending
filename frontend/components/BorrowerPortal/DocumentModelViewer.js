@@ -163,22 +163,66 @@ function TreeNode({ name, value, depth, changedPaths, path }) {
   );
 }
 
+function highlightJson(json) {
+  // Tokenize JSON string into syntax-highlighted spans.
+  // Order matters: handle strings (with optional key colon) before numbers/booleans.
+  const tokenRe = /("(?:\\.|[^"\\])*")(\s*:)?|\b(true|false|null)\b|(-?\d+\.?\d*(?:[eE][+-]?\d+)?)/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  let idx = 0;
+  while ((match = tokenRe.exec(json)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(json.slice(lastIndex, match.index));
+    }
+    const [full, str, colon, literal, num] = match;
+    if (str !== undefined) {
+      if (colon) {
+        // Object key
+        parts.push(
+          <span key={idx++} style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{str}</span>
+        );
+        parts.push(<span key={idx++} style={{ color: 'var(--text-dim)' }}>{colon}</span>);
+      } else {
+        // String value — check if it looks like a date/objectId
+        const inner = str.slice(1, -1);
+        let color = TYPE_COLORS.string;
+        if (/^\d{4}-\d{2}-\d{2}T/.test(inner)) color = TYPE_COLORS.date;
+        else if (/^[a-f0-9]{24}$/.test(inner)) color = TYPE_COLORS.objectId;
+        parts.push(<span key={idx++} style={{ color }}>{str}</span>);
+      }
+    } else if (literal !== undefined) {
+      const color = literal === 'null' ? TYPE_COLORS.null : TYPE_COLORS.boolean;
+      parts.push(
+        <span key={idx++} style={{ color, fontStyle: literal === 'null' ? 'italic' : 'normal' }}>{literal}</span>
+      );
+    } else if (num !== undefined) {
+      parts.push(<span key={idx++} style={{ color: TYPE_COLORS.number }}>{num}</span>);
+    }
+    lastIndex = match.index + full.length;
+  }
+  if (lastIndex < json.length) parts.push(json.slice(lastIndex));
+  return parts;
+}
+
 function RawJsonView({ doc }) {
+  const json = JSON.stringify(doc, null, 2);
   return (
     <pre style={{
-      fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1.6,
+      fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.65,
       background: 'var(--bg-void)', padding: spacing[3], borderRadius: 6,
-      margin: spacing[3], overflow: 'auto', color: 'var(--text-primary)',
+      margin: spacing[3], overflow: 'auto', color: 'var(--text-dim)',
       whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+      border: '1px solid var(--border-dim)',
     }}>
-      {JSON.stringify(doc, null, 2)}
+      {highlightJson(json)}
     </pre>
   );
 }
 
 export default function DocumentModelViewer({ applicationId }) {
   const [doc, setDoc] = useState(null);
-  const [viewMode, setViewMode] = useState('tree');
+  const [viewMode, setViewMode] = useState('json');
   const [changedPaths, setChangedPaths] = useState(new Set());
   const [lastUpdated, setLastUpdated] = useState(null);
   const prevDocRef = useRef(null);

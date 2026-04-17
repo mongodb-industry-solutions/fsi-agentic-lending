@@ -721,7 +721,7 @@ export default function ApplicationAgent({ applicationId, applicationStatus, onT
       <div style={{
         borderTop: '1px solid var(--border-dim)',
         padding: `${spacing[3]}px ${spacing[4]}px`,
-        display: 'flex', alignItems: 'flex-end',
+        display: 'flex', alignItems: 'center',
         gap: spacing[2], flexShrink: 0,
       }}>
         <textarea
@@ -735,14 +735,16 @@ export default function ApplicationAgent({ applicationId, applicationStatus, onT
           disabled={loading}
           rows={1}
           style={{
-            flex: 1, resize: 'none',
+            flex: 1, minWidth: 0, resize: 'none',
             border: '1px solid var(--border-dim)', borderRadius: 8,
             padding: `${spacing[2]}px ${spacing[3]}px`,
+            minHeight: 36, boxSizing: 'border-box',
             fontSize: 13, lineHeight: '20px',
             color: loading ? 'var(--text-dim)' : 'var(--text-primary)',
             background: loading ? 'var(--bg-surface)' : 'var(--bg-base)',
             fontFamily: 'inherit', outline: 'none',
-            overflow: 'hidden',
+            overflow: 'auto',
+            wordBreak: 'break-word',
             opacity: loading ? 0.7 : 1,
             cursor: loading ? 'not-allowed' : 'text',
             transition: 'border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease',
@@ -768,7 +770,7 @@ export default function ApplicationAgent({ applicationId, applicationStatus, onT
               color: 'var(--text-primary)',
               border: '1px solid var(--border-base)',
               borderRadius: 8,
-              width: 32, height: 32,
+              width: 36, height: 36,
               fontSize: 11, fontWeight: 700,
               fontFamily: 'var(--font-display)',
               cursor: 'pointer', flexShrink: 0,
@@ -806,7 +808,7 @@ export default function ApplicationAgent({ applicationId, applicationStatus, onT
               background: canSend ? 'var(--mongo)' : 'var(--border-dim)',
               color: canSend ? '#FFFFFF' : 'var(--text-dim)',
               border: 'none', borderRadius: 8,
-              width: 32, height: 32,
+              width: 36, height: 36,
               fontSize: 16, fontWeight: 600,
               fontFamily: 'var(--font-display)',
               cursor: canSend ? 'pointer' : 'default',

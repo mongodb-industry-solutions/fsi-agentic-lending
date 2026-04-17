@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
+import { apiGet } from '../../lib/api';
 
 // TODO: reconcile with PipelineExplorer.STAGE_META — same 7-stage pipeline
 // but this list uses outputKey/outputPreview closures for live-output binding
@@ -155,10 +156,71 @@ function StageCard({ stage, index, isComplete, isActive, output }) {
   );
 }
 
-export default function AggregationPipelineVisualizer({ liveAgentOutput, expanded, onToggle }) {
+export default function AggregationPipelineVisualizer({ applicationId, liveAgentOutput, expanded, onToggle }) {
   const [autoExpanded, setAutoExpanded] = useState(false);
+  const [fallbackData, setFallbackData] = useState(null);
   const userCollapsedRef = useRef(false);
   const prevExpandedRef = useRef(expanded);
+
+  // REST fallback: if SSE `liveAgentOutput` never populates (e.g. /stream
+  // reconnect path never sees node_complete events, or K8s proxy dropped
+  // early frames), fetch /applications/{id} and derive the same metrics.
+  // This guarantees the visualizer fills in for any in-flight application.
+  useEffect(() => {
+    if (!applicationId) return undefined;
+    const hasLiveData = liveAgentOutput && (
+      liveAgentOutput.risk_score != null ||
+      liveAgentOutput.gds_ratio != null ||
+      liveAgentOutput.primary_credit_score != null
+    );
+    if (hasLiveData) {
+      setFallbackData(null);
+      return undefined;
+    }
+    let cancelled = false;
+    let timer = null;
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const app = await apiGet(`/applications/${applicationId}`);
+        if (cancelled || !app) return;
+        const derived = {
+          document_count: Array.isArray(app.documents) ? app.documents.length : undefined,
+          primary_credit_score: app.primary_credit_score,
+          gds_ratio: app.gds_ratio,
+          tds_ratio: app.tds_ratio,
+          risk_score: app.risk_score,
+          risk_tier: app.risk_tier,
+          decision: app.status,
+        };
+        setFallbackData(derived);
+      } catch {
+        // Swallow — next tick will retry.
+      }
+      if (!cancelled) timer = setTimeout(tick, 5000);
+    };
+    // First attempt after 3s to give SSE a chance to win.
+    timer = setTimeout(tick, 3000);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [applicationId, liveAgentOutput?.risk_score, liveAgentOutput?.gds_ratio, liveAgentOutput?.primary_credit_score]);
+
+  // Merge: prefer whichever source has more stage-relevant signal, so that
+  // during reconnect (where SSE may only emit early node_complete events like
+  // `document_count`) the REST fallback — which reads persisted risk metrics —
+  // still gets to fill in downstream stages. We count stage-mapped keys from
+  // each source and pick the winner; ties prefer live data.
+  const effectiveOutput = useMemo(() => {
+    const stageKeys = ['document_count', 'primary_credit_score', 'gds_ratio', 'tds_ratio', 'risk_score', 'decision'];
+    const count = (obj) => obj ? stageKeys.filter((k) => obj[k] != null).length : 0;
+    const liveCount = count(liveAgentOutput);
+    const fbCount = count(fallbackData);
+    if (liveCount === 0 && fbCount === 0) return liveAgentOutput || {};
+    if (fbCount > liveCount) return fallbackData;
+    return liveAgentOutput || fallbackData || {};
+  }, [liveAgentOutput, fallbackData]);
 
   // Track user-initiated collapse so we don't fight their intent.
   useEffect(() => {
@@ -177,28 +239,28 @@ export default function AggregationPipelineVisualizer({ liveAgentOutput, expande
   // after the user has manually collapsed the panel.
   useEffect(() => {
     if (userCollapsedRef.current) return;
-    if (!autoExpanded && (liveAgentOutput?.risk_score != null || liveAgentOutput?.gds_ratio != null)) {
+    if (!autoExpanded && (effectiveOutput?.risk_score != null || effectiveOutput?.gds_ratio != null)) {
       setAutoExpanded(true);
       if (!expanded && onToggle) onToggle();
     }
     // expanded and onToggle intentionally omitted — autoExpanded guards against re-fire
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveAgentOutput?.risk_score, liveAgentOutput?.gds_ratio, autoExpanded]);
+  }, [effectiveOutput?.risk_score, effectiveOutput?.gds_ratio, autoExpanded]);
 
   // Determine which stages are complete based on available data
   const completedStages = useMemo(() => {
-    if (!liveAgentOutput || Object.keys(liveAgentOutput).length === 0) return 0;
+    if (!effectiveOutput || Object.keys(effectiveOutput).length === 0) return 0;
     // Progressive: each stage completes when its output key has data
     let completed = 0;
     for (const stage of PIPELINE_STAGES) {
-      if (liveAgentOutput[stage.outputKey] != null) {
+      if (effectiveOutput[stage.outputKey] != null) {
         completed = PIPELINE_STAGES.indexOf(stage) + 1;
       }
     }
     // If risk_score exists, all stages complete
-    if (liveAgentOutput.risk_score != null) return PIPELINE_STAGES.length;
+    if (effectiveOutput.risk_score != null) return PIPELINE_STAGES.length;
     return completed;
-  }, [liveAgentOutput]);
+  }, [effectiveOutput]);
 
   const totalMs = PIPELINE_STAGES.reduce((s, st) => s + st.estimatedMs, 0);
   const hasData = completedStages > 0;
@@ -206,7 +268,7 @@ export default function AggregationPipelineVisualizer({ liveAgentOutput, expande
 
   // Collapsed summary
   const summaryText = hasData
-    ? `${PIPELINE_STAGES.length}-Stage Pipeline | ${totalMs.toFixed(1)}ms${liveAgentOutput?.risk_score != null ? ` | Risk: ${liveAgentOutput.risk_score}/100` : ''}`
+    ? `${PIPELINE_STAGES.length}-Stage Pipeline | ${totalMs.toFixed(1)}ms${effectiveOutput?.risk_score != null ? ` | Risk: ${effectiveOutput.risk_score}/100` : ''}`
     : `${PIPELINE_STAGES.length}-Stage Aggregation Pipeline`;
 
   return (
@@ -266,7 +328,7 @@ export default function AggregationPipelineVisualizer({ liveAgentOutput, expande
               index={i}
               isComplete={i < completedStages}
               isActive={i === completedStages}
-              output={liveAgentOutput || {}}
+              output={effectiveOutput || {}}
             />
           ))}
 

@@ -556,6 +556,12 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     const result = await apiPost(`/hitl/${selectedApp}/decision`, {
       action: 'approve',
       officer_notes: details?.conditions || 'Approved after manual review',
+      officer_id: 'officer-demo',
+      conditions: details?.conditions ? [details.conditions] : [],
+      overrides: {
+        ...(details?.rate ? { rate: parseFloat(details.rate) } : {}),
+        ...(details?.loanAmount ? { loan_amount: details.loanAmount } : {}),
+      },
     });
 
     if (result) {
@@ -580,6 +586,9 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       const result = await apiPost(`/hitl/${selectedApp}/decision`, {
         action: 'decline',
         officer_notes: 'Declined after manual review',
+        officer_id: 'officer-demo',
+        conditions: [],
+        overrides: {},
       });
 
       if (result) {

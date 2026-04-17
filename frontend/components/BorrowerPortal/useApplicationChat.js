@@ -154,7 +154,9 @@ export function useApplicationChat(applicationId, applicationStatus) {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    const maxHeight = 20 * 4;
+    // Grow up to ~7 lines; beyond that the textarea's own overflow:auto
+    // lets the borrower scroll inside the input rather than clipping.
+    const maxHeight = 20 * 7;
     el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
   }, []);
 

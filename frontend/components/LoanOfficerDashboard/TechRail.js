@@ -122,6 +122,7 @@ export default function TechRail({ applicationId, liveAgentOutput, lastCorrelate
 
       {/* Aggregation Pipeline Visualizer — collapsible */}
       <AggregationPipelineVisualizer
+        applicationId={applicationId}
         liveAgentOutput={liveAgentOutput}
         expanded={pipelineExpanded}
         onToggle={handlePipelineToggle}

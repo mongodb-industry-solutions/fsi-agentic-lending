@@ -291,7 +291,7 @@ export default function ChangeStreamConsole({ applicationId }) {
               animation: 'eventSlideIn 220ms cubic-bezier(0.33, 1, 0.68, 1) both',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{
                 fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)',
                 minWidth: 80, flexShrink: 0,
@@ -300,7 +300,10 @@ export default function ChangeStreamConsole({ applicationId }) {
               </span>
               <OpBadge op={evt.operation} />
               <CollectionBadge name={evt.collection} />
-              <span style={{ fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+              <span style={{
+                fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1,
+              }}>
                 {evt.summary}
               </span>
             </div>
@@ -308,6 +311,7 @@ export default function ChangeStreamConsole({ applicationId }) {
               <div style={{
                 paddingLeft: 88, fontSize: 11, color: 'var(--text-dim)',
                 fontFamily: 'var(--font-mono)', marginTop: 1,
+                wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap', maxWidth: '100%',
               }}>
                 {evt.detail}
               </div>
