@@ -4,11 +4,11 @@ export const NODE_COLORS = {
   supervisor: palette.green.dark2,    // #00684A
   appAgent: '#0891b2',
   underwriter: '#2563eb',
-  servicingAgent: '#6341e0',
+  docVerifier: '#0891b2',
+  creditPuller: '#0891b2',
   creditAPI: '#64748b',
   voyageEmbed: '#6341e0',
   vectorSearch: '#6341e0',
-  graphLookup: '#dc2626',
   aggregation: '#0891b2',
   changeStream: '#059669',
   timeSeries: '#6341e0',

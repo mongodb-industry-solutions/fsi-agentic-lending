@@ -7,28 +7,27 @@ import { apiGet } from '../../lib/api';
 import { formatCurrency, getRiskColor } from './utils';
 
 const POST_APPROVAL_STAGES = [
-  { label: 'Closing in progress', icon: '📑', delay: 1500 },
-  { label: 'Documents signed', icon: '✍️', delay: 2500 },
-  { label: 'Funded', icon: '💰', delay: 1500 },
+  { label: 'Closing in progress', icon: '📑', statuses: ['closing'] },
+  { label: 'Documents signed', icon: '✍️', statuses: ['funded', 'active'] },
+  { label: 'Funded', icon: '💰', statuses: ['funded', 'active'] },
 ];
 
-function PostApprovalProgression({ active, applicationId }) {
-  const [stage, setStage] = useState(0);
+// Map the current application status to a stage index.
+// `approved` is pre-closing (stage 0 shown but not yet active),
+// `closing` → stage 0, `funded`/`active` → final stage.
+function stageFromStatus(status) {
+  if (!status) return -1;
+  if (status === 'closing') return 0;
+  if (status === 'funded' || status === 'active') return POST_APPROVAL_STAGES.length - 1;
+  return -1;
+}
 
-  useEffect(() => {
-    setStage(0);
-    if (!active) return;
-    let cancelled = false;
-    let cumulative = 0;
-    POST_APPROVAL_STAGES.forEach((s, i) => {
-      if (i === 0) return;
-      cumulative += POST_APPROVAL_STAGES[i - 1].delay;
-      setTimeout(() => { if (!cancelled) setStage(i); }, cumulative);
-    });
-    return () => { cancelled = true; };
-  }, [active, applicationId]);
+function PostApprovalProgression({ active, status }) {
+  const stage = stageFromStatus(status);
 
-  if (!active) return null;
+  // Only show once backend has actually advanced to a post-approval status.
+  // Hides for plain "approved" (no fake progress) — fires on closing/funded/active.
+  if (!active || stage < 0) return null;
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: `${spacing[2]}px 0`, marginBottom: spacing[3] }}>
@@ -54,6 +53,14 @@ function PostApprovalProgression({ active, applicationId }) {
   );
 }
 
+const AGENT_TIMELINE_COLORS = {
+  supervisor: { color: 'var(--mongo)', bg: 'var(--mongo-dim)' },
+  loan_app_agent: { color: 'var(--agent-cyan)', bg: 'var(--agent-cyan-dim)' },
+  loan_app: { color: 'var(--agent-cyan)', bg: 'var(--agent-cyan-dim)' },
+  underwriter: { color: 'var(--hitl-amber)', bg: 'var(--hitl-amber-dim)' },
+  hitl_gate: { color: 'var(--hitl-amber)', bg: 'var(--hitl-amber-dim)' },
+};
+
 function StageTimeline({ trail }) {
   if (!trail || trail.length === 0) return null;
 
@@ -74,8 +81,14 @@ function StageTimeline({ trail }) {
     }
   });
 
+  const maxDuration = Math.max(...stages.map((s) => {
+    const start = s.startTime ? new Date(s.startTime) : null;
+    const end = s.endTime ? new Date(s.endTime) : null;
+    return start && end ? end - start : 0;
+  }), 1);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: spacing[3] }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: spacing[3] }}>
       <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
         Processing Timeline
       </div>
@@ -84,25 +97,31 @@ function StageTimeline({ trail }) {
         const end = stage.endTime ? new Date(stage.endTime) : null;
         const durationMs = start && end ? end - start : 0;
         const durationLabel = durationMs < 1000 ? `${durationMs}ms` : `${(durationMs / 1000).toFixed(1)}s`;
+        const pct = Math.max(8, (durationMs / maxDuration) * 100);
+        const colors = AGENT_TIMELINE_COLORS[stage.agent] || { color: 'var(--text-dim)', bg: 'var(--bg-raised)' };
 
         return (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{
-              width: 8, height: 8, borderRadius: '50%',
-              background: i === stages.length - 1 ? 'var(--success)' : 'var(--agent-cyan)',
-              flexShrink: 0,
-            }} />
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{
-                fontSize: 10, fontWeight: 600, color: 'var(--text-primary)',
-                fontFamily: 'var(--font-mono)',
-              }}>
-                {stage.agent}
-              </span>
-              <span style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-                {stage.actions.length} actions · {durationLabel}
-              </span>
+          <div key={i} style={{
+            padding: '6px 10px', borderRadius: 6,
+            background: colors.bg,
+            borderLeft: `3px solid ${colors.color}`,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{
+              fontSize: 10, fontWeight: 700, color: colors.color,
+              fontFamily: 'var(--font-mono)', minWidth: 90,
+            }}>
+              {stage.agent}
+            </span>
+            <div style={{ flex: 1, height: 4, background: 'var(--border-dim)', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{
+                width: `${pct}%`, height: '100%', borderRadius: 2,
+                background: colors.color, transition: 'width 400ms ease',
+              }} />
             </div>
+            <span style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', minWidth: 85, textAlign: 'right' }}>
+              {stage.actions.length} actions · {durationLabel}
+            </span>
           </div>
         );
       })}
@@ -266,7 +285,7 @@ export default function DecisionSummary({ applicationId, appDetail, approvalDeta
             {isDeclined ? '\u2715' : '\u2713'}
           </div>
           <div>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16, color: statusColor }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'var(--text-md)', color: statusColor }}>
               {isDeclined ? 'APPLICATION DECLINED' : 'LOAN APPROVED'}
             </div>
             <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
@@ -290,8 +309,8 @@ export default function DecisionSummary({ applicationId, appDetail, approvalDeta
       {/* Decision Provenance Chain */}
       <ProvenanceChain trail={trail} approvalDetails={approvalDetails} isDeclined={isDeclined} />
 
-      {/* Post-approval micro-progression */}
-      {!isDeclined && <PostApprovalProgression active={!isDeclined} applicationId={applicationId} />}
+      {/* Post-approval micro-progression — only renders on real closing/funded status */}
+      {!isDeclined && <PostApprovalProgression active={!isDeclined} status={appDetail?.status} />}
 
       {/* Officer modifications (HITL) */}
       {(isHITL || isManual) && (
@@ -433,28 +452,64 @@ export default function DecisionSummary({ applicationId, appDetail, approvalDeta
               transition: 'transform 0.2s', display: 'inline-block',
             }}>{'\u25BE'}</span>
           </button>
-          {showAudit && (
-            <div style={{
-              padding: '8px 10px', background: 'var(--bg-surface)',
-              border: '1px solid var(--border-dim)', borderTop: 'none',
-              borderRadius: '0 0 6px 6px', marginBottom: spacing[2],
-              maxHeight: 200, overflowY: 'auto',
-            }}>
-              {trail.map((entry, i) => (
-                <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 3, fontSize: 9, lineHeight: 1.5 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-dim)', minWidth: 55, flexShrink: 0 }}>
-                    {entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}
-                  </span>
-                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--agent-cyan)', fontWeight: 600, minWidth: 65, flexShrink: 0 }}>
-                    {entry.agent}
-                  </span>
-                  <span style={{ color: 'var(--text-secondary)' }}>
-                    {entry.detail || entry.action}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          {showAudit && (() => {
+            const groups = [];
+            let currentGroup = null;
+            trail.forEach((entry) => {
+              const agent = entry.agent || 'system';
+              if (agent !== currentGroup?.agent) {
+                currentGroup = { agent, entries: [entry] };
+                groups.push(currentGroup);
+              } else {
+                currentGroup.entries.push(entry);
+              }
+            });
+            const agentColors = AGENT_TIMELINE_COLORS;
+            return (
+              <div style={{
+                padding: '8px 10px', background: 'var(--bg-surface)',
+                border: '1px solid var(--border-dim)', borderTop: 'none',
+                borderRadius: '0 0 6px 6px', marginBottom: spacing[2],
+                maxHeight: 240, overflowY: 'auto',
+              }}>
+                {groups.map((group, gi) => {
+                  const colors = agentColors[group.agent] || { color: 'var(--text-dim)', bg: 'var(--bg-raised)' };
+                  return (
+                    <div key={gi} style={{ marginBottom: gi < groups.length - 1 ? 6 : 0 }}>
+                      <div style={{
+                        fontSize: 8, fontWeight: 700, fontFamily: 'var(--font-mono)',
+                        color: colors.color, textTransform: 'uppercase', letterSpacing: '0.5px',
+                        padding: '3px 0', borderBottom: `1px solid ${colors.color}20`,
+                        marginBottom: 2,
+                      }}>
+                        {group.agent} ({group.entries.length})
+                      </div>
+                      {group.entries.map((entry, i) => (
+                        <div key={i} style={{
+                          display: 'flex', gap: 6, padding: '2px 0 2px 8px',
+                          fontSize: 9, lineHeight: 1.5,
+                          borderLeft: `2px solid ${colors.color}30`,
+                          background: i % 2 === 0 ? 'transparent' : 'var(--bg-raised)',
+                        }}>
+                          <span style={{
+                            width: 5, height: 5, borderRadius: '50%',
+                            background: colors.color, flexShrink: 0, marginTop: 5,
+                            opacity: 0.6,
+                          }} />
+                          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-dim)', minWidth: 55, flexShrink: 0 }}>
+                            {entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}
+                          </span>
+                          <span style={{ color: 'var(--text-secondary)' }}>
+                            {entry.detail || entry.action}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* Copy Audit Trail */}
           <button

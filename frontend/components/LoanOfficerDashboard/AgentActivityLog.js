@@ -5,6 +5,8 @@ import { spacing } from '@leafygreen-ui/tokens';
 import { apiSSE, apiGet } from '../../lib/api';
 import styles from './AgentActivityLog.module.css';
 
+const NOISE_ACTIONS = ['tool_parse_warning', 'heartbeat', 'ping', 'noop'];
+
 const FILTERS = [
   { id: 'all', label: 'All' },
   { id: 'supervisor', label: 'Supervisor' },
@@ -52,7 +54,9 @@ function relativeTime(ts) {
   return `${Math.floor(diff / 3600)}h ago`;
 }
 
-export default function AgentActivityLog({ onEvent, applicationId, onStatsChange, hitlReached, liveAgentOutput }) {
+const HITL_FALLBACK_STATUSES = new Set(['review', 'pending_review', 'processing', 'underwriting']);
+
+export default function AgentActivityLog({ onEvent, applicationId, applicationStatus, onStatsChange, hitlReached, liveAgentOutput }) {
   const [entries, setEntries] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [activeFilter, setActiveFilter] = useState('all');
@@ -62,6 +66,7 @@ export default function AgentActivityLog({ onEvent, applicationId, onStatsChange
   const [searchFocused, setSearchFocused] = useState(false);
   const pausedRef = useRef(false);
   const bufferedEntriesRef = useRef([]);
+  const sseEventCountRef = useRef(0);
   const [bufferCount, setBufferCount] = useState(0);
   const [totalReceived, setTotalReceived] = useState(0);
   const hitlInjectedRef = useRef(false);
@@ -130,6 +135,7 @@ export default function AgentActivityLog({ onEvent, applicationId, onStatsChange
     setBufferCount(0);
     bufferedEntriesRef.current = [];
     hitlInjectedRef.current = false;
+    sseEventCountRef.current = 0;
 
     const source = apiSSE(
       `/agent/${applicationId}/stream`,
@@ -149,6 +155,7 @@ export default function AgentActivityLog({ onEvent, applicationId, onStatsChange
             isLive: true,
           };
 
+          sseEventCountRef.current += 1;
           setTotalReceived((prev) => prev + 1);
 
           if (pausedRef.current) {
@@ -168,32 +175,44 @@ export default function AgentActivityLog({ onEvent, applicationId, onStatsChange
       }
     );
 
-    // REST fallback: fetch activity trail for apps already in review
-    apiGet(`/hitl/${applicationId}/context`).then((ctx) => {
-      if (ctx?.activity_trail?.length > 0) {
-        const trailEntries = ctx.activity_trail.map((a, i) => ({
-          id: `trail-${i}-${Date.now()}`,
-          agent: a.agent || 'System',
-          category: (a.agent || '').toLowerCase().includes('underwrit') ? 'underwriting'
-            : (a.agent || '').toLowerCase().includes('supervisor') ? 'supervisor'
-            : (a.agent || '').toLowerCase().includes('hitl') ? 'hitl'
-            : 'loanapp',
-          action: a.action || '',
-          reasoning: a.detail || '',
-          time: a.timestamp ? new Date(a.timestamp).toLocaleTimeString() : '',
-          _ts: a.timestamp ? new Date(a.timestamp).getTime() : Date.now(),
-          isLive: false,
-        }));
-        setEntries((prev) => prev.length === 0 ? trailEntries : prev);
-        setTotalReceived((prev) => prev === 0 ? trailEntries.length : prev);
-      }
-    }).catch(() => {});
+    // REST fallback: fetch activity trail for apps whose status implies there
+    // should be prior activity. Gated by status + a 2s timer so SSE has a
+    // chance to populate first before we hit the fallback endpoint.
+    let fallbackTimer = null;
+    if (applicationStatus && HITL_FALLBACK_STATUSES.has(applicationStatus)) {
+      fallbackTimer = setTimeout(() => {
+        // Skip if SSE already produced events for this app.
+        if (sseEventCountRef.current > 0) return;
+        apiGet(`/hitl/${applicationId}/context`).then((ctx) => {
+          if (ctx?.activity_trail?.length > 0) {
+            const trailEntries = ctx.activity_trail.map((a, i) => ({
+              id: `trail-${i}-${Date.now()}`,
+              agent: a.agent || 'System',
+              category: (a.agent || '').toLowerCase().includes('underwrit') ? 'underwriting'
+                : (a.agent || '').toLowerCase().includes('supervisor') ? 'supervisor'
+                : (a.agent || '').toLowerCase().includes('hitl') ? 'hitl'
+                : 'loanapp',
+              action: a.action || '',
+              reasoning: a.detail || '',
+              time: a.timestamp ? new Date(a.timestamp).toLocaleTimeString() : '',
+              _ts: a.timestamp ? new Date(a.timestamp).getTime() : Date.now(),
+              isLive: false,
+            }));
+            setEntries((prev) => prev.length === 0 ? trailEntries : prev);
+            setTotalReceived((prev) => prev === 0 ? trailEntries.length : prev);
+          }
+        }).catch(() => {});
+      }, 2000);
+    }
 
-    return () => source?.close();
-  }, [applicationId]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      source?.close();
+    };
+  }, [applicationId, applicationStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = useMemo(() => {
-    let result = entries;
+    let result = entries.filter((e) => !NOISE_ACTIONS.includes(e.action));
     if (activeFilter !== 'all') {
       result = result.filter((e) => e.category === activeFilter);
     }
@@ -229,7 +248,7 @@ export default function AgentActivityLog({ onEvent, applicationId, onStatsChange
         overflow: 'hidden',
       }}>
         <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--border-dim)' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 'var(--text-sm)' }}>
             Agent Activity Log
           </div>
         </div>
@@ -293,7 +312,7 @@ export default function AgentActivityLog({ onEvent, applicationId, onStatsChange
       {/* Header */}
       <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--border-dim)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 'var(--text-sm)' }}>
             Agent Activity Log
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -568,7 +587,9 @@ export default function AgentActivityLog({ onEvent, applicationId, onStatsChange
                         fontSize: 9, color: 'var(--text-dim)', fontStyle: 'italic',
                         marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>
-                        {entry.reasoning.length > 80 ? entry.reasoning.slice(0, 80) + '...' : entry.reasoning}
+                        {entry.reasoning.length > 120
+                          ? entry.reasoning.slice(0, entry.reasoning.lastIndexOf(' ', 120) || 120) + '...'
+                          : entry.reasoning}
                       </div>
                     )}
                   </div>
@@ -583,14 +604,27 @@ export default function AgentActivityLog({ onEvent, applicationId, onStatsChange
                           fontSize: 9, fontWeight: 700, color: 'var(--agent-cyan)',
                           textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4,
                         }}>
-                          Reasoning
+                          Detail
                         </div>
                         <div style={{
-                          fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5,
-                          padding: '6px 8px', background: 'var(--bg-raised)',
+                          fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6,
+                          padding: '8px 10px', background: 'var(--bg-raised)',
                           borderRadius: 6, borderLeft: '2px solid var(--agent-cyan)',
                         }}>
-                          {entry.reasoning}
+                          {entry.reasoning.split('\n').filter(Boolean).map((para, pi) => {
+                            const isHeader = para.startsWith('# ') || para.startsWith('## ');
+                            const isBold = para.startsWith('**') && para.endsWith('**');
+                            return (
+                              <div key={pi} style={{
+                                marginBottom: 4,
+                                fontWeight: (isHeader || isBold) ? 700 : 400,
+                                fontSize: isHeader ? 11 : 10,
+                                color: isHeader ? 'var(--text-primary)' : 'var(--text-secondary)',
+                              }}>
+                                {isHeader ? para.replace(/^#+\s*/, '') : isBold ? para.slice(2, -2) : para}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>

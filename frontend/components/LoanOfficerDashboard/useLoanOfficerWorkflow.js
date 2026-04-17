@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { apiPost, apiGet, apiSSE, apiWebSocket } from '../../lib/api';
-import { NODE_TO_STAGE } from './constants';
+import { agentToStageIdx } from './constants';
 
 export function useLoanOfficerWorkflow(addToast, active = true) {
   const [selectedApp, setSelectedApp] = useState(null);
@@ -17,6 +17,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
   const [liveAgentOutput, setLiveAgentOutput] = useState({});
   const sseRef = useRef(null);
   const stageTimestampsRef = useRef({});
+  const [stageTimestamps, setStageTimestamps] = useState({});
   const executingStartRef = useRef(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [liveApplications, setLiveApplications] = useState([]);
@@ -124,22 +125,6 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       return '';
     };
 
-    const completedApps = liveApplications.filter((a) =>
-      (a.status === 'approved' || a.status === 'declined') && a.created_at
-    );
-    let avgTimeStr = '';
-    if (completedApps.length > 0) {
-      const times = completedApps.map((a) => {
-        const created = new Date(a.created_at).getTime();
-        const updated = a.updated_at ? new Date(a.updated_at).getTime() : Date.now();
-        return updated - created;
-      }).filter((t) => t > 0);
-      if (times.length > 0) {
-        const avgMs = times.reduce((s, t) => s + t, 0) / times.length;
-        avgTimeStr = avgMs < 60000 ? `~${(avgMs / 1000).toFixed(0)}s` : `~${(avgMs / 60000).toFixed(1)}m`;
-      }
-    }
-
     const stats = [
       { label: 'Applications', value: String(liveApplications.length), color: 'var(--mongo)', trend: trend('total', liveApplications.length) },
       { label: 'Processing', value: String(processingCount), color: 'var(--agent-cyan)', trend: trend('processing', processingCount) },
@@ -147,19 +132,12 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       { label: 'Pending Reviews', value: String(pendingCount), color: 'var(--hitl-amber)', trend: trend('pending', pendingCount) },
     ];
 
-    if (avgTimeStr) {
-      stats.push({ label: 'Avg Time', value: avgTimeStr, color: 'var(--agent-cyan)' });
-    }
-
     if (portfolioStats) {
       if (portfolioStats.total_portfolio_value) {
         stats.push({ label: 'Portfolio Value', value: `$${(portfolioStats.total_portfolio_value / 1_000_000).toFixed(1)}M`, color: 'var(--mongo)' });
       }
       if (portfolioStats.active_loans != null) {
         stats.push({ label: 'Active Loans', value: String(portfolioStats.active_loans), color: 'var(--tool-blue)' });
-      }
-      if (portfolioStats.delinquency_rate != null) {
-        stats.push({ label: 'Delinquency', value: `${(portfolioStats.delinquency_rate * 100).toFixed(1)}%`, color: portfolioStats.delinquency_rate > 0.05 ? 'var(--danger)' : 'var(--success)' });
       }
     }
 
@@ -187,8 +165,8 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       (event) => {
         if (event.type === 'agent_step') {
           const agentName = event.agent || '';
-          const stageIdx = NODE_TO_STAGE[agentName];
-          if (stageIdx !== undefined) {
+          const stageIdx = agentToStageIdx(agentName);
+          if (stageIdx != null) {
             setWorkflowStage(stageIdx);
           }
           if (agentName === 'hitl_gate' && event.action === 'interrupt') {
@@ -220,6 +198,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     setApprovalDetails(null);
     setLiveAgentOutput({});
     stageTimestampsRef.current = {};
+    setStageTimestamps({});
 
     if (!selectedApp) {
       setWorkflowPhase('idle');
@@ -282,17 +261,19 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     setWorkflowPhase('executing');
     setLiveAgentOutput({});
     stageTimestampsRef.current = { 0: Date.now() };
+    setStageTimestamps({ ...stageTimestampsRef.current });
 
     const source = apiSSE(
       `/agent/${appId}/run-stream?autonomy_level=bounded`,
       (event) => {
         if (event.type === 'node_start') {
           const agentName = event.agent || event.name || '';
-          const stageIdx = NODE_TO_STAGE[agentName];
-          if (stageIdx !== undefined) {
+          const stageIdx = agentToStageIdx(agentName);
+          if (stageIdx != null) {
             setWorkflowStage((prev) => {
               if (stageIdx > prev) {
                 stageTimestampsRef.current[stageIdx] = Date.now();
+                setStageTimestamps({ ...stageTimestampsRef.current });
               }
               return Math.max(prev, stageIdx);
             });
@@ -301,11 +282,12 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
 
         if (event.type === 'node_complete') {
           const agentName = event.agent || '';
-          const stageIdx = NODE_TO_STAGE[agentName];
-          if (stageIdx !== undefined) {
+          const stageIdx = agentToStageIdx(agentName);
+          if (stageIdx != null) {
             setWorkflowStage((prev) => {
               if (stageIdx >= prev) {
                 stageTimestampsRef.current[stageIdx + 1] = stageTimestampsRef.current[stageIdx + 1] || Date.now();
+                setStageTimestamps({ ...stageTimestampsRef.current });
               }
               return Math.max(prev, stageIdx);
             });
@@ -325,6 +307,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
           setHitlReached(true); setHitlStartTime(Date.now());
           setWorkflowStage(2);
           stageTimestampsRef.current[2] = stageTimestampsRef.current[2] || Date.now();
+          setStageTimestamps({ ...stageTimestampsRef.current });
           addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
         }
 
@@ -425,10 +408,8 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
   const handleAgentEvent = useCallback((entry) => {
     if (!entry) return;
     const agentName = entry.agent || '';
-    const stageIdx = NODE_TO_STAGE[agentName.toLowerCase().includes('underwrit') ? 'underwriter'
-      : agentName.toLowerCase().includes('loan_app') ? 'loan_app'
-      : agentName.toLowerCase().includes('hitl') ? 'hitl_gate' : ''];
-    if (stageIdx !== undefined) {
+    const stageIdx = agentToStageIdx(agentName);
+    if (stageIdx != null) {
       setWorkflowStage(stageIdx);
     }
     if (entry.agent === 'hitl_gate' && entry.action === 'interrupt') {
@@ -455,7 +436,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     selectedAppDetail,
     portfolioStats,
     dashboardStats,
-    stageTimestamps: stageTimestampsRef.current,
+    stageTimestamps,
 
     handleProceed,
     handleManual,

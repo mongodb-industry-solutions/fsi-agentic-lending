@@ -39,31 +39,7 @@ export const CAPABILITIES = [
   { $merge: { into: "riskScores", whenMatched: "merge" } }
 ])`,
     demoScene:
-      "Scene 1: Underwriting Agent runs 7-stage aggregation on riskScores.",
-  },
-  {
-    id: "graphLookup",
-    glyph: "Connect",
-    label: "$graphLookup",
-    colorVar: "danger",
-    oneLiner:
-      "Recursive graph traversal within MongoDB — no separate graph database.",
-    replaces: "Dedicated graph database",
-    description:
-      "Recursive graph traversal within MongoDB collections. Start with a suspect borrower, traverse linkedAccountIds up to 3 hops deep, flag high-risk connections.",
-    code: `db.entities.aggregate([
-  { $graphLookup: {
-    from: "entities",
-    startWith: "$linkedIds",
-    connectFromField: "linkedIds",
-    connectToField: "_id",
-    as: "network",
-    maxDepth: 3,
-    restrictSearchWithMatch: { riskScore: { $gte: 0.6 } }
-  }}
-])`,
-    demoScene:
-      "Scene 3: Fraud network detection — nodes animate as hops are discovered.",
+      "Scene 1: Underwriting Agent runs risk scoring pipeline via aggregation.",
   },
   {
     id: "changeStreams",
@@ -81,7 +57,7 @@ changeStream.on("change", (event) => {
   triggerUnderwriting(event.fullDocument._id);
 });`,
     demoScene:
-      "Scene 1 & 6: Underwriting triggered on status change; Servicing Agent on payment events.",
+      "Scene 1: Underwriting triggered on status change; real-time activity streaming to borrower and officer portals.",
   },
   {
     id: "timeSeries",

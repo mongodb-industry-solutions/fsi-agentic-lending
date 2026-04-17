@@ -16,11 +16,11 @@ const NODES = {
   supervisor:    { label: 'Supervisor',           abbr: 'S',  color: NODE_COLORS.supervisor, w: 120, h: 44, type: NODE_TYPES.agent },
   appAgent:      { label: 'Loan App Agent',       abbr: 'A',  color: NODE_COLORS.appAgent,   w: 114, h: 42, type: NODE_TYPES.agent },
   underwriter:   { label: 'Underwriting',         abbr: 'U',  color: NODE_COLORS.underwriter, w: 120, h: 42, type: NODE_TYPES.agent },
-  servicingAgent:  { label: 'Servicing Agent',    abbr: 'SA', color: NODE_COLORS.servicingAgent, w: 114, h: 42, type: NODE_TYPES.agent },
+  docVerifier:     { label: 'Doc Verifier',        abbr: 'DV', color: NODE_COLORS.docVerifier, w: 104, h: 42, type: NODE_TYPES.agent },
+  creditPuller:    { label: 'Credit Puller',      abbr: 'CR', color: NODE_COLORS.creditPuller, w: 110, h: 42, type: NODE_TYPES.agent },
   creditAPI:     { label: 'Credit Bureau',        abbr: 'C',  color: NODE_COLORS.creditAPI,   w: 104, h: 34, type: NODE_TYPES.tool },
   voyageEmbed:   { label: 'Voyage MM 3.5',        abbr: 'V',  color: NODE_COLORS.voyageEmbed, w: 104, h: 34, type: NODE_TYPES.tool },
   vectorSearch:  { label: 'Vector Search',        abbr: 'VS', color: NODE_COLORS.vectorSearch, w: 110, h: 34, type: NODE_TYPES.tool },
-  graphLookup:   { label: '$graphLookup',         abbr: 'GL', color: NODE_COLORS.graphLookup, w: 104, h: 34, type: NODE_TYPES.tool },
   aggregation:   { label: 'Aggregation',          abbr: 'AG', color: NODE_COLORS.aggregation, w: 104, h: 34, type: NODE_TYPES.tool },
   changeStream:  { label: 'Change Streams',       abbr: 'CS', color: NODE_COLORS.changeStream, w: 110, h: 34, type: NODE_TYPES.output },
   timeSeries:    { label: 'Time Series',          abbr: 'TS', color: NODE_COLORS.timeSeries,  w: 96,  h: 34, type: NODE_TYPES.tool },
@@ -33,24 +33,24 @@ const NODES = {
   ledger:        { label: 'Loan Ledger',          abbr: 'L',  color: NODE_COLORS.fundingEngine, w: 100, h: 34, type: NODE_TYPES.storage },
   closingEngine: { label: 'Closing Engine',       abbr: 'CL', color: NODE_COLORS.closingEngine, w: 114, h: 38, type: NODE_TYPES.output },
   eSign:         { label: 'E-Sign',               abbr: 'ES', color: NODE_COLORS.eSign, w: 96,  h: 34, type: NODE_TYPES.gate },
-  modificationOffer:  { label: 'Modification Offer', abbr: 'MO', color: NODE_COLORS.servicingAgent, w: 110, h: 34, type: NODE_TYPES.output },
 };
 
 const EDGES = [
-  ['supervisor', 'appAgent'],
+  ['supervisor', 'docVerifier'],
+  ['supervisor', 'creditPuller'],
   ['supervisor', 'underwriter'],
-  ['supervisor', 'servicingAgent'],
-  ['appAgent', 'creditAPI'],
-  ['appAgent', 'voyageEmbed'],
+  ['docVerifier', 'voyageEmbed'],
+  ['creditPuller', 'creditAPI'],
+  ['docVerifier', 'appAgent'],
+  ['creditPuller', 'appAgent'],
+  ['appAgent', 'supervisor'],
   ['underwriter', 'aggregation'],
   ['underwriter', 'vectorSearch'],
-  ['underwriter', 'graphLookup'],
   ['underwriter', 'hitlGate'],
   ['voyageEmbed', 'vectorSearch'],
   ['hitlGate', 'decision'],
   ['aggregation', 'mongoAtlas'],
   ['vectorSearch', 'mongoAtlas'],
-  ['graphLookup', 'mongoAtlas'],
   ['changeStream', 'mongoAtlas'],
   ['timeSeries', 'mongoAtlas'],
   ['checkpoint', 'mongoAtlas'],
@@ -64,19 +64,19 @@ const EDGES = [
   ['fundingEngine', 'ledger'],
   ['fundingEngine', 'changeStream'],
   ['ledger', 'mongoAtlas'],
-  ['changeStream', 'servicingAgent'],
-  ['timeSeries', 'servicingAgent'],
-  ['servicingAgent', 'vectorSearch'],
-  ['servicingAgent', 'modificationOffer'],
-  ['modificationOffer', 'mongoAtlas'],
 ];
 
 const EDGE_LABELS = {
-  'appAgent>voyageEmbed': 'embeddings',
+  'supervisor>docVerifier': 'parallel',
+  'supervisor>creditPuller': 'parallel',
+  'docVerifier>voyageEmbed': 'embeddings',
+  'creditPuller>creditAPI': 'bureau pull',
+  'docVerifier>appAgent': 'doc results',
+  'creditPuller>appAgent': 'credit data',
+  'appAgent>supervisor': 'synthesis',
   'voyageEmbed>vectorSearch': 'vectors',
   'underwriter>aggregation': 'risk pipeline',
   'underwriter>vectorSearch': 'policy RAG',
-  'underwriter>graphLookup': 'fraud scan',
   'underwriter>hitlGate': 'risk score',
   'hitlGate>decision': 'approval',
   'hitlGate>checkpoint': 'state save',
@@ -87,15 +87,10 @@ const EDGE_LABELS = {
   'eSign>mongoAtlas': 'executed',
   'fundingEngine>ledger': 'accounting',
   'fundingEngine>changeStream': 'events',
-  'changeStream>servicingAgent': 'alerts',
-  'servicingAgent>vectorSearch': 'similarity',
-  'servicingAgent>modificationOffer': 'offer',
   'aggregation>mongoAtlas': 'scores',
   'vectorSearch>mongoAtlas': 'results',
-  'graphLookup>mongoAtlas': 'graph',
   'checkpoint>mongoAtlas': 'checkpoint',
   'ledger>mongoAtlas': 'ledger',
-  'modificationOffer>mongoAtlas': 'stored',
 };
 
 const STAGE_COLUMNS = [
@@ -104,19 +99,19 @@ const STAGE_COLUMNS = [
   { key: 'approval',     label: 'APPROVAL',     px: 0.40 },
   { key: 'closing',      label: 'CLOSING',      px: 0.56 },
   { key: 'funding',      label: 'FUNDING',      px: 0.72 },
-  { key: 'servicing',    label: 'SERVICING',    px: 0.90 },
 ];
 
 const PIPELINE_LAYOUT = {
   supervisor:    { px: 0.08, py: 0.18 },
-  appAgent:      { px: 0.08, py: 0.50 },
-  creditAPI:     { px: 0.03, py: 0.78 },
-  voyageEmbed:   { px: 0.14, py: 0.78 },
+  docVerifier:   { px: 0.03, py: 0.42 },
+  creditPuller:  { px: 0.14, py: 0.42 },
+  appAgent:      { px: 0.08, py: 0.65 },
+  creditAPI:     { px: 0.18, py: 0.18 },
+  voyageEmbed:   { px: 0.03, py: 0.78 },
 
   underwriter:   { px: 0.24, py: 0.18 },
   aggregation:   { px: 0.18, py: 0.50 },
   vectorSearch:  { px: 0.30, py: 0.50 },
-  graphLookup:   { px: 0.18, py: 0.78 },
   timeSeries:    { px: 0.30, py: 0.78 },
 
   hitlGate:      { px: 0.40, py: 0.18 },
@@ -129,9 +124,6 @@ const PIPELINE_LAYOUT = {
   fundingEngine: { px: 0.72, py: 0.18 },
   ledger:        { px: 0.66, py: 0.50 },
   changeStream:  { px: 0.78, py: 0.50 },
-
-  servicingAgent:      { px: 0.90, py: 0.18 },
-  modificationOffer:   { px: 0.90, py: 0.50 },
 
   mongoAtlas:    { px: 0.50, py: 0.92 },
   memory:        { px: 0.34, py: 0.50 },
@@ -235,7 +227,6 @@ const NODE_TECH = {
   creditAPI: 'Experian API (Simulated)',
   voyageEmbed: 'Voyage AI Multimodal',
   vectorSearch: 'Atlas Vector Search',
-  graphLookup: 'MongoDB $graphLookup',
   aggregation: 'MongoDB Agg Pipeline',
   hitlGate: 'LangGraph interrupt()',
   checkpoint: 'MongoDBSaver Checkpoint',
@@ -248,12 +239,10 @@ const NODE_TECH = {
   eSign: 'Digital Signature Service',
   fundingEngine: 'Payment Disbursement',
   ledger: 'MongoDB Transactions',
-  servicingAgent: 'LangGraph Agent Node',
-  modificationOffer: 'Modification Generator',
 };
 
 // Pipeline nodes downstream of HITL gate (excludes infrastructure nodes like changeStream/timeSeries)
-const DOWNSTREAM_OF_HITL = new Set(['closingEngine', 'eSign', 'fundingEngine', 'ledger', 'servicingAgent', 'modificationOffer', 'decision']);
+const DOWNSTREAM_OF_HITL = new Set(['closingEngine', 'eSign', 'fundingEngine', 'ledger', 'decision']);
 
 export default function WorkflowCanvas({
   activeNodes = [],

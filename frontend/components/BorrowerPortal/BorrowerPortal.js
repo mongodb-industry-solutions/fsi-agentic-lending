@@ -559,12 +559,12 @@ export default function BorrowerPortal() {
 
         {/* Upper zone: existing 3-column layout */}
         <div style={{ flex: 1, display: 'flex', minHeight: 280, overflow: 'hidden' }}>
+          <DocumentContext applicationId={applicationId} refreshTrigger={docRefreshTrigger} />
           <StatusTracker
             applicationId={applicationId}
             applicationData={borrowerProfile}
             onOpenChat={() => setChatOpen(true)}
           />
-          <DocumentContext applicationId={applicationId} refreshTrigger={docRefreshTrigger} />
           <ApplicationAgent
             applicationId={applicationId}
             applicationStatus={applicationStatus}
@@ -624,10 +624,6 @@ export default function BorrowerPortal() {
           borrowerProfile={borrowerProfile}
         />
       </div>
-      <FloatingChatDrawer
-        open={chatOpen}
-        onToggle={() => setChatOpen((p) => !p)}
-      />
       <NotificationToast toasts={toasts} onDismiss={removeToast} />
     </div>
   );

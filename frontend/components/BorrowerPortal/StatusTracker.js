@@ -458,9 +458,7 @@ export default function StatusTracker({ onNotification, applicationId, applicati
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: `20px ${spacing[4]}px` }}>
-      <span style={{ fontSize: 9, color: 'var(--mongo)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-        MongoDB Change Streams
-      </span>
+      {/* Status tracking header removed — borrower-facing view */}
       {/* Summary card */}
       <div style={{
         padding: spacing[3],

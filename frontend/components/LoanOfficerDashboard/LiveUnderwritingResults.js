@@ -1,4 +1,4 @@
-import { getRiskColor } from './utils';
+import { getRiskColor, GDS_LIMIT, TDS_LIMIT } from './utils';
 
 export function LiveUnderwritingResults({ data }) {
   if (!data || Object.keys(data).length === 0) return null;
@@ -76,7 +76,7 @@ export function LiveUnderwritingResults({ data }) {
             {data.gds_ratio != null && (
               <div style={{ fontSize: 9 }}>
                 <span style={{ color: 'var(--text-dim)' }}>GDS </span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: data.gds_ratio > 0.39 ? 'var(--danger)' : 'var(--text-primary)' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: data.gds_ratio > GDS_LIMIT ? 'var(--danger)' : 'var(--text-primary)' }}>
                   {(data.gds_ratio * 100).toFixed(1)}%
                 </span>
               </div>
@@ -84,7 +84,7 @@ export function LiveUnderwritingResults({ data }) {
             {data.tds_ratio != null && (
               <div style={{ fontSize: 9 }}>
                 <span style={{ color: 'var(--text-dim)' }}>TDS </span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: data.tds_ratio > 0.44 ? 'var(--danger)' : 'var(--text-primary)' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: data.tds_ratio > TDS_LIMIT ? 'var(--danger)' : 'var(--text-primary)' }}>
                   {(data.tds_ratio * 100).toFixed(1)}%
                 </span>
               </div>
@@ -96,9 +96,9 @@ export function LiveUnderwritingResults({ data }) {
               {data.stress_gds != null && data.stress_tds != null ? (
                 <span style={{
                   fontFamily: 'var(--font-mono)', fontWeight: 700,
-                  color: (data.stress_gds > 0.39 || data.stress_tds > 0.44) ? 'var(--danger)' : 'var(--success)',
+                  color: (data.stress_gds > GDS_LIMIT || data.stress_tds > TDS_LIMIT) ? 'var(--danger)' : 'var(--success)',
                 }}>
-                  {(data.stress_gds > 0.39 || data.stress_tds > 0.44) ? 'FAIL' : 'PASS'}
+                  {(data.stress_gds > GDS_LIMIT || data.stress_tds > TDS_LIMIT) ? 'FAIL' : 'PASS'}
                 </span>
               ) : (
                 <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-dim)' }}>

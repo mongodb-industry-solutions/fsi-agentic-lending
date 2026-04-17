@@ -89,7 +89,7 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
       flexShrink: 0,
     }}>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-dim)' }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, marginBottom: 4 }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 'var(--text-sm)', marginBottom: 4 }}>
           Application Queue
         </div>
         <div style={{ fontSize: 10, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>

@@ -83,7 +83,14 @@ function CapabilitySection({ cap }) {
   );
 }
 
-const agentGlyphs = { supervisor: 'Beaker', loanAppAgent: 'File', underwritingAgent: 'Charts', servicingAgent: 'Refresh' };
+const agentGlyphs = {
+  supervisor: 'Beaker',
+  docVerifier: 'File',
+  creditPuller: 'CreditCard',
+  loanAppAgent: 'Apps',
+  underwritingAgent: 'Charts',
+  applicationAgent: 'Sparkle',
+};
 
 function AgentSection({ agentKey }) {
   const agent = architectureContent.agentDescriptions[agentKey];
@@ -140,8 +147,98 @@ function AgentSection({ agentKey }) {
   );
 }
 
+function InterventionSection() {
+  const intv = architectureContent.interventionSystem;
+  if (!intv) return null;
+  return (
+    <InsightCard title={intv.title} icon={<Icon glyph="Warning" size={14} />}>
+      <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: spacing[2] }}>
+        {intv.description}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[1], marginBottom: spacing[200] }}>
+        {intv.types.map((t, i) => (
+          <div key={i} style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: spacing[2],
+            padding: `${spacing[150]}px ${spacing[2]}px`,
+            borderRadius: 8,
+            background: 'var(--bg-raised)',
+            fontSize: 10,
+          }}>
+            <span style={{
+              fontWeight: 700,
+              color: t.severity === 'blocking' ? 'var(--danger)' : 'var(--hitl-amber)',
+              minWidth: 62,
+              flexShrink: 0,
+              fontSize: 9,
+              textTransform: 'uppercase',
+            }}>
+              {t.severity}
+            </span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono, monospace)', fontSize: 10 }}>
+                {t.type}
+              </div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 9, marginTop: 1 }}>
+                {t.source} — {t.desc}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <CodeSnippet code={intv.codeSample} />
+    </InsightCard>
+  );
+}
+
+function GenerativeUISection() {
+  const genUI = architectureContent.generativeUI;
+  if (!genUI) return null;
+  return (
+    <InsightCard title={genUI.title} icon={<Icon glyph="Wizard" size={14} />}>
+      <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: spacing[2] }}>
+        {genUI.description}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[1] }}>
+        {genUI.components.map((c, i) => (
+          <div key={i} style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: spacing[2],
+            padding: `${spacing[150]}px ${spacing[2]}px`,
+            borderRadius: 8,
+            background: 'var(--bg-raised)',
+            fontSize: 10,
+          }}>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{c.name}</span>
+              <span style={{ color: 'var(--text-secondary)', marginLeft: spacing[1] }}>{c.desc}</span>
+            </div>
+            {c.interactive && (
+              <span style={{
+                padding: `1px ${spacing[150]}px`,
+                borderRadius: 6,
+                background: dimMap['agent-cyan'] || 'var(--agent-cyan-dim)',
+                color: colorMap['agent-cyan'] || 'var(--agent-cyan)',
+                fontSize: 8,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                flexShrink: 0,
+              }}>
+                Interactive
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </InsightCard>
+  );
+}
+
 function HITLSection() {
   const hitl = architectureContent.hitlExplanation;
+  if (!hitl) return null;
   return (
     <InsightCard title={hitl.title} icon={<Icon glyph="Lock" size={14} />}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[150], marginBottom: spacing[200] }}>
@@ -166,6 +263,11 @@ function HITLSection() {
           </div>
         ))}
       </div>
+      {hitl.officerActions && (
+        <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: spacing[2] }}>
+          {hitl.officerActions}
+        </div>
+      )}
       <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: spacing[2] }}>
         {hitl.persistence}
       </div>
@@ -343,6 +445,18 @@ export default function InfoWizardPanel({ isOpen, onClose, activeScreen = 'demo'
                 <AgentSection agentKey={key} />
               </div>
             ))}
+          </div>
+
+          {/* Interventions */}
+          <SectionHeader>Intervention System</SectionHeader>
+          <div style={{ padding: `${spacing[2]}px ${spacing[3]}px` }} data-section="interventions">
+            <InterventionSection />
+          </div>
+
+          {/* Generative UI */}
+          <SectionHeader>Generative UI</SectionHeader>
+          <div style={{ padding: `${spacing[2]}px ${spacing[3]}px` }} data-section="generativeUI">
+            <GenerativeUISection />
           </div>
 
           {/* HITL */}

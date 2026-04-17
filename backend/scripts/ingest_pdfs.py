@@ -560,24 +560,36 @@ def main():
     db_connector = MongoDBConnector()
     db = db_connector.client[os.getenv("DATABASE_NAME", "lendflow")]
 
-    # Idempotency check — if Marcus already exists, skip PDF extraction but
-    # still seed additional profiles, policies, and payment histories (they
-    # have their own idempotency checks).
+    # Idempotency check — if Marcus already exists AND has documents, skip PDF
+    # extraction. If the app exists but documents are gone (e.g. wiped by a prior
+    # demo reset before the seed_complete fix), clean up and fall through to
+    # full re-ingest.
     existing = db["applications"].count_documents({"application_id": APPLICATION_ID})
     if existing > 0:
-        print(f"Data already ingested for {APPLICATION_ID}. Skipping PDF extraction.")
         # Idempotent backfill: ensures profile_id and seed_complete are present
-        # (no-op on already-patched databases, fixes pre-fix ones).
         db["applications"].update_one(
             {"application_id": APPLICATION_ID},
             {"$set": {"profile_id": "marcus-delgado", "seed_complete": True}},
         )
-        print("Checking additional profiles, policies, and payments...\n")
-        create_policies(db)
-        create_payment_history(db)
-        seed_additional_profiles(db)
-        print("\nDone.")
-        sys.exit(0)
+
+        doc_count = db["documents"].count_documents({"application_id": APPLICATION_ID})
+        if doc_count == 0:
+            # App exists but documents are gone — clean up and fall through to re-ingest
+            print(f"  {APPLICATION_ID} exists but has 0 documents — re-seeding from PDFs...")
+            app = db["applications"].find_one({"application_id": APPLICATION_ID}, {"borrower_ids": 1})
+            old_bids = app.get("borrower_ids", []) if app else []
+            db["applications"].delete_many({"application_id": APPLICATION_ID})
+            db["borrowers"].delete_many({"application_id": APPLICATION_ID})
+            if old_bids:
+                db["credit_reports"].delete_many({"borrower_id": {"$in": old_bids}})
+        else:
+            print(f"Data already ingested for {APPLICATION_ID} ({doc_count} docs). Skipping PDF extraction.")
+            print("Checking additional profiles, policies, and payments...\n")
+            create_policies(db)
+            create_payment_history(db)
+            seed_additional_profiles(db)
+            print("\nDone.")
+            sys.exit(0)
 
     model_id = os.getenv("CHATCOMPLETIONS_MODEL_ID")
     if not model_id:

@@ -245,7 +245,7 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
               }}
               aria-label="Open technology reference panel"
             >
-              <Icon glyph="InfoWithCircle" size={14} />
+              <Icon glyph="Wizard" size={14} />
             </button>
           </>
         )}

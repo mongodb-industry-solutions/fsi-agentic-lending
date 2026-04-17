@@ -5,7 +5,7 @@ import { CAPABILITIES } from '../../lib/data/capabilities';
 import { spacing } from '@leafygreen-ui/tokens';
 
 const CAP_BY_ID = Object.fromEntries(CAPABILITIES.map((c) => [c.id, c]));
-const ORDER = ['document', 'changeStreams', 'aggregation', 'vectorSearch', 'graphLookup', 'timeSeries'];
+const ORDER = ['document', 'changeStreams', 'aggregation', 'vectorSearch', 'timeSeries'];
 
 export default function FeatureBar({ activeFeatures }) {
   return (

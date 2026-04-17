@@ -121,10 +121,9 @@ export default function UnderwritingScene({ sceneStep, currentStepData }) {
 
   const showFactors = sceneStep >= 1;
   const showCounterfactual = sceneStep >= 2;
-  const showFraudResult = sceneStep >= 3;
-  const showPaymentHistory = sceneStep >= 4;
-  const showFinalScore = sceneStep >= 5;
-  const showValidation = sceneStep >= 6;
+  const showPaymentHistory = sceneStep >= 3;
+  const showFinalScore = sceneStep >= 4;
+  const showValidation = sceneStep >= 5;
 
   const factorRevealCount = showFactors
     ? (sceneStep >= 2 ? FACTORS.length : Math.min(4, FACTORS.length))
@@ -185,18 +184,6 @@ export default function UnderwritingScene({ sceneStep, currentStepData }) {
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: spacing[200] }}>Powered by Atlas Vector Search — similar borrower profiling</div>
               </div>
               <WhatIfSliders />
-            </div>
-          )}
-
-          {showFraudResult && (
-            <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--success)', marginBottom: spacing[400], animation: 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: spacing[200] }}>
-                <span style={{ fontSize: 18, color: 'var(--success)' }}>✓</span>
-                <div>
-                  <div style={{ fontFamily: uiTokens.font, fontWeight: 700, fontSize: 12, color: 'var(--success)' }}>Fraud Scan: CLEAR</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>$graphLookup 3-hop scan — 2,847 entities, 0 suspicious links</div>
-                </div>
-              </div>
             </div>
           )}
 

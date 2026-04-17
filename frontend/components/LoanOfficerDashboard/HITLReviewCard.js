@@ -3,7 +3,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import { apiGet } from '../../lib/api';
-import { formatCurrency, getAppDisplayName } from './utils';
+import { formatCurrency, getAppDisplayName, GDS_LIMIT, TDS_LIMIT } from './utils';
+
+const GDS_PCT_LABEL = `${(GDS_LIMIT * 100).toFixed(0)}%`;
+const TDS_PCT_LABEL = `${(TDS_LIMIT * 100).toFixed(0)}%`;
 
 export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove, onDecline, addToast, liveAgentOutput = {} }) {
   const [showProvenance, setShowProvenance] = useState(false);
@@ -149,6 +152,62 @@ export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove,
           </div>
         )}
 
+        {/* Part 2b: Trigger Analysis — specific thresholds */}
+        {(() => {
+          const purchasePrice = appDetail?.purchase_price || queueData?.purchase_price;
+          const rawGds = liveAgentOutput.gds_ratio ?? appDetail?.gds_ratio;
+          const rawTds = liveAgentOutput.tds_ratio ?? appDetail?.tds_ratio;
+          const stressGdsVal = liveAgentOutput.stress_gds ?? appDetail?.stress_gds;
+          const stressTdsVal = liveAgentOutput.stress_tds ?? appDetail?.stress_tds;
+          // Backend escalates on effective ratio = max(raw, stress) vs 36% / 41%
+          const effGds = [rawGds, stressGdsVal].filter((v) => v != null).length ? Math.max(...[rawGds, stressGdsVal].filter((v) => v != null)) : null;
+          const effTds = [rawTds, stressTdsVal].filter((v) => v != null).length ? Math.max(...[rawTds, stressTdsVal].filter((v) => v != null)) : null;
+          const riskTierVal = liveAgentOutput.risk_tier ?? appDetail?.risk_tier;
+          const triggers = [
+            { label: 'Purchase price', value: purchasePrice ? `$${Number(purchasePrice).toLocaleString()}` : null, threshold: '$500,000', triggered: purchasePrice > 500000 },
+            { label: 'Effective GDS', value: effGds != null ? `${(effGds * 100).toFixed(1)}%` : null, threshold: '36%', triggered: effGds != null && effGds > 0.36 },
+            { label: 'Effective TDS', value: effTds != null ? `${(effTds * 100).toFixed(1)}%` : null, threshold: '41%', triggered: effTds != null && effTds > 0.41 },
+            { label: 'Risk tier', value: riskTierVal || null, threshold: 'A / B+ (auto)', triggered: riskTierVal && ['B', 'C'].includes(riskTierVal) },
+          ].filter((t) => t.value != null);
+          if (triggers.length === 0) return null;
+          return (
+            <div style={{
+              padding: '8px 10px',
+              background: 'var(--bg-base)',
+              borderBottom: '1px solid var(--border-dim)',
+            }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--hitl-amber)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
+                Threshold Analysis
+              </div>
+              {triggers.map((t, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, fontSize: 10 }}>
+                  <span style={{
+                    width: 14, height: 14, borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 8, fontWeight: 700, flexShrink: 0,
+                    background: t.triggered ? 'var(--hitl-amber-dim)' : 'var(--success-dim)',
+                    color: t.triggered ? 'var(--hitl-amber)' : 'var(--success)',
+                    border: `1px solid ${t.triggered ? 'var(--hitl-amber)' : 'var(--success)'}`,
+                  }}>
+                    {t.triggered ? '!' : '\u2713'}
+                  </span>
+                  <span style={{ color: 'var(--text-secondary)', flex: 1 }}>
+                    {t.label} <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-primary)' }}>{t.value}</span>
+                    {' '}<span style={{ color: 'var(--text-dim)' }}>vs {t.threshold}</span>
+                  </span>
+                  <span style={{
+                    fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
+                    background: t.triggered ? 'var(--hitl-amber-dim)' : 'var(--success-dim)',
+                    color: t.triggered ? 'var(--hitl-amber)' : 'var(--success)',
+                  }}>
+                    {t.triggered ? 'TRIGGERED' : 'PASS'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
         {/* Part 3: Agent Recommendation */}
         <div style={{
           padding: '10px 12px',
@@ -183,12 +242,12 @@ export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove,
 
             const factors = [
               { label: 'Risk Score', value: riskScore != null ? `${riskScore}/100` : null, threshold: '65', pass: riskScore != null ? riskScore < 65 : null, color: riskScore != null && riskScore >= 65 ? 'var(--danger)' : 'var(--success)' },
-              { label: 'Risk Tier', value: riskTier || null, threshold: 'Low', pass: riskTier === 'Low', color: riskTier === 'High' ? 'var(--danger)' : riskTier === 'Medium' ? 'var(--hitl-amber)' : 'var(--success)' },
+              { label: 'Risk Tier', value: riskTier || null, threshold: 'A / B+', pass: riskTier === 'A' || riskTier === 'B+', color: ['C', 'D'].includes(riskTier) ? 'var(--danger)' : riskTier === 'B' ? 'var(--hitl-amber)' : 'var(--success)' },
               { label: 'Credit Score', value: creditScore != null ? String(creditScore) : null, threshold: '680', pass: creditScore != null ? creditScore >= 680 : null, color: creditScore != null && creditScore < 680 ? 'var(--hitl-amber)' : 'var(--success)' },
-              { label: 'GDS Ratio', value: gds != null ? `${(gds * 100).toFixed(1)}%` : null, threshold: '39%', pass: gds != null ? gds <= 0.39 : null, bar: gds, barThreshold: 0.39 },
-              { label: 'TDS Ratio', value: tds != null ? `${(tds * 100).toFixed(1)}%` : null, threshold: '44%', pass: tds != null ? tds <= 0.44 : null, bar: tds, barThreshold: 0.44 },
-              ...(stressGds != null ? [{ label: 'Stress GDS', value: `${(stressGds * 100).toFixed(1)}%`, threshold: '39%', pass: stressGds <= 0.39, bar: stressGds, barThreshold: 0.39 }] : []),
-              ...(stressTds != null ? [{ label: 'Stress TDS', value: `${(stressTds * 100).toFixed(1)}%`, threshold: '44%', pass: stressTds <= 0.44, bar: stressTds, barThreshold: 0.44 }] : []),
+              { label: 'GDS Ratio', value: gds != null ? `${(gds * 100).toFixed(1)}%` : null, threshold: GDS_PCT_LABEL, pass: gds != null ? gds <= GDS_LIMIT : null, bar: gds, barThreshold: GDS_LIMIT },
+              { label: 'TDS Ratio', value: tds != null ? `${(tds * 100).toFixed(1)}%` : null, threshold: TDS_PCT_LABEL, pass: tds != null ? tds <= TDS_LIMIT : null, bar: tds, barThreshold: TDS_LIMIT },
+              ...(stressGds != null ? [{ label: 'Stress GDS', value: `${(stressGds * 100).toFixed(1)}%`, threshold: GDS_PCT_LABEL, pass: stressGds <= GDS_LIMIT, bar: stressGds, barThreshold: GDS_LIMIT }] : []),
+              ...(stressTds != null ? [{ label: 'Stress TDS', value: `${(stressTds * 100).toFixed(1)}%`, threshold: TDS_PCT_LABEL, pass: stressTds <= TDS_LIMIT, bar: stressTds, barThreshold: TDS_LIMIT }] : []),
             ].filter((f) => f.value != null);
 
             return factors.map((f) => (
@@ -454,16 +513,38 @@ export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove,
         }}>
           {showModify ? 'Back' : 'Modify & Approve'}
         </button>
-        <button type="button" onClick={fetchContext} disabled={fetchingContext} style={{
-          flex: '1 1 auto', padding: 10, borderRadius: 8,
-          border: '1px solid var(--tool-blue)',
-          background: fetchingContext ? 'var(--tool-blue-dim)' : 'transparent',
-          color: 'var(--tool-blue)',
-          fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 11,
-          cursor: fetchingContext ? 'default' : 'pointer',
-        }}>
-          {fetchingContext ? 'Fetching...' : 'Refresh Context'}
-        </button>
+        {showModify ? (
+          // Compact icon-only refresh in modify mode to keep action row uncluttered.
+          <button
+            type="button"
+            onClick={fetchContext}
+            disabled={fetchingContext}
+            aria-label={fetchingContext ? 'Refreshing context' : 'Refresh context'}
+            title={fetchingContext ? 'Refreshing...' : 'Refresh context'}
+            style={{
+              flex: '0 0 auto', width: 36, padding: 10, borderRadius: 8,
+              border: '1px solid var(--tool-blue)',
+              background: fetchingContext ? 'var(--tool-blue-dim)' : 'transparent',
+              color: 'var(--tool-blue)',
+              fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12,
+              cursor: fetchingContext ? 'default' : 'pointer',
+              lineHeight: 1,
+            }}
+          >
+            {fetchingContext ? '…' : '\u21BB'}
+          </button>
+        ) : (
+          <button type="button" onClick={fetchContext} disabled={fetchingContext} style={{
+            flex: '1 1 auto', padding: 10, borderRadius: 8,
+            border: '1px solid var(--tool-blue)',
+            background: fetchingContext ? 'var(--tool-blue-dim)' : 'transparent',
+            color: 'var(--tool-blue)',
+            fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 11,
+            cursor: fetchingContext ? 'default' : 'pointer',
+          }}>
+            {fetchingContext ? 'Fetching...' : 'Refresh Context'}
+          </button>
+        )}
         <button type="button" onClick={() => onDecline?.()} disabled={submitting} style={{
           flex: '1 1 auto', padding: 10, borderRadius: 8,
           border: '1px solid var(--danger)', background: 'transparent',

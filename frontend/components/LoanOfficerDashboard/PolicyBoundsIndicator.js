@@ -1,11 +1,7 @@
 export function PolicyBoundsIndicator({ exceeded, policyCitations }) {
-  const bounds = policyCitations?.length > 0
-    ? policyCitations.map((c) => ({ rule: c.detail || c.action || c, marker: 'ESC' }))
-    : [
-        { rule: 'Auto-approve if score > 80 and GDS < 36%', marker: 'PASS' },
-        { rule: 'Escalate if property value > $500,000', marker: 'ESC' },
-        { rule: 'Auto-decline if GDS > 50% or score < 35', marker: 'FAIL' },
-      ];
+  // Only show real citations — no placeholder/fallback rules.
+  if (!policyCitations || policyCitations.length === 0) return null;
+  const bounds = policyCitations.map((c) => ({ rule: c.detail || c.action || c, marker: 'ESC' }));
 
   return (
     <div style={{
@@ -21,7 +17,7 @@ export function PolicyBoundsIndicator({ exceeded, policyCitations }) {
         fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
         color: exceeded ? 'var(--hitl-amber)' : 'var(--tool-blue)', marginBottom: 6,
       }}>
-        {exceeded ? 'Boundary Exceeded — Escalating' : policyCitations?.length > 0 ? 'Active Policy Bounds' : 'Default Policy Bounds'}
+        {exceeded ? 'Boundary Exceeded — Escalating' : 'Active Policy Bounds'}
       </div>
       {bounds.map((b, i) => (
         <div key={i} style={{

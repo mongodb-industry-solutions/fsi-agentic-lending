@@ -1,8 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 
+// TODO: reconcile with PipelineExplorer.STAGE_META — same 7-stage pipeline
+// but this list uses outputKey/outputPreview closures for live-output binding
+// while STAGE_META carries collection/docsIn/docsOut/syntax/sampleOutput for
+// the explorer view. Consolidate into a single pipelineStages.js module when
+// one surface needs both sets of metadata.
 const PIPELINE_STAGES = [
   {
     operator: '$match',
@@ -152,9 +157,26 @@ function StageCard({ stage, index, isComplete, isActive, output }) {
 
 export default function AggregationPipelineVisualizer({ liveAgentOutput, expanded, onToggle }) {
   const [autoExpanded, setAutoExpanded] = useState(false);
+  const userCollapsedRef = useRef(false);
+  const prevExpandedRef = useRef(expanded);
 
-  // Auto-expand when underwriting data arrives
+  // Track user-initiated collapse so we don't fight their intent.
   useEffect(() => {
+    if (prevExpandedRef.current && !expanded) {
+      userCollapsedRef.current = true;
+    }
+    prevExpandedRef.current = expanded;
+  }, [expanded]);
+
+  const handleToggle = () => {
+    if (expanded) userCollapsedRef.current = true;
+    if (onToggle) onToggle();
+  };
+
+  // Auto-expand when underwriting data arrives — but only once, and never
+  // after the user has manually collapsed the panel.
+  useEffect(() => {
+    if (userCollapsedRef.current) return;
     if (!autoExpanded && (liveAgentOutput?.risk_score != null || liveAgentOutput?.gds_ratio != null)) {
       setAutoExpanded(true);
       if (!expanded && onToggle) onToggle();
@@ -192,7 +214,7 @@ export default function AggregationPipelineVisualizer({ liveAgentOutput, expande
       {/* Collapsible header */}
       <button
         type="button"
-        onClick={onToggle}
+        onClick={handleToggle}
         style={{
           width: '100%', padding: '6px 10px',
           background: 'none', border: 'none', cursor: 'pointer',

@@ -8,7 +8,7 @@ const STATUS_CHANGE_MESSAGES = {
   processing: 'Your documents are now being verified by our AI agents.',
   underwriting: 'Document verification complete \u2014 underwriting has begun.',
   review: 'Your application is now under officer review.',
-  approved: '\u2705 Your application has been approved!',
+  approved: 'Your application has been approved.',
   declined: 'Your application decision is ready.',
   closing: 'Your application is moving to the closing stage.',
 };
@@ -21,21 +21,62 @@ export function useApplicationChat(applicationId, applicationStatus) {
   const [interventions, setInterventions] = useState([]);
   const [resolvingId, setResolvingId] = useState(null);
   const [activeTools, setActiveTools] = useState([]);
+  const [pendingComponents, setPendingComponents] = useState([]);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const textareaRef = useRef(null);
   const abortRef = useRef(null);
+  const abortedRef = useRef(false);
   const toolsRef = useRef([]);
   const citationsRef = useRef([]);
   const uiComponentsRef = useRef([]);
 
+  // Bug 3: dedicated reset on applicationId change so the previous
+  // conversation, interventions, streaming state, and refs don't leak into
+  // the new app. Runs before the history fetch so there's no flash of the
+  // previous user's chat. Skips the initial mount (applicationId stays
+  // constant on first render; the main history fetch handles that path).
+  const firstAppIdRef = useRef(true);
+  useEffect(() => {
+    if (firstAppIdRef.current) {
+      firstAppIdRef.current = false;
+      return;
+    }
+    if (abortRef.current) abortRef.current.abort();
+    abortedRef.current = true;
+    setMessages([createWelcomeMessage()]);
+    setInterventions([]);
+    setStreamingContent('');
+    setActiveTools([]);
+    setPendingComponents([]);
+    setLoading(false);
+    toolsRef.current = [];
+    citationsRef.current = [];
+    uiComponentsRef.current = [];
+  }, [applicationId]);
+
   useEffect(() => {
     if (!applicationId) return;
+    // Guard against a stale history response from a previous applicationId
+    // resolving after the user has switched borrowers. Without this, app A's
+    // history could overwrite app B's freshly-seeded welcome state.
+    let cancelled = false;
     apiGet(`/chat/${applicationId}/history`).then(data => {
+      if (cancelled) return;
       if (data?.messages?.length) {
-        setMessages(data.messages);
+        // A2: returning user — if server history already contains an assistant
+        // reply, strip any stored isWelcome flag so WelcomeCard doesn't render
+        // on top of a real conversation.
+        const hasRealAssistant = data.messages.some(
+          m => m.role === 'assistant' && !m.isWelcome
+        );
+        setMessages(hasRealAssistant
+          ? data.messages.map(m => ({ ...m, isWelcome: false }))
+          : data.messages);
       }
+      // else: reset effect already seeded [welcome], leave it alone
     });
+    return () => { cancelled = true; };
   }, [applicationId]);
 
   const fetchInterventions = useCallback(() => {
@@ -74,10 +115,19 @@ export function useApplicationChat(applicationId, applicationStatus) {
     setResolvingId(null);
   }, [applicationId]);
 
-  // Proactive system messages on status changes
+  // Proactive system messages on status changes.
+  // Bug 3 follow-up: reset prevStatusRef when applicationId changes so the
+  // first render after an app switch doesn't emit a transition banner
+  // because the previous app happened to be in a different stage.
   const prevStatusRef = useRef(null);
+  const prevAppIdForStatusRef = useRef(null);
   useEffect(() => {
     if (!applicationId) return;
+    if (prevAppIdForStatusRef.current !== applicationId) {
+      prevAppIdForStatusRef.current = applicationId;
+      prevStatusRef.current = applicationStatus;
+      return;
+    }
     if (prevStatusRef.current && prevStatusRef.current !== applicationStatus) {
       const msg = STATUS_CHANGE_MESSAGES[applicationStatus];
       if (msg) {
@@ -121,9 +171,11 @@ export function useApplicationChat(applicationId, applicationStatus) {
     setLoading(true);
     setStreamingContent('');
     setActiveTools([]);
+    setPendingComponents([]);
     toolsRef.current = [];
     citationsRef.current = [];
     uiComponentsRef.current = [];
+    abortedRef.current = false;
 
     if (applicationId) {
       try {
@@ -167,6 +219,7 @@ export function useApplicationChat(applicationId, applicationStatus) {
                   id: payload.id,
                   status: payload.status || 'ready',
                 }];
+                setPendingComponents([...uiComponentsRef.current]);
               } else if (payload.type === 'token') {
                 accumulated += payload.content;
                 setStreamingContent(accumulated);
@@ -185,6 +238,7 @@ export function useApplicationChat(applicationId, applicationStatus) {
                 }]);
                 setStreamingContent('');
                 setActiveTools([]);
+                setPendingComponents([]);
                 setLoading(false);
               }
             } catch { /* skip malformed SSE lines */ }
@@ -201,7 +255,9 @@ export function useApplicationChat(applicationId, applicationStatus) {
           }]);
         }
       } catch (err) {
-        if (err.name !== 'AbortError') {
+        if (err.name === 'AbortError') {
+          abortedRef.current = true;
+        } else {
           setMessages(prev => [...prev, {
             role: 'assistant',
             content: 'Sorry, I had trouble processing that. Please try again.',
@@ -211,10 +267,15 @@ export function useApplicationChat(applicationId, applicationStatus) {
       } finally {
         setStreamingContent('');
         setActiveTools([]);
+        setPendingComponents([]);
         setLoading(false);
         abortRef.current = null;
         inputRef.current?.focus();
-        fetchInterventions();
+        // Bug 4: if the request was aborted (user hit Stop or switched apps),
+        // skip the trailing intervention refresh so it can't overwrite the
+        // freshly-cleared list for the new context.
+        if (!abortedRef.current) fetchInterventions();
+        abortedRef.current = false;
       }
     } else {
       try {
@@ -240,11 +301,36 @@ export function useApplicationChat(applicationId, applicationStatus) {
   }, [input, loading, applicationId, fetchInterventions]);
 
   const clearChat = useCallback(() => {
-    if (abortRef.current) abortRef.current.abort();
+    if (abortRef.current) {
+      abortedRef.current = true;
+      abortRef.current.abort();
+    }
     setMessages([createWelcomeMessage()]);
     setInput('');
     setStreamingContent('');
     setLoading(false);
+    // B6: full ephemeral cleanup so a stale in-flight streaming frame doesn't
+    // leak into the new conversation.
+    setActiveTools([]);
+    setPendingComponents([]);
+    toolsRef.current = [];
+    citationsRef.current = [];
+    uiComponentsRef.current = [];
+  }, []);
+
+  // UX 1: exposed so the input area can render a Stop button. Marks the
+  // active fetch as aborted so finally knows to skip fetchInterventions().
+  const abort = useCallback(() => {
+    if (abortRef.current) {
+      abortedRef.current = true;
+      abortRef.current.abort();
+    }
+  }, []);
+
+  // UX 7: welcome-card dismiss. Removes the seeded welcome message; the
+  // effect that fetches history can still populate real chat.
+  const dismissWelcome = useCallback(() => {
+    setMessages(prev => prev.filter(m => !m.isWelcome));
   }, []);
 
   return {
@@ -256,12 +342,15 @@ export function useApplicationChat(applicationId, applicationStatus) {
     interventions,
     resolvingId,
     activeTools,
+    pendingComponents,
     messagesEndRef,
     inputRef,
     textareaRef,
     sendMessage,
     clearChat,
     resolveIntervention,
+    abort,
+    dismissWelcome,
     canSend: input.trim().length > 0 && !loading,
   };
 }

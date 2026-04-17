@@ -20,6 +20,19 @@ def serialize_doc(doc):
         doc["borrower_ids"] = [str(bid) for bid in doc["borrower_ids"]]
     if "borrower_id" in doc:
         doc["borrower_id"] = str(doc["borrower_id"])
+    for key, value in list(doc.items()):
+        if isinstance(value, datetime):
+            doc[key] = value.isoformat()
+        elif isinstance(value, list):
+            new_list = []
+            for item in value:
+                if isinstance(item, dict):
+                    item = dict(item)
+                    for k, v in list(item.items()):
+                        if isinstance(v, datetime):
+                            item[k] = v.isoformat()
+                new_list.append(item)
+            doc[key] = new_list
     return doc
 
 

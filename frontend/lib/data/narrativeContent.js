@@ -120,13 +120,6 @@ export const mongoContent = {
       description:
         'Real-time risk scoring in a single pipeline execution. $lookup credit data, $addFields DTI calculation, $setWindowFields rolling 90-day payment average, $switch risk tiering, $group factor aggregation, $merge materialized view. $unionWith for cross-product analytics. MongoDB 8.0 block processing for time series.',
     },
-    graphLookup: {
-      id: 'graphLookup',
-      label: '$graphLookup',
-      oneLiner: 'Recursive graph traversal within MongoDB — no separate graph database.',
-      description:
-        'Recursive graph traversal within MongoDB collections. Start with a suspect borrower, traverse linkedAccountIds up to 3 hops deep, flag high-risk connections. Index connectToField and use restrictSearchWithMatch to prune irrelevant branches.',
-    },
     changeStreams: {
       id: 'changeStreams',
       label: 'Change Streams',
@@ -159,106 +152,182 @@ export const mongoContent = {
 export const architectureContent = {
   pageTitle: 'The AI Layer',
   pageIntro:
-    'LangGraph orchestrates agents that use LangChain tools backed by MongoDB.',
+    'LangGraph orchestrates 6 specialized agents through a supervisor pattern, backed by MongoDB for state persistence, vector search, and real-time streaming.',
 
   agentDescriptions: {
     supervisor: {
       name: 'Supervisor',
       responsibilities:
-        'For regulated workflows like lending, the orchestrator-worker pattern (supervisor) ensures every agent interaction flows through a documented, auditable path. The StateGraph API provides clearer workflow visualization — the graph structure maps directly to lending workflow diagrams.',
+        'Orchestrator-worker pattern for the lending pipeline. Routes agents via LangGraph StateGraph with 4 autonomy levels: observe (nodes paused for officer approval, approved nodes bypass), suggest (final decision paused), bounded (escalations paused — default), and auto (fully autonomous). Supervisor-level retry logic (3× attempts) with safe_node timeout wrappers. Dispatches parallel execution of Document Verifier + Credit Puller via LangGraph Send().',
       productionNote:
-        'Production agentic lending systems processing 1,000+ applications/hour use a supervisor that orchestrates specialized agents, each with access to domain-specific MongoDB tools, while maintaining a shared state graph for full auditability.',
+        'Bounded autonomy is the default — agents act autonomously for standard checks while the HITL gate triggers on policy thresholds. Every agent interaction is logged to the agent_activity time-series collection for full auditability.',
+    },
+    docVerifier: {
+      name: 'Document Verifier',
+      responsibilities:
+        'Validates document completeness against 10 required types (pay stubs, tax returns, bank statements, IDs, etc.). Detects extraction errors and duplicates via filename + content hash matching. Cross-references borrower names across all submitted documents.',
+      tools: [
+        { glyph: 'File', label: 'MongoDB Query', colorVar: 'mongo' },
+        { glyph: 'Beaker', label: 'Extraction Validation', colorVar: 'voyage' },
+      ],
+      collections: 'documents',
+      capabilities: [
+        '10-type coverage verification',
+        'Duplicate detection (filename + content hash)',
+        'Extraction error flagging (advisory interventions)',
+        'Cross-document name verification',
+        'Blocking intervention creation for missing docs',
+      ],
+      productionNote:
+        'Runs in parallel with Credit Puller via LangGraph Send() for faster data gathering.',
+    },
+    creditPuller: {
+      name: 'Credit Puller',
+      responsibilities:
+        'Pulls credit reports for all borrowers on the application — primary applicant and co-applicant. Extracts primary and co-applicant credit scores. Creates advisory intervention if no credit data is found for any borrower.',
+      tools: [
+        { glyph: 'CreditCard', label: 'Credit Bureau API', colorVar: 'tool-blue' },
+        { glyph: 'File', label: 'MongoDB Query', colorVar: 'mongo' },
+      ],
+      collections: 'credit_reports',
+      capabilities: [
+        'Multi-borrower credit extraction',
+        'Co-applicant score pairing',
+        'Parallel execution with Document Verifier',
+        'Advisory intervention on missing data',
+      ],
     },
     loanAppAgent: {
       name: 'Loan Application Agent',
       responsibilities:
-        'Multi-document ingestion (CRA notices, bank statements, pay stubs), identity verification, open banking data enrichment, and abandonment prevention.',
+        'Synthesizes results from Document Verifier and Credit Puller into a unified assessment. Uses LLM (Bedrock Claude) to analyze combined document extractions and credit data. Extracts and validates combined gross income figures. Generates a structured verification summary for the underwriter.',
       tools: [
-        { glyph: 'CreditCard', label: 'creditBureau()', colorVar: 'tool-blue' },
-        { glyph: 'Beaker', label: 'voyage-multimodal-3.5', colorVar: 'voyage' },
-        { glyph: 'Visibility', label: 'Change Streams', colorVar: 'success' },
-        { glyph: 'Building', label: 'Open Banking (Plaid)', colorVar: 'agent-cyan' },
+        { glyph: 'Beaker', label: 'Bedrock Claude (LLM)', colorVar: 'voyage' },
+        { glyph: 'File', label: 'MongoDB Query', colorVar: 'mongo' },
       ],
-      collections: 'loanApplications, loanDocuments',
-      dataSources: [
-        'Borrower Profiles',
-        'CRA Notices / Bank Statements / Pay Stubs',
-        'Communication Logs',
-        'IDs',
-      ],
+      collections: 'applications, documents, credit_reports',
       capabilities: [
-        '23 document types classified',
-        'Multi-channel intake',
-        'Open Banking data enrichment',
+        'Multi-source data synthesis',
+        'LLM-powered document analysis',
+        'Income extraction and validation',
+        'Structured verification summary',
       ],
     },
     underwritingAgent: {
       name: 'Underwriting Agent',
       responsibilities:
-        'Cash flow underwriting, alternative data scoring, risk tiering, champion/challenger model evaluation, and explainable decisions.',
+        'Risk scoring pipeline backed by MongoDB aggregation and Python computation. Calculates GDS/TDS ratios with OSFI B-20 stress testing (+2% qualifying rate). Detects insured mortgages (LTV > 80%) and applies tighter limits (GDS 35%/TDS 42% vs conventional 39%/44%). Classifies into risk tiers (A, B+, B, C, D). Makes 3-way decisions: approve, decline, or escalate to officer review. Uses Atlas Vector Search for underwriting policy RAG.',
       tools: [
-        { glyph: 'Charts', label: 'Aggregation', colorVar: 'agent-cyan' },
-        { glyph: 'MagnifyingGlass', label: 'Vector Search', colorVar: 'voyage' },
-        { glyph: 'Connect', label: '$graphLookup', colorVar: 'danger' },
+        { glyph: 'Charts', label: 'Aggregation Pipeline', colorVar: 'agent-cyan' },
+        { glyph: 'MagnifyingGlass', label: 'Atlas Vector Search', colorVar: 'voyage' },
+        { glyph: 'File', label: 'MongoDB Query', colorVar: 'mongo' },
         { glyph: 'TimeSeries', label: 'Time Series', colorVar: 'voyage' },
       ],
-      collections: 'riskScores, creditReports',
-      dataSources: [
-        'Credit Reports',
-        'Financial Scores',
-        '3rd Party / Social Media',
-        'Cash Flow Data',
-      ],
+      collections: 'applications, credit_reports, underwriting_policies, payments',
       capabilities: [
-        'Cash flow underwriting',
-        'SHAP explainability',
-        'Adverse action generation',
-        'Champion/challenger evaluation',
+        'OSFI B-20 stress testing',
+        'Insured vs conventional mortgage detection',
+        'GDS/TDS ratio calculation',
+        'Risk tier classification (A → D)',
+        'Policy RAG via Vector Search',
+        'Intervention creation (stress failure, missing data)',
       ],
     },
-    servicingAgent: {
-      name: 'Servicing Agent',
+    applicationAgent: {
+      name: 'Application Agent',
       responsibilities:
-        'Early warning system monitoring, propensity-to-pay scoring, proactive intervention triggers, and multi-channel outreach for retention and collections.',
+        'Conversational AI assistant for borrowers, operating independently from the pipeline. Stage-aware prompting calibrates tone by application status. Provides 10 borrower-safe tools with explicit projection allowlists — raw risk scores and internal data are never exposed. Renders 7 interactive generative UI components inline in chat. Returns source citations with provenance badges.',
       tools: [
-        { glyph: 'Visibility', label: 'Change Streams', colorVar: 'success' },
-        { glyph: 'TimeSeries', label: 'Time Series', colorVar: 'voyage' },
-        { glyph: 'MagnifyingGlass', label: 'Vector Search', colorVar: 'voyage' },
+        { glyph: 'MagnifyingGlass', label: 'Policy RAG (Vector Search)', colorVar: 'voyage' },
+        { glyph: 'File', label: 'Status + Documents Query', colorVar: 'mongo' },
+        { glyph: 'Warning', label: 'Intervention Check', colorVar: 'hitl-amber' },
+        { glyph: 'Charts', label: 'Affordability Calculator', colorVar: 'agent-cyan' },
       ],
-      collections: 'modificationOffers, ewsAlerts, paymentPatterns',
-      dataSources: [
-        'Payment History',
-        'Behavioral Signals',
-        'External Events',
-        'Similar Borrower Profiles',
-      ],
+      collections: 'applications, documents, interventions, underwriting_policies, conversations',
       capabilities: [
-        'Early Warning System',
-        'Propensity-to-pay scoring',
-        'Proactive restructuring',
-        'Multi-channel outreach',
+        'Stage-aware conversation (tone shifts by status)',
+        '7 generative UI components (calculators, checklists, timelines)',
+        'Policy RAG with source citations',
+        'Safety-filtered data (no raw risk scores to borrowers)',
+        'Intervention awareness + re-evaluation triggers',
+        'Tool transparency (context gathering display)',
       ],
     },
   },
 
-  hitlExplanation: {
-    title: 'Human-in-the-loop',
-    tiers: [
-      { tier: 'Tier 1 (low risk)', desc: 'Auto-approve, no interrupt' },
-      { tier: 'Tier 2 (medium)', desc: 'Junior officer review via interrupt()' },
-      { tier: 'Tier 3 (high)', desc: 'Senior escalation via interrupt() with override' },
+  interventionSystem: {
+    title: 'Intervention System',
+    description:
+      'Pipeline agents create typed interventions with dual context — internal details for officers (severity, risk flags, source node) and borrower-safe summaries for chat display. Blocking interventions pause the pipeline until the borrower resolves them; advisory interventions are informational.',
+    types: [
+      { type: 'missing_document', severity: 'blocking', source: 'Doc Verifier', desc: 'Required document types not submitted' },
+      { type: 'stress_test_failure', severity: 'blocking', source: 'Underwriter', desc: 'OSFI B-20 stress test exceeds GDS/TDS limits' },
+      { type: 'income_data_required', severity: 'blocking', source: 'Underwriter', desc: 'Combined income is zero or unavailable' },
+      { type: 'credit_score_required', severity: 'blocking', source: 'Underwriter', desc: 'Primary credit score unavailable' },
+      { type: 'credit_data_unavailable', severity: 'advisory', source: 'Credit Puller', desc: 'No credit reports retrieved for borrower' },
+      { type: 'document_processing_error', severity: 'advisory', source: 'Doc Verifier', desc: 'Extraction errors in submitted documents' },
+      { type: 'additional_info_required', severity: 'advisory', source: 'Underwriter', desc: 'Escalation due to policy conditions' },
     ],
+    codeSample: `db.interventions.insertOne({
+  application_id: "APP-2026-00001",
+  type: "stress_test_failure",
+  status: "pending",
+  internal_context: {
+    source_node: "underwriter",
+    severity: "blocking",
+    risk_flag: "stress_test_failure",
+    stress_gds: 0.68, stress_tds: 0.72
+  },
+  borrower_context: {
+    summary: "Your stress test ratios exceed guidelines.",
+    action_required: "Consider a larger down payment or lower purchase price."
+  }
+})`,
+  },
+
+  generativeUI: {
+    title: 'Generative UI',
+    description:
+      'The Application Agent renders interactive React components inline in chat. The backend detects trigger keywords, fetches borrower-safe data, and emits ui_component SSE events. The frontend maps component names to React components via a registry. The LLM receives a description of visible components so it complements rather than duplicates the visual.',
+    components: [
+      { name: 'AffordabilityCalculator', interactive: true, desc: 'Sliders for down payment, rate, term — live GDS/TDS + stress test' },
+      { name: 'DocumentChecklist', interactive: false, desc: 'Visual status badges for each required document type' },
+      { name: 'ApplicationStrength', interactive: false, desc: 'Qualitative strength factors (no raw risk scores)' },
+      { name: 'RateComparison', interactive: false, desc: 'Fixed vs variable rate options with monthly payments' },
+      { name: 'PaymentSchedule', interactive: true, desc: 'Amortization table with annual/monthly toggle' },
+      { name: 'ScenarioComparison', interactive: false, desc: 'Side-by-side down payment scenario analysis' },
+      { name: 'ClosingTimeline', interactive: false, desc: 'Post-approval steps: rate lock → signing → funding' },
+    ],
+  },
+
+  hitlExplanation: {
+    title: 'Human-in-the-Loop',
+    tiers: [
+      { tier: 'Auto-approve', desc: 'Clean credit, low ratios, purchase < $500K — no interrupt' },
+      { tier: 'Officer Review', desc: 'Purchase > $500K, GDS > 36%, TDS > 41%, risk tier B/C — interrupt()' },
+      { tier: 'Auto-decline', desc: 'Risk score > 80, tier D, or stress test failure — no interrupt' },
+    ],
+    officerActions:
+      'Officers can Approve, Decline, or Modify & Continue. Modifications support loan amount overrides, risk tier overrides, and additional conditions. Modify & Continue re-executes the pipeline with updated parameters.',
     persistence:
-      'Every interrupt() persists state to MongoDB via MongoDBSaver. Every resume restores from checkpoint. Full audit trail.',
-    codeSample: `def loan_approval_node(state):
+      'Every interrupt() persists full graph state to MongoDB via MongoDBSaver. Resume restores from checkpoint. All decisions logged to hitl_audit (immutable). Pipeline lock prevents concurrent execution.',
+    codeSample: `def hitl_gate(state):
+    # LangGraph interrupt pauses execution, persists to MongoDB
     decision = interrupt({
-        "loan_amount": state["loan_amount"],
+        "application_id": state["application_id"],
         "risk_score": state["risk_score"],
-        "underwriting_summary": state["underwriting_result"]
+        "risk_tier": state["risk_tier"],
+        "gds_ratio": state["gds_ratio"],
+        "tds_ratio": state["tds_ratio"],
+        "decision_reasoning": state["decision_reasoning"],
+        "policy_citations": state.get("policy_citations", [])
     })
-    if decision["approved"]:
-        return Command(goto="disburse", update={"terms": decision.get("modified_terms")})
-    return Command(goto="reject", update={"rejection_reason": decision["reason"]})`,
+    # Officer resumes with approve / decline / modify_and_continue
+    if decision["action"] == "approve":
+        return Command(goto="complete", update={"approved": True})
+    elif decision["action"] == "modify_and_continue":
+        return Command(goto="underwriter", update=decision["overrides"])
+    return Command(goto="complete", update={"approved": False})`,
   },
 
 };

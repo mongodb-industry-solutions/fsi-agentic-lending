@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import Badge from '@leafygreen-ui/badge';
 import { apiGet, apiPost } from '../../lib/api';
-import { formatCurrency, getRiskColor } from './utils';
+import { formatCurrency, getRiskColor, GDS_LIMIT, TDS_LIMIT } from './utils';
 import PipelineExplorer from './PipelineExplorer';
 
 function MetricBox({ label, value, color, mono = true }) {
@@ -173,7 +173,7 @@ export default function ApplicationDetail({ appDetail, compact = false }) {
         <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: spacing[2] }}>
           Borrower
         </div>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, marginBottom: spacing[2] }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 'var(--text-base)', marginBottom: spacing[2] }}>
           {borrower_names?.join(' & ') || 'Unknown'}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: spacing[2] }}>
@@ -217,14 +217,14 @@ export default function ApplicationDetail({ appDetail, compact = false }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: spacing[2], marginBottom: spacing[2] }}>
           <div>
             <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: 2 }}>Risk Score</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 800, color: getRiskColor(risk_score) }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-lg)', fontWeight: 800, color: getRiskColor(risk_score) }}>
               {risk_score != null ? risk_score : 'N/A'}
               {risk_score != null && <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600 }}> / 100</span>}
             </div>
           </div>
           <MetricBox label="Tier" value={risk_tier || 'N/A'} color={getRiskColor(risk_score)} />
-          <MetricBox label="GDS" value={gds_ratio != null ? `${(gds_ratio * 100).toFixed(1)}%` : 'N/A'} color={gds_ratio > 0.36 ? 'var(--danger)' : undefined} />
-          <MetricBox label="TDS" value={tds_ratio != null ? `${(tds_ratio * 100).toFixed(1)}%` : 'N/A'} color={tds_ratio > 0.41 ? 'var(--danger)' : undefined} />
+          <MetricBox label="GDS" value={gds_ratio != null ? `${(gds_ratio * 100).toFixed(1)}%` : 'N/A'} color={gds_ratio > GDS_LIMIT ? 'var(--danger)' : undefined} />
+          <MetricBox label="TDS" value={tds_ratio != null ? `${(tds_ratio * 100).toFixed(1)}%` : 'N/A'} color={tds_ratio > TDS_LIMIT ? 'var(--danger)' : undefined} />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: spacing[2] }}>

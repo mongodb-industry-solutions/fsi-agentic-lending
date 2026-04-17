@@ -1,3 +1,9 @@
+// Backend escalation thresholds (see backend underwriter / constants.js).
+// Insured mortgages (LTV > 80%) use tighter limits (35% / 42%); these
+// are the conventional thresholds used for HITL display/gating.
+export const GDS_LIMIT = 0.36;
+export const TDS_LIMIT = 0.41;
+
 export function formatCurrency(amount) {
   if (amount == null) return 'N/A';
   return `$${Number(amount).toLocaleString('en-US')}`;

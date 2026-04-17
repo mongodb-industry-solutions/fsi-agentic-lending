@@ -86,7 +86,7 @@ export function PolicyExplorer({ autoQuery = '' }) {
         aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}
         style={{
-          width: '100%', padding: '8px 12px',
+          width: '100%', padding: `${spacing[200]}px ${spacing[300]}px`,
           background: 'none', border: 'none', cursor: 'pointer',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           font: 'inherit',
@@ -123,11 +123,11 @@ export function PolicyExplorer({ autoQuery = '' }) {
       </button>
       <div style={{
         maxHeight: expanded ? 800 : 0,
-        overflow: 'hidden',
+        overflow: expanded ? 'auto' : 'hidden',
         transition: 'max-height 220ms cubic-bezier(0.33, 1, 0.68, 1)',
       }}>
-        <div style={{ padding: `0 12px ${spacing[3]}px` }}>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+        <div style={{ padding: `0 ${spacing[300]}px ${spacing[3]}px` }}>
+          <div style={{ display: 'flex', gap: spacing[150], marginBottom: spacing[100] }}>
             <input
               type="text"
               value={query}
@@ -175,10 +175,10 @@ export function PolicyExplorer({ autoQuery = '' }) {
             </div>
           )}
           {results && results.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[100] }}>
               {results.map((r, i) => (
                 <div key={i} onClick={() => setExpandedResult(expandedResult === i ? null : i)} style={{
-                  padding: '6px 8px', background: 'var(--bg-surface)', borderRadius: 6,
+                  padding: `${spacing[150]}px ${spacing[200]}px`, background: 'var(--bg-surface)', borderRadius: 6,
                   border: `1px solid ${expandedResult === i ? 'var(--voyage)' : 'var(--border-dim)'}`,
                   cursor: 'pointer',
                   animation: `thinkingFade 200ms cubic-bezier(0.33, 1, 0.68, 1) ${i * 60}ms both`,

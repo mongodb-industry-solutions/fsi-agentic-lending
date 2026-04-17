@@ -477,6 +477,33 @@ input[type="range"]::-moz-range-thumb {
   100% { box-shadow: none; }
 }
 
+@keyframes capabilityTileIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* A5: highlight newly-unlocked capability actions (e.g., "My Application"
+   appearing when status crosses underwriting). */
+@keyframes capabilityUnlock {
+  0%   { opacity: 0; transform: translateY(4px) scale(0.95); box-shadow: 0 0 0 0 var(--agent-cyan); }
+  60%  { opacity: 1; transform: translateY(0) scale(1); box-shadow: 0 0 0 4px var(--agent-cyan-dim); }
+  100% { opacity: 1; transform: translateY(0) scale(1); box-shadow: 0 0 0 0 transparent; }
+}
+
+/* G4: subtle breathing invitation on the send button when the user has
+   typed input but not yet submitted. */
+@keyframes sendInvite {
+  0%, 100% { box-shadow: 0 0 0 0 var(--mongo-glow); }
+  50%      { box-shadow: 0 0 0 3px var(--mongo-glow); }
+}
+
+/* D3: pre-announcement strip fade-out as it morphs into the rendered
+   component. Applied via inline style on unmount phase. */
+@keyframes announcementMorph {
+  0%   { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-2px); }
+}
+
 /* ===================== REDUCED MOTION ===================== */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -485,5 +512,12 @@ input[type="range"]::-moz-range-thumb {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  /* Review #9: the global rule collapses the duration but the send-invite
+     keyframe pulses a box-shadow on an interactive button. Neutralize it
+     explicitly so reduced-motion users don't get a halted mid-pulse glow. */
+  @keyframes sendInvite {
+    0%, 100% { box-shadow: none; }
   }
 }

@@ -115,7 +115,7 @@ export function PortfolioIntelligence() {
       </button>
       <div style={{
         maxHeight: expanded ? 600 : 0,
-        overflow: 'hidden',
+        overflow: expanded ? 'auto' : 'hidden',
         transition: 'max-height 220ms cubic-bezier(0.33, 1, 0.68, 1)',
       }}>
         <div style={{ padding: `0 12px ${spacing[3]}px`, display: 'flex', flexDirection: 'column', gap: spacing[2] }}>

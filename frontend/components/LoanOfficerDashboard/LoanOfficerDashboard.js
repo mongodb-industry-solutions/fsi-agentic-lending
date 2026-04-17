@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
+import Modal from '@leafygreen-ui/modal';
 import ApplicationQueue from './ApplicationQueue';
 import AgentActivityLog from './AgentActivityLog';
 import IntentPreview from './IntentPreview';
@@ -91,6 +92,8 @@ function AgentRailHeader({ agentStats, elapsedSeconds, hitlReached, applicationI
 
 const AGENT_TO_NODE = {
   supervisor: 'supervisor',
+  doc_verifier: 'docVerifier',
+  credit_puller: 'creditPuller',
   loan_app_agent: 'appAgent',
   loan_app: 'appAgent',
   underwriter: 'underwriter',
@@ -102,6 +105,7 @@ export default function LoanOfficerDashboard({ active = true }) {
   const [lastCorrelatedEvent, setLastCorrelatedEvent] = useState(null);
   const [agentStats, setAgentStats] = useState({ totalReceived: 0 });
   const [canvasHighlightNode, setCanvasHighlightNode] = useState(null);
+  const [showWorkflowModal, setShowWorkflowModal] = useState(false);
   const highlightTimerRef = useRef(null);
 
   // Cleanup highlight timer on unmount
@@ -254,129 +258,231 @@ export default function LoanOfficerDashboard({ active = true }) {
             </div>
           )}
 
-          {/* Workflow Canvas + overlays */}
-          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: '35vh' }}>
-            {selectedApp && (workflowPhase === 'executing' || workflowPhase === 'preview') ? (
-              <>
-                <WorkflowCanvas
-                  activeNodes={workflowPhase === 'preview' ? [] : currentWorkflow.activeNodes}
-                  activeEdges={workflowPhase === 'preview' ? [] : currentWorkflow.activeEdges}
-                  pulsingNodes={workflowPhase === 'preview' ? [] : hitlReached ? ['hitlGate'] : currentWorkflow.pulsingNodes}
-                  currentScene={workflowPhase === 'preview' ? 'origination' : currentWorkflow.currentScene}
-                  highlightNode={canvasHighlightNode}
-                  liveAgentOutput={liveAgentOutput}
-                  hitlActive={hitlReached && !approved}
-                  hitlStartTime={hitlStartTime}
-                  hitlResolution={approved && hitlReached ? (approvalDetails?.mode === 'declined' ? 'declined' : 'approved') : null}
-                  hitlResolutionTime={hitlResolutionTime}
-                />
-
-                {workflowPhase === 'executing' && (
-                  <PolicyBoundsIndicator exceeded={hitlReached} />
-                )}
-
-                {workflowPhase === 'executing' && (
-                  <LiveUnderwritingResults data={liveAgentOutput} />
-                )}
-
-                <div style={{
-                  position: 'absolute', bottom: 12, left: 12, right: 12,
-                  padding: '10px 14px',
-                  background: 'var(--bg-overlay-alpha)',
-                  backdropFilter: 'blur(8px)',
-                  borderRadius: 8,
-                  border: '1px solid var(--border-dim)',
-                  fontSize: 11,
-                  color: 'var(--text-secondary)',
-                }}>
-                  <span style={{ fontWeight: 700, color: 'var(--text-primary)', marginRight: 6 }}>
+          {/* Workflow status bar + modal */}
+          {selectedApp && (workflowPhase === 'executing' || workflowPhase === 'preview') ? (
+            <>
+              <div style={{
+                padding: '10px 14px',
+                borderBottom: '1px solid var(--border-dim)',
+                background: 'var(--bg-base)',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {workflowPhase === 'executing' && !approved && (
+                    <div style={{
+                      width: 7, height: 7, borderRadius: '50%',
+                      background: hitlReached ? 'var(--hitl-amber)' : 'var(--agent-cyan)',
+                      boxShadow: `0 0 6px ${hitlReached ? 'var(--hitl-amber)' : 'var(--agent-cyan)'}`,
+                      animation: 'pulse 1.5s infinite', flexShrink: 0,
+                    }} />
+                  )}
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
                     {workflowPhase === 'preview'
                       ? 'Execution Plan'
                       : hitlReached
-                        ? 'HITL Gate'
+                        ? 'HITL Gate — Awaiting Decision'
                         : `Stage: ${currentWorkflow.label}`
                     }
                   </span>
-                  {workflowPhase === 'preview'
-                    ? 'Agent has generated an execution plan. Review and approve above to begin processing.'
-                    : hitlReached && !approved
-                      ? 'Agent workflow paused. All state persisted to MongoDB via MongoDBSaver. Awaiting officer decision.'
-                      : approved
-                        ? 'Decision recorded. Workflow resuming from checkpoint.'
-                        : (() => {
-                            const parts = [];
-                            if (liveAgentOutput.primary_credit_score) parts.push(`Credit score ${liveAgentOutput.primary_credit_score}`);
-                            if (liveAgentOutput.document_count) parts.push(`${liveAgentOutput.document_count} docs verified`);
-                            if (liveAgentOutput.risk_score != null) parts.push(`Risk ${liveAgentOutput.risk_score}/100`);
-                            if (liveAgentOutput.gds_ratio != null) parts.push(`GDS ${(liveAgentOutput.gds_ratio * 100).toFixed(1)}%`);
-                            if (parts.length > 0) {
-                              return `${parts.join(' \u00b7 ')}. Running ${currentWorkflow.label.toLowerCase()} stage...`;
-                            }
-                            return `Agents are processing this application through the ${currentWorkflow.label.toLowerCase()} stage.`;
-                          })()
-                  }
-                </div>
-              </>
-            ) : selectedApp && workflowPhase === 'manual' ? (
-              <ManualWorkspace appDetail={selectedAppDetail} queueData={selectedAppData} onApprove={handleApprove} onDecline={handleDecline} addToast={addToast} />
-            ) : !selectedApp ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                <div style={{
-                  textAlign: 'center', padding: spacing[5],
-                  border: '2px dashed var(--border-dim)', borderRadius: 12,
-                  background: 'var(--bg-void)', maxWidth: 380,
-                }}>
-                  {/* Mini pipeline sketch */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, marginBottom: 16 }}>
-                    {['Origination', 'Underwriting', 'HITL'].map((label, i) => (
-                      <div key={label} style={{ display: 'flex', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <div style={{
-                            width: 24, height: 24, borderRadius: '50%',
-                            border: '2px dashed var(--border-base)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: 9, fontWeight: 700, color: 'var(--text-dim)',
-                          }}>
-                            {i + 1}
-                          </div>
-                          <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 3, fontFamily: 'var(--font-display)', fontWeight: 600 }}>
-                            {label}
-                          </div>
-                        </div>
-                        {i < 2 && (
-                          <div style={{ width: 28, height: 1, background: 'var(--border-base)', margin: '0 4px', marginBottom: 16 }} />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {(() => {
-                    const pendingCount = liveApplications.filter(
-                      (a) => ['submitted', 'review', 'pending_review', 'processing', 'underwriting'].includes(a.status)
-                    ).length;
-                    return (
-                      <>
-                        {pendingCount > 0 && (
-                          <div style={{
-                            fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 700,
-                            color: 'var(--mongo)', marginBottom: 4,
-                          }}>
-                            {pendingCount} application{pendingCount > 1 ? 's' : ''} in queue
-                          </div>
-                        )}
-                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-dim)', fontSize: 13 }}>
-                          {pendingCount > 0 ? 'Select one from the queue to begin' : 'No applications in queue'}
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
-                          {pendingCount === 0 ? 'Submit an application from the Borrower Portal to get started' : 'Review the plan, adjust parameters, then run the agent pipeline'}
-                        </div>
-                      </>
-                    );
+                  {workflowPhase === 'executing' && (() => {
+                    const parts = [];
+                    if (liveAgentOutput.primary_credit_score) parts.push(`Credit ${liveAgentOutput.primary_credit_score}`);
+                    if (liveAgentOutput.document_count) parts.push(`${liveAgentOutput.document_count} docs`);
+                    if (liveAgentOutput.risk_score != null) parts.push(`Risk ${liveAgentOutput.risk_score}/100`);
+                    if (liveAgentOutput.gds_ratio != null) parts.push(`GDS ${(liveAgentOutput.gds_ratio * 100).toFixed(1)}%`);
+                    return parts.length > 0 ? (
+                      <span style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
+                        {parts.join(' \u00b7 ')}
+                      </span>
+                    ) : null;
                   })()}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setShowWorkflowModal(true)}
+                  style={{
+                    padding: '4px 12px', borderRadius: 6,
+                    border: '1px solid var(--border-base)',
+                    background: 'var(--bg-surface)',
+                    color: 'var(--text-secondary)',
+                    fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-display)',
+                    cursor: 'pointer',
+                    transition: 'all var(--transition-fast)',
+                  }}
+                >
+                  View Workflow
+                </button>
               </div>
-            ) : null}
-          </div>
+
+              {/* Workflow Canvas Modal */}
+              <Modal
+                open={showWorkflowModal}
+                setOpen={setShowWorkflowModal}
+                size="large"
+              >
+                {showWorkflowModal && <div style={{ position: 'relative', height: '70vh', minHeight: 400 }}>
+                  <WorkflowCanvas
+                    activeNodes={workflowPhase === 'preview' ? [] : currentWorkflow.activeNodes}
+                    activeEdges={workflowPhase === 'preview' ? [] : currentWorkflow.activeEdges}
+                    pulsingNodes={workflowPhase === 'preview' ? [] : hitlReached ? ['hitlGate'] : currentWorkflow.pulsingNodes}
+                    currentScene={workflowPhase === 'preview' ? 'origination' : currentWorkflow.currentScene}
+                    highlightNode={canvasHighlightNode}
+                    liveAgentOutput={liveAgentOutput}
+                    hitlActive={hitlReached && !approved}
+                    hitlStartTime={hitlStartTime}
+                    hitlResolution={approved && hitlReached ? (approvalDetails?.mode === 'declined' ? 'declined' : 'approved') : null}
+                    hitlResolutionTime={hitlResolutionTime}
+                  />
+
+                  {workflowPhase === 'executing' && (
+                    <PolicyBoundsIndicator exceeded={hitlReached} />
+                  )}
+
+                  {workflowPhase === 'executing' && (
+                    <LiveUnderwritingResults data={liveAgentOutput} />
+                  )}
+
+                  <div style={{
+                    position: 'absolute', bottom: 12, left: 12, right: 12,
+                    padding: '10px 14px',
+                    background: 'var(--bg-overlay-alpha)',
+                    backdropFilter: 'blur(8px)',
+                    borderRadius: 8,
+                    border: '1px solid var(--border-dim)',
+                    fontSize: 11,
+                    color: 'var(--text-secondary)',
+                  }}>
+                    <span style={{ fontWeight: 700, color: 'var(--text-primary)', marginRight: 6 }}>
+                      {workflowPhase === 'preview'
+                        ? 'Execution Plan'
+                        : hitlReached
+                          ? 'HITL Gate'
+                          : `Stage: ${currentWorkflow.label}`
+                      }
+                    </span>
+                    {workflowPhase === 'preview'
+                      ? 'Agent has generated an execution plan. Review and approve above to begin processing.'
+                      : hitlReached && !approved
+                        ? 'Agent workflow paused. All state persisted to MongoDB via MongoDBSaver. Awaiting officer decision.'
+                        : approved
+                          ? 'Decision recorded. Workflow resuming from checkpoint.'
+                          : `Agents are processing this application through the ${currentWorkflow.label.toLowerCase()} stage.`
+                    }
+                  </div>
+                </div>}
+              </Modal>
+            </>
+          ) : selectedApp && workflowPhase === 'manual' ? (
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <ManualWorkspace appDetail={selectedAppDetail} queueData={selectedAppData} onApprove={handleApprove} onDecline={handleDecline} addToast={addToast} />
+            </div>
+          ) : !selectedApp ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: spacing[4], flex: 1 }}>
+              <div style={{
+                padding: spacing[4], maxWidth: 560,
+                border: '1px solid var(--border-dim)', borderRadius: 12,
+                background: 'var(--bg-surface)',
+              }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15, color: 'var(--text-primary)', marginBottom: 4 }}>
+                  Agentic Lending Pipeline
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 16 }}>
+                  LangGraph orchestration with MongoDB Atlas data layer
+                </div>
+
+                {/* 3-column architecture */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
+                  {[
+                    {
+                      stage: 'Origination',
+                      color: 'var(--agent-cyan)',
+                      agents: [
+                        { name: 'Doc Verifier', desc: 'Validates 10+ doc types' },
+                        { name: 'Credit Puller', desc: 'Bureau pull (parallel)' },
+                        { name: 'Loan App Agent', desc: 'LLM synthesis (Claude)' },
+                      ],
+                    },
+                    {
+                      stage: 'Underwriting',
+                      color: 'var(--tool-blue)',
+                      agents: [
+                        { name: 'Underwriter', desc: '7-stage aggregation' },
+                        { name: 'OSFI B-20', desc: 'Stress test + risk tiers' },
+                        { name: 'Policy RAG', desc: 'Atlas Vector Search' },
+                      ],
+                    },
+                    {
+                      stage: 'Decision',
+                      color: 'var(--hitl-amber)',
+                      agents: [
+                        { name: 'HITL Gate', desc: 'LangGraph interrupt()' },
+                        { name: 'Auto-approve', desc: 'Tier A, <$500K' },
+                        { name: 'Escalate', desc: 'GDS>36%, TDS>41%' },
+                      ],
+                    },
+                  ].map((col) => (
+                    <div key={col.stage} style={{
+                      padding: '10px 10px', borderRadius: 8,
+                      background: 'var(--bg-base)',
+                      border: '1px solid var(--border-dim)',
+                      borderTop: `2px solid ${col.color}`,
+                    }}>
+                      <div style={{
+                        fontSize: 9, fontWeight: 700, color: col.color,
+                        textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8,
+                      }}>
+                        {col.stage}
+                      </div>
+                      {col.agents.map((a) => (
+                        <div key={a.name} style={{ marginBottom: 4 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                            {a.name}
+                          </div>
+                          <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.3 }}>
+                            {a.desc}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Capability badges */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                  {['6 Pipeline Agents', '1 Application Agent', '7 Intervention Types', '7 Generative UI Components', 'Atlas Vector Search', 'OSFI B-20 Compliance'].map((cap) => (
+                    <span key={cap} style={{
+                      fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-mono)',
+                      padding: '2px 8px', borderRadius: 10,
+                      background: 'var(--bg-raised)', border: '1px solid var(--border-dim)',
+                      color: 'var(--text-secondary)',
+                    }}>
+                      {cap}
+                    </span>
+                  ))}
+                </div>
+
+                {/* CTA */}
+                {(() => {
+                  const pendingCount = liveApplications.filter(
+                    (a) => ['submitted', 'review', 'pending_review', 'processing', 'underwriting'].includes(a.status)
+                  ).length;
+                  return (
+                    <div style={{ textAlign: 'center' }}>
+                      {pendingCount > 0 ? (
+                        <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--mongo)' }}>
+                          {pendingCount} application{pendingCount > 1 ? 's' : ''} in queue — select one to begin
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                          Submit an application from the Borrower Portal to get started
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          ) : null}
 
           {/* HITL Review panel */}
           {selectedApp && hitlReached && !approved && (
@@ -438,6 +544,7 @@ export default function LoanOfficerDashboard({ active = true }) {
               }
             }}
             applicationId={selectedApp}
+            applicationStatus={selectedAppDetail?.status}
             onStatsChange={setAgentStats}
             hitlReached={hitlReached && !approved}
             liveAgentOutput={liveAgentOutput}
