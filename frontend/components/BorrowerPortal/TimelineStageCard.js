@@ -30,7 +30,6 @@ export function TimelineStageCard({
   const stageType = stage.getType ? stage.getType(stageContext) : (stage.type || 'clean');
   const detail = stage.getDetail ? stage.getDetail(stageContext) : (stage.detail || '');
   const interventions = stage.getInterventions ? stage.getInterventions(stageContext) : (stage.interventions || []);
-  const metrics = stage.getMetrics ? stage.getMetrics(stageContext) : null;
 
   const hasInterventions = stageType === 'intervention';
   const isActionReq = stageType === 'action-required';
@@ -192,7 +191,7 @@ export function TimelineStageCard({
 
         <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
           {stage.id === 'approved' && isDeclined
-            ? (stageContext.decisionReasoning || 'Application has been declined after review.')
+            ? (stageContext.declineReason || 'Application has been declined after review.')
             : detail}
         </div>
 
@@ -309,7 +308,7 @@ export function TimelineStageCard({
             }}>
               What happened
             </div>
-            <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: (interventions.length > 0 || metrics) ? 8 : 0 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: interventions.length > 0 ? 8 : 0 }}>
               {stageEvents.length > 0
                 ? `${stageEvents.length} agent action${stageEvents.length !== 1 ? 's' : ''} recorded. ${stageEvents.map((e) => e.detail).filter(Boolean).slice(0, 3).join(' \u2192 ')}`
                 : 'Processing completed for this stage.'}
@@ -349,38 +348,6 @@ export function TimelineStageCard({
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
-
-            {/* Underwriting metrics summary */}
-            {metrics && (
-              <div style={{
-                marginTop: 8, padding: '6px 8px',
-                background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--success)',
-              }}>
-                <div style={{
-                  fontSize: 9, fontWeight: 700, color: 'var(--success)',
-                  textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6,
-                }}>
-                  Underwriting Results
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[1] }}>
-                  {metrics.map((m, idx) => (
-                    <div key={idx} style={{
-                      display: 'flex', alignItems: 'center', gap: 6, fontSize: 9,
-                      opacity: 0,
-                      animation: `thinkingFade 300ms cubic-bezier(0.33, 1, 0.68, 1) ${idx * 100}ms forwards`,
-                    }}>
-                      <span style={{ color: 'var(--text-dim)', minWidth: 70 }}>{m.label}:</span>
-                      <span style={{
-                        color: 'var(--success)', fontFamily: 'var(--font-mono)', fontWeight: 700,
-                      }}>
-                        {m.value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
           </div>

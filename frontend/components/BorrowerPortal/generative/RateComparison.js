@@ -85,10 +85,6 @@ export default function RateComparison({ data }) {
                   <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 1 }}>Term</div>
                   <div style={{ fontWeight: 600 }}>{opt.term_years}yr</div>
                 </div>
-                <div>
-                  <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 1 }}>Stress Test</div>
-                  <div style={{ fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{opt.stress_test_rate.toFixed(2)}%</div>
-                </div>
                 {diff > 0 && (
                   <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
                     <div style={{ fontSize: 8, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 1 }}>vs best</div>

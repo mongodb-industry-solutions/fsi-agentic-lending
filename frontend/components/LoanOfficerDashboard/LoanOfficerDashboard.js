@@ -454,7 +454,7 @@ export default function LoanOfficerDashboard({ active = true }) {
 
                 {/* Capability badges */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-                  {['6 Pipeline Agents', '1 Application Agent', '7 Intervention Types', '7 Generative UI Components', 'Atlas Vector Search', 'OSFI B-20 Compliance'].map((cap) => (
+                  {['6 Pipeline Agents', '1 Application Agent', '7 Intervention Types', '6 Generative UI Components', 'Atlas Vector Search', 'OSFI B-20 Compliance'].map((cap) => (
                     <span key={cap} style={{
                       fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-mono)',
                       padding: '2px 8px', borderRadius: 10,

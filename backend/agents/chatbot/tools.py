@@ -192,66 +192,6 @@ def get_document_checklist_data(application_id: str) -> dict:
     return {"items": items, "complete": complete, "total": len(items)}
 
 
-def get_application_strength_data(application_id: str) -> dict:
-    """Get qualitative application strength assessment.
-
-    NEVER returns raw risk scores — only qualitative labels derived server-side.
-    """
-    db = get_db()
-    app = db["applications"].find_one(
-        {"application_id": application_id},
-        {
-            "_id": 0, "status": 1, "loan_amount": 1,
-            "purchase_price": 1, "down_payment": 1,
-            "combined_income": 1, "existing_monthly_debt": 1,
-        },
-    )
-    if not app:
-        return {}
-
-    purchase = max(app.get("purchase_price", 1), 1)
-    down = app.get("down_payment", 0)
-    down_pct = (down / purchase) * 100
-    monthly_income = max(app.get("combined_income", 1), 1) / 12
-    dti = app.get("existing_monthly_debt", 0) / monthly_income
-
-    factors = [
-        {
-            "label": "Down Payment",
-            "rating": "Excellent" if down_pct >= 20 else "Good" if down_pct >= 10 else "Fair",
-            "value": round(min(down_pct / 25 * 100, 100)),
-            "detail": f"{down_pct:.0f}% of purchase price",
-        },
-        {
-            "label": "Debt Ratios",
-            "rating": "Excellent" if dti < 0.30 else "Good" if dti < 0.40 else "Fair",
-            "value": round(max(0, min((1 - dti) * 100, 100))),
-            "detail": "Based on current debt obligations",
-        },
-        {
-            "label": "Employment",
-            "rating": "Good",
-            "value": 75,
-            "detail": "Verified employment",
-        },
-        {
-            "label": "Credit History",
-            "rating": "Good",
-            "value": 80,
-            "detail": "Based on credit report",
-        },
-    ]
-
-    fair_count = sum(1 for f in factors if f["rating"] == "Fair")
-    overall = "Strong" if fair_count == 0 else "Good" if fair_count <= 1 else "Fair"
-
-    return {
-        "overall": overall,
-        "factors": factors,
-        "status": app.get("status", "unknown"),
-    }
-
-
 def get_rate_comparison_data(application_id: str = None) -> dict:
     """Get rate comparison options with real loan amount from application."""
     loan_amount = 450000

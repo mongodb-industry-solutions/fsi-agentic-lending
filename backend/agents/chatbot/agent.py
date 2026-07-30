@@ -24,7 +24,6 @@ from agents.chatbot.tools import (
     get_pending_interventions,
     get_affordability_data,
     get_document_checklist_data,
-    get_application_strength_data,
     get_rate_comparison_data,
     get_closing_timeline_data,
 )
@@ -66,11 +65,6 @@ UI_TRIGGERS = {
         "amortization", "schedule", "payment breakdown",
         "principal", "interest split", "payment plan",
     ],
-    "application_strength": [
-        "how strong is my application", "application strength",
-        "how does my application look", "chances of approval",
-        "my application look",
-    ],
     "scenario_comparison": [
         "what if i put", "what if i increase",
         "compare down payment", "alternative scenario",
@@ -88,7 +82,6 @@ UI_TRIGGERS = {
 
 # Components that should only trigger in specific statuses
 UI_STATUS_GATES = {
-    "application_strength": lambda s: s in ("underwriting", "review", "approved", "declined", "closing"),
     "closing_timeline": lambda s: s in ("approved", "closing"),
 }
 
@@ -118,8 +111,6 @@ def _detect_ui_components(user_msg: str, app_id: str, app_status: str = None) ->
                 data = get_affordability_data(app_id)
             elif component_name == "document_checklist" and app_id:
                 data = get_document_checklist_data(app_id)
-            elif component_name == "application_strength" and app_id:
-                data = get_application_strength_data(app_id)
             elif component_name == "rate_comparison":
                 data = get_rate_comparison_data(app_id)
             elif component_name == "closing_timeline" and app_id:
@@ -292,8 +283,7 @@ def _build_context(state: AppAgentState) -> tuple[str, list[dict], list[dict]]:
         comp_descriptions = {
             "affordability_calculator": "An interactive affordability calculator with sliders for rate, term, and down payment. The user can adjust values and see GDS/TDS ratios update live. DO NOT list payment amounts or ratios — the calculator shows those. Instead explain concepts, suggest what to adjust, and provide context.",
             "document_checklist": "A visual document checklist showing status (verified/processing/missing) for each document. DO NOT re-list documents — the checklist shows them. Instead explain WHY key documents matter and what happens if one is missing.",
-            "application_strength": "A qualitative application strength card showing factors like Down Payment, Debt Ratios, Employment, and Credit History with ratings. DO NOT state ratings — the card shows them. Instead explain what drives each factor and how the borrower can improve.",
-            "rate_comparison": "A rate comparison card showing Fixed 3yr, Fixed 5yr, and Variable options with monthly payments and stress test rates. DO NOT repeat rates or payments — the card shows them. Instead explain the trade-offs between fixed vs variable and why one might be recommended.",
+            "rate_comparison": "A rate comparison card showing Fixed 3yr, Fixed 5yr, and Variable options with monthly payments. DO NOT repeat rates or payments — the card shows them. Instead explain the trade-offs between fixed vs variable and why one might be recommended.",
             "payment_schedule": "An amortization table showing monthly/annual payment breakdown (principal vs interest). DO NOT repeat payment figures — the table shows them. Instead explain how amortization works and what the split means for the borrower.",
             "scenario_comparison": "A side-by-side scenario comparison showing current vs alternative down payment. DO NOT repeat the numbers — the card shows them. Instead explain the trade-off and what the borrower should consider.",
             "closing_timeline": "A closing timeline showing the 4 steps after approval: Rate Lock, Doc Prep, Signing, Funding. DO NOT re-list steps — the timeline shows them. Instead explain what the borrower needs to do at each step and any time-sensitive actions.",

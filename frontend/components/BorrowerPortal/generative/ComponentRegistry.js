@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import GenUIShimmer from './GenUIShimmer';
 import AffordabilityCalculator from './AffordabilityCalculator';
 import DocumentChecklist from './DocumentChecklist';
-import ApplicationStrength from './ApplicationStrength';
 import RateComparison from './RateComparison';
 import PaymentSchedule from './PaymentSchedule';
 import ScenarioComparison from './ScenarioComparison';
@@ -13,7 +12,6 @@ import ClosingTimeline from './ClosingTimeline';
 const COMPONENT_MAP = {
   affordability_calculator: AffordabilityCalculator,
   document_checklist: DocumentChecklist,
-  application_strength: ApplicationStrength,
   rate_comparison: RateComparison,
   payment_schedule: PaymentSchedule,
   scenario_comparison: ScenarioComparison,

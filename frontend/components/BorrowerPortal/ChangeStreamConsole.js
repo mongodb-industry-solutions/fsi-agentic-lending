@@ -13,6 +13,14 @@ const OP_COLORS = {
 
 const COLLECTION_FILTERS = ['All', 'applications', 'documents', 'agent_activity', 'interventions'];
 
+// Underwriting internals never named to the borrower — filtered from the
+// change-stream "updatedFields" list so field names like risk_score don't leak.
+const SENSITIVE_FIELDS = new Set([
+  'risk_score', 'risk_tier', 'gds_ratio', 'tds_ratio',
+  'stress_gds', 'stress_tds', 'primary_credit_score', 'ltv',
+  'decision_reasoning', 'credit_score', 'risk_factors',
+]);
+
 function OpBadge({ op }) {
   const style = OP_COLORS[op] || OP_COLORS.UPDATE;
   return (
@@ -72,7 +80,10 @@ function synthesizeEvent(sseEvent) {
     };
   }
   if (sseEvent.type === 'node_complete') {
-    const fields = sseEvent.output ? Object.keys(sseEvent.output).join(', ') : '';
+    const safeKeys = sseEvent.output
+      ? Object.keys(sseEvent.output).filter((k) => !SENSITIVE_FIELDS.has(k))
+      : [];
+    const fields = safeKeys.join(', ');
     return {
       id: `cs-${Date.now()}-${Math.random()}`,
       timestamp: ts,

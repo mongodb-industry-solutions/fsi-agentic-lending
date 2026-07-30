@@ -8,27 +8,8 @@ import { SavingsSummary } from './SavingsSummary';
 import { TimelineStageCard } from './TimelineStageCard';
 
 function ApprovalContextCard({ stageContext }) {
-  const parts = [];
-  if (typeof stageContext.riskScore === 'number') {
-    parts.push(`Risk Tier ${stageContext.riskTier || 'N/A'} (score ${stageContext.riskScore}/100)`);
-  }
-  if (typeof stageContext.gds === 'number') {
-    parts.push(`GDS ${(stageContext.gds * 100).toFixed(1)}% within policy limits`);
-  }
-  if (typeof stageContext.tds === 'number') {
-    parts.push(`TDS ${(stageContext.tds * 100).toFixed(1)}% within policy limits`);
-  }
-  if (typeof stageContext.creditScore === 'number') {
-    parts.push(`credit score ${stageContext.creditScore}`);
-  }
-  if (parts.length === 0) return null;
-
-  const wasOfficerReviewed = stageContext.decisionReasoning?.toLowerCase().includes('officer')
-    || stageContext.decisionReasoning?.toLowerCase().includes('escalat');
-  const prefix = wasOfficerReviewed
-    ? 'Officer approved after AI review'
-    : 'Auto-approved by AI pipeline';
-
+  // Borrower-facing: qualitative summary only. No risk score/tier, GDS/TDS,
+  // or credit score — those remain officer-only.
   return (
     <div style={{
       padding: spacing[3],
@@ -43,61 +24,36 @@ function ApprovalContextCard({ stageContext }) {
         fontFamily: 'var(--font-display)', fontWeight: 700,
         fontSize: 13, color: 'var(--success)', marginBottom: spacing[2],
       }}>
-        Why This Was Approved
+        Your Application Was Approved
       </div>
       <div style={{
         fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5,
       }}>
-        {prefix}: {parts.join(', ')}.
+        Your income, credit, and documentation met our lending criteria
+        {stageContext.product ? ` for the ${stageContext.product}` : ''}. Your
+        Personal Lending Assistant can walk you through your rate, payment, and
+        next steps toward closing.
       </div>
-      {(typeof stageContext.riskScore === 'number' || typeof stageContext.gds === 'number') && (
-        <div style={{ display: 'flex', gap: spacing[2], marginTop: spacing[2], flexWrap: 'wrap' }}>
-          {typeof stageContext.riskScore === 'number' && (
-            <div style={{ padding: '4px 8px', background: 'var(--success-dim)', borderRadius: 4, fontSize: 9 }}>
-              <span style={{ color: 'var(--text-dim)' }}>Risk Score: </span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--success)' }}>{stageContext.riskScore}/100</span>
-            </div>
-          )}
-          {typeof stageContext.gds === 'number' && (
-            <div style={{ padding: '4px 8px', background: 'var(--success-dim)', borderRadius: 4, fontSize: 9 }}>
-              <span style={{ color: 'var(--text-dim)' }}>GDS: </span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{(stageContext.gds * 100).toFixed(1)}%</span>
-            </div>
-          )}
-          {typeof stageContext.tds === 'number' && (
-            <div style={{ padding: '4px 8px', background: 'var(--success-dim)', borderRadius: 4, fontSize: 9 }}>
-              <span style={{ color: 'var(--text-dim)' }}>TDS: </span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{(stageContext.tds * 100).toFixed(1)}%</span>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
 
 function DeclineCard({ stageContext, onOpenChat }) {
-  const reasoning = stageContext.decisionReasoning || '';
+  // Borrower-facing: qualitative reason only (no ratios/scores). The reasoning
+  // text comes from the backend's borrower-safe decline_reason.
+  const reasoning = stageContext.declineReason
+    || 'We’re unable to approve this application at this time.';
   const r = reasoning.toLowerCase();
 
-  // Map decline keywords to actionable guidance, enriched with actual metrics when available
+  // Map the qualitative reason to actionable guidance — no numbers.
   const guidance = [];
-  if (r.includes('stress test')) {
-    guidance.push('Consider increasing your down payment or choosing a less expensive property to improve your stress test results.');
+  if (r.includes('afford')) {
+    guidance.push('Consider increasing your down payment or choosing a less expensive property to improve affordability.');
+    guidance.push('Reducing existing monthly debt payments can also help.');
   }
-  if (r.includes('income') || r.includes('zero')) guidance.push('Ensure all income documentation is uploaded and accurate, including employment letters, pay stubs, and tax notices.');
-  if (r.includes('credit')) {
-    const scoreStr = typeof stageContext.creditScore === 'number' ? ` Your credit score of ${stageContext.creditScore} may need improvement.` : '';
-    guidance.push(`Review your credit report for errors and consider resolving any outstanding debts before reapplying.${scoreStr}`);
-  }
-  if (r.includes('gds') || r.includes('tds') || r.includes('debt')) {
-    const ratioStr = typeof stageContext.gds === 'number' && typeof stageContext.tds === 'number'
-      ? ` Your GDS is ${(stageContext.gds * 100).toFixed(1)}% and TDS is ${(stageContext.tds * 100).toFixed(1)}%.`
-      : '';
-    guidance.push(`Reducing existing monthly debt payments will improve your debt service ratios.${ratioStr}`);
-  }
-  if (r.includes('risk') && r.includes('threshold')) guidance.push('Your risk profile exceeded the automated approval threshold. A loan officer may be able to review your case manually.');
-  if (guidance.length === 0) guidance.push('Contact a loan officer for personalized guidance on your application.');
+  if (r.includes('income')) guidance.push('Ensure all income documentation is uploaded and accurate, including employment letters, pay stubs, and tax notices.');
+  if (r.includes('credit')) guidance.push('Review your credit report for errors and consider resolving any outstanding debts before reapplying.');
+  if (guidance.length === 0) guidance.push('Speak with a loan officer for personalized guidance on your application and next steps.');
 
   return (
     <div style={{
@@ -124,30 +80,6 @@ function DeclineCard({ stageContext, onOpenChat }) {
           fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5,
         }}>
           {reasoning}
-        </div>
-      )}
-
-      {/* Key metrics at decline */}
-      {(typeof stageContext.riskScore === 'number' || typeof stageContext.gds === 'number') && (
-        <div style={{ display: 'flex', gap: spacing[2], marginBottom: spacing[2], flexWrap: 'wrap' }}>
-          {typeof stageContext.riskScore === 'number' && (
-            <div style={{ padding: '4px 8px', background: 'var(--bg-raised)', borderRadius: 4, fontSize: 9 }}>
-              <span style={{ color: 'var(--text-dim)' }}>Risk Score: </span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--danger)' }}>{stageContext.riskScore}/100</span>
-            </div>
-          )}
-          {typeof stageContext.gds === 'number' && (
-            <div style={{ padding: '4px 8px', background: 'var(--bg-raised)', borderRadius: 4, fontSize: 9 }}>
-              <span style={{ color: 'var(--text-dim)' }}>GDS: </span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{(stageContext.gds * 100).toFixed(1)}%</span>
-            </div>
-          )}
-          {typeof stageContext.tds === 'number' && (
-            <div style={{ padding: '4px 8px', background: 'var(--bg-raised)', borderRadius: 4, fontSize: 9 }}>
-              <span style={{ color: 'var(--text-dim)' }}>TDS: </span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{(stageContext.tds * 100).toFixed(1)}%</span>
-            </div>
-          )}
         </div>
       )}
 
@@ -321,6 +253,10 @@ export default function StatusTracker({ onNotification, applicationId, applicati
     const app = timelineCtx?.application || {};
     const interventions = timelineCtx?.interventions || [];
     const summary = timelineCtx?.activity_summary || {};
+    const history = timelineCtx?.status_history || [];
+    // Borrower-safe signal for narrative tone: did the app pass through officer
+    // review? Derived from status history, not from any underwriting metric.
+    const wasReviewed = history.some((h) => h.status === 'review');
 
     const docTypes = ['missing_document', 'document_processing_error'];
     const creditTypes = ['credit_score_required', 'credit_data_unavailable'];
@@ -333,12 +269,11 @@ export default function StatusTracker({ onNotification, applicationId, applicati
       appId: applicationId,
       loanAmount: app.loan_amount,
       product: app.product,
-      riskScore: app.risk_score,
-      riskTier: app.risk_tier,
-      gds: app.gds_ratio,
-      tds: app.tds_ratio,
-      creditScore: app.primary_credit_score,
-      decisionReasoning: app.decision_reasoning,
+      // Underwriting internals (risk score/tier, GDS/TDS, credit score, raw
+      // decision reasoning) are officer-only and are not sent to the borrower.
+      // Only a qualitative decline_reason is surfaced, for declined apps.
+      declineReason: app.decline_reason,
+      wasReviewed,
       docCount: app.doc_count || 0,
       borrowerNames: app.borrower_names || [],
       approvedRate: app.approved_rate,
