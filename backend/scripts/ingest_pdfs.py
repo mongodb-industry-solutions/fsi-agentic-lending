@@ -695,6 +695,13 @@ def main():
     print("=" * 60)
     seed_additional_profiles(db)
 
+    print("\n" + "=" * 60)
+    print("STEP 8: Seeding loan officer")
+    print("=" * 60)
+    from services.officer_service import seed_officer, DEFAULT_OFFICER
+    seed_officer(db)
+    print(f"  Seeded officer: {DEFAULT_OFFICER['full_name']} ({DEFAULT_OFFICER['title']})")
+
     # Summary
     print("\n" + "=" * 60)
     print("INGESTION COMPLETE")

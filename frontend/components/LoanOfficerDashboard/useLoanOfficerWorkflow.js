@@ -121,7 +121,18 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
   const [liveApplications, setLiveApplications] = useState([]);
   const [selectedAppDetail, setSelectedAppDetail] = useState(null);
   const [portfolioStats, setPortfolioStats] = useState(null);
+  const [officer, setOfficer] = useState(null);
   const prevStatsRef = useRef({});
+
+  // Fetch the reviewing loan officer once (seeded singleton). Used for header
+  // identity and to attribute HITL decisions.
+  useEffect(() => {
+    let ignore = false;
+    apiGet('/officers/current')
+      .then((data) => { if (!ignore && data) setOfficer(data); })
+      .catch(() => {});
+    return () => { ignore = true; };
+  }, []);
 
   const snapshotReceived = useRef(false);
   const selectedAppRef = useRef(selectedApp);
@@ -556,7 +567,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     const result = await apiPost(`/hitl/${selectedApp}/decision`, {
       action: 'approve',
       officer_notes: details?.conditions || 'Approved after manual review',
-      officer_id: 'officer-demo',
+      officer_id: officer?.officer_id || 'officer-001',
       conditions: details?.conditions ? [details.conditions] : [],
       overrides: {
         ...(details?.rate ? { rate: parseFloat(details.rate) } : {}),
@@ -574,7 +585,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     } else {
       addToast({ type: 'error', title: 'Approval Failed', message: 'Could not process approval. Please try again.' });
     }
-  }, [addToast, selectedApp, selectedAppDetail, selectedAppData]);
+  }, [addToast, selectedApp, selectedAppDetail, selectedAppData, officer]);
 
   const handleDecline = useCallback(async () => {
     const appName = selectedAppDetail?.borrower_names?.length
@@ -586,7 +597,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       const result = await apiPost(`/hitl/${selectedApp}/decision`, {
         action: 'decline',
         officer_notes: 'Declined after manual review',
-        officer_id: 'officer-demo',
+        officer_id: officer?.officer_id || 'officer-001',
         conditions: [],
         overrides: {},
       });
@@ -602,7 +613,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
         addToast({ type: 'error', title: 'Decline Failed', message: 'Could not process decline. Please try again.' });
       }
     }
-  }, [addToast, selectedApp, selectedAppDetail, selectedAppData]);
+  }, [addToast, selectedApp, selectedAppDetail, selectedAppData, officer]);
 
   // Compatibility shim — LoanOfficerDashboard calls this on each activity entry
   // render. Stage progression is now handled in the hoisted SSE effect, so this
@@ -633,6 +644,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     selectedAppDetail,
     portfolioStats,
     dashboardStats,
+    officer,
     stageTimestamps,
     activityEvents,
     streamConnected,

@@ -113,6 +113,12 @@ def main():
             else:
                 print(f"  Warning: {e}")
 
+    # Seed the singleton loan officer (idempotent upsert)
+    print("\nSeeding loan officer...")
+    from services.officer_service import seed_officer, DEFAULT_OFFICER
+    seed_officer(db)
+    print(f"  Seeded officer: {DEFAULT_OFFICER['full_name']} ({DEFAULT_OFFICER['title']})")
+
     print("\nDone! All collections and indexes created.")
 
 

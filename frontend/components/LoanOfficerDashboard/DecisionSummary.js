@@ -237,7 +237,7 @@ function ProvenanceChain({ trail, approvalDetails, isDeclined }) {
   );
 }
 
-export default function DecisionSummary({ applicationId, appDetail, approvalDetails, appName, onClose }) {
+export default function DecisionSummary({ applicationId, appDetail, approvalDetails, appName, officer, onClose }) {
   const [trail, setTrail] = useState(null);
   const [showAudit, setShowAudit] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -291,6 +291,7 @@ export default function DecisionSummary({ applicationId, appDetail, approvalDeta
             <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
               {appName} · {appDetail?.product || ''}
               {approvalDetails?.rate && ` @ ${approvalDetails.rate}`}
+              {!isAuto && officer?.full_name && ` · Reviewed by ${officer.full_name}`}
             </div>
           </div>
         </div>

@@ -73,6 +73,12 @@ COLLECTIONS = {
             {"keys": [("officer_id", 1)]},
         ],
     },
+    "officers": {
+        "description": "Loan officer identities (currently a seeded singleton — the reviewing officer)",
+        "indexes": [
+            {"keys": [("officer_id", 1)], "unique": True},
+        ],
+    },
     "pipeline_locks": {
         "description": "Distributed pipeline concurrency locks (TTL-based)",
         "indexes": [

@@ -61,8 +61,8 @@ class TestCalculateGdsTds:
         assert abs(gds - 0.39) < 0.001
 
     def test_at_tds_limit(self):
-        """TDS exactly at 44%."""
-        gds, tds = calculate_gds_tds(2000, 500, 250, 650, 10_000)
+        """TDS exactly at 44%: housing 2750 + debt 1650 = 4400 over 10k income."""
+        gds, tds = calculate_gds_tds(2000, 500, 250, 1650, 10_000)
         assert abs(tds - 0.44) < 0.01
 
     def test_division_by_zero_raises(self):
@@ -126,12 +126,14 @@ class TestComputeRiskScore:
         assert 31 <= score <= 50
 
     def test_tier_b(self):
-        score, tier = compute_risk_score(80, 0.35, 0.42)
+        # base 70, gds 0.35 => -5, tds 0.50 => no adj => 65 => tier B (51..65)
+        score, tier = compute_risk_score(70, 0.35, 0.50)
         assert tier == "B"
         assert 51 <= score <= 65
 
     def test_tier_c(self):
-        score, tier = compute_risk_score(90, 0.40, 0.50)
+        # base 75, gds 0.40/tds 0.50 => no adjustments => 75 => tier C (66..80)
+        score, tier = compute_risk_score(75, 0.40, 0.50)
         assert tier == "C"
         assert 66 <= score <= 80
 
