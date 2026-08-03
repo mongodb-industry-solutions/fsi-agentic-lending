@@ -136,7 +136,7 @@ export default function TechnologyTheatre({ applicationId, activeTools, toolHist
         }}>
           <Suspense fallback={PANEL_FALLBACK}>
             {activeTab === 'stream' && <ChangeStreamConsole applicationId={applicationId} />}
-            {activeTab === 'document' && <DocumentModelViewer applicationId={applicationId} />}
+            {activeTab === 'document' && <DocumentModelViewer applicationId={applicationId} borrowerSafe />}
             {activeTab === 'capabilities' && (
               <AICapabilitiesPanel
                 applicationId={applicationId}

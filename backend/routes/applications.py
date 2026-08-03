@@ -23,6 +23,55 @@ def _validate_app_id(app_id: str):
         raise HTTPException(status_code=400, detail=f"Invalid application ID format: {app_id}")
 
 
+def _borrower_decline_reason(status_detail: str) -> str:
+    """Map an internal decline detail to a borrower-safe, qualitative reason.
+
+    Internal decline text can embed raw ratios/scores; the borrower only ever
+    sees a plain-language explanation with no numbers. Classification is keyword
+    based against the known pipeline/officer decline messages, with a neutral
+    default for anything unrecognized.
+    """
+    detail = (status_detail or "").lower()
+    if "income" in detail:
+        return ("We were unable to verify sufficient income to support the "
+                "requested loan amount. A loan officer can discuss options with you.")
+    if "credit" in detail:
+        return ("We were unable to complete a credit assessment for this "
+                "application. A loan officer can help you resolve this.")
+    if "stress" in detail or "gds" in detail or "tds" in detail or "affordab" in detail:
+        return ("Based on our affordability assessment, this loan amount exceeds "
+                "what we're able to approve at this time. A loan officer can review "
+                "alternative options with you.")
+    if "officer" in detail:
+        return ("After review, a loan officer was unable to approve this "
+                "application. They can walk you through the details and next steps.")
+    return ("We're unable to approve this application at this time. A loan officer "
+            "can discuss the details and any next steps with you.")
+
+
+# Underwriting vocabulary that must never surface in the borrower activity feed.
+# When an activity detail mentions any of these, the raw text (which typically
+# embeds ratios/scores like "GDS 32%, Risk 25/100 (A)") is replaced with a
+# qualitative, number-free summary. Doc-verification/credit-pull steps that don't
+# mention these terms pass through unchanged.
+_UW_KEYWORDS_RE = re.compile(
+    r"\b(gds|tds|risk score|risk tier|stress|tier\s+[a-d]|ltv|credit score|debt service)\b",
+    re.IGNORECASE,
+)
+
+
+def _borrower_safe_activity_detail(agent: str, action: str, detail: str) -> str:
+    """Redact underwriting internals from a borrower-facing activity detail."""
+    if not detail or not _UW_KEYWORDS_RE.search(detail):
+        return detail
+    a = (agent or "").lower()
+    if "underwriter" in a:
+        return "Affordability and risk assessment step completed."
+    if "credit" in a:
+        return "Credit and income data reviewed."
+    return "Assessment step completed."
+
+
 @router.post("/applications")
 async def create_application(req: ApplicationCreateRequest):
     """Create a new loan application, or reset an existing session-isolated demo app."""
@@ -188,7 +237,9 @@ async def stream_activity(app_id: str):
                             "type": "activity",
                             "agent": doc.get("agent", ""),
                             "action": doc.get("action", ""),
-                            "detail": doc.get("detail", ""),
+                            "detail": _borrower_safe_activity_detail(
+                                doc.get("agent", ""), doc.get("action", ""), doc.get("detail", "")
+                            ),
                             "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else str(ts or ""),
                         }
                         yield f"data: {json.dumps(event)}\n\n"
@@ -264,7 +315,9 @@ async def stream_activity(app_id: str):
                         "type": "activity",
                         "agent": doc.get("agent", ""),
                         "action": doc.get("action", ""),
-                        "detail": doc.get("detail", ""),
+                        "detail": _borrower_safe_activity_detail(
+                            doc.get("agent", ""), doc.get("action", ""), doc.get("detail", "")
+                        ),
                         "timestamp": doc.get("timestamp", "").isoformat()
                         if hasattr(doc.get("timestamp", ""), "isoformat")
                         else str(doc.get("timestamp", "")),
@@ -511,22 +564,27 @@ async def get_timeline_context(app_id: str):
         summary["total_events"] = activity_counts[0].get("total", 0)
         summary["docs_verified"] = actions.count("verification")
 
-    # Borrower-safe app fields only
+    # Borrower-safe app fields only.
+    # Underwriting internals (risk_score, risk_tier, gds_ratio, tds_ratio,
+    # primary_credit_score, decision_reasoning) are intentionally EXCLUDED —
+    # the borrower sees a high-level, Amazon-style status only. All quantitative
+    # scoring detail stays on the loan officer side. Do not add them back here.
     safe_app = {
         "application_id": app.get("application_id"),
         "loan_amount": app.get("loan_amount"),
         "purchase_price": app.get("purchase_price"),
         "product": app.get("product"),
-        "risk_score": app.get("risk_score"),
-        "risk_tier": app.get("risk_tier"),
-        "gds_ratio": app.get("gds_ratio"),
-        "tds_ratio": app.get("tds_ratio"),
-        "primary_credit_score": app.get("primary_credit_score"),
-        "decision_reasoning": app.get("decision_reasoning"),
         "borrower_names": app.get("borrower_names", []),
         "status": app.get("status"),
         "doc_count": len(app.get("documents", [])),
     }
+
+    # Declined applications get a plain-language, qualitative reason only.
+    # The pipeline's status_detail / decision_reasoning can embed raw ratios and
+    # scores (e.g. "Stress GDS 68% ... limit 39%"), so we classify the underlying
+    # cause and emit a borrower-safe message with no numbers.
+    if app.get("status") == "declined":
+        safe_app["decline_reason"] = _borrower_decline_reason(app.get("status_detail", ""))
 
     # Compute loan term details only for approved applications
     if app.get("status") in ("approved", "closing", "funded", "active"):
@@ -548,11 +606,17 @@ async def get_timeline_context(app_id: str):
             else:
                 safe_app["monthly_payment"] = round(loan_amount / n_payments) if n_payments > 0 else 0
 
-    # Status history for stage timing
-    status_history = app.get("status_history", [])
-    for entry in status_history:
-        if hasattr(entry.get("timestamp"), "isoformat"):
-            entry["timestamp"] = entry["timestamp"].isoformat()
+    # Status history for stage timing — project to status + timestamp only.
+    # The per-entry `detail` can embed raw ratios/scores (e.g. the auto-approve
+    # detail "Auto-approved: GDS 32%, ...") so it is intentionally dropped here.
+    raw_history = app.get("status_history", [])
+    status_history = []
+    for entry in raw_history:
+        ts = entry.get("timestamp")
+        status_history.append({
+            "status": entry.get("status"),
+            "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else ts,
+        })
 
     # Serialize intervention timestamps
     for intv in interventions:

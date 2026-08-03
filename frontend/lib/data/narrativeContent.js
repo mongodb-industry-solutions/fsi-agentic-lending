@@ -246,7 +246,7 @@ export const architectureContent = {
       collections: 'applications, documents, interventions, underwriting_policies, conversations',
       capabilities: [
         'Stage-aware conversation (tone shifts by status)',
-        '7 generative UI components (calculators, checklists, timelines)',
+        '6 generative UI components (calculators, checklists, timelines)',
         'Policy RAG with source citations',
         'Safety-filtered data (no raw risk scores to borrowers)',
         'Intervention awareness + re-evaluation triggers',
@@ -292,7 +292,6 @@ export const architectureContent = {
     components: [
       { name: 'AffordabilityCalculator', interactive: true, desc: 'Sliders for down payment, rate, term — live GDS/TDS + stress test' },
       { name: 'DocumentChecklist', interactive: false, desc: 'Visual status badges for each required document type' },
-      { name: 'ApplicationStrength', interactive: false, desc: 'Qualitative strength factors (no raw risk scores)' },
       { name: 'RateComparison', interactive: false, desc: 'Fixed vs variable rate options with monthly payments' },
       { name: 'PaymentSchedule', interactive: true, desc: 'Amortization table with annual/monthly toggle' },
       { name: 'ScenarioComparison', interactive: false, desc: 'Side-by-side down payment scenario analysis' },

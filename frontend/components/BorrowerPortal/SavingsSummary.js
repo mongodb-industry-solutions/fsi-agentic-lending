@@ -30,7 +30,6 @@ export function SavingsMetric({ label, value, prefix = '', suffix = '' }) {
 
 export function SavingsSummary({ stageContext = {} }) {
   const resolved = stageContext.totalResolved || 0;
-  const creditScore = typeof stageContext.creditScore === 'number' ? stageContext.creditScore : null;
   const rate = typeof stageContext.approvedRate === 'number' ? stageContext.approvedRate : null;
   const payment = typeof stageContext.monthlyPayment === 'number' ? stageContext.monthlyPayment : null;
 
@@ -54,8 +53,7 @@ export function SavingsSummary({ stageContext = {} }) {
         marginBottom: spacing[3],
       }}>
         {(() => {
-          const wasOfficerReviewed = stageContext.decisionReasoning?.toLowerCase().includes('officer')
-            || stageContext.decisionReasoning?.toLowerCase().includes('escalat');
+          const wasOfficerReviewed = stageContext.wasReviewed;
           if (wasOfficerReviewed) {
             return resolved > 0
               ? `AI prepared your case and resolved ${resolved} issue${resolved !== 1 ? 's' : ''} — officer confirmed approval with full context.`
@@ -68,7 +66,6 @@ export function SavingsSummary({ stageContext = {} }) {
       </div>
       <div style={{ display: 'flex', gap: spacing[2], flexWrap: 'wrap' }}>
         <SavingsMetric label="Issues Resolved" value={resolved} />
-        {creditScore !== null && <SavingsMetric label="Credit Score" value={creditScore} />}
         {rate !== null && <SavingsMetric label="Approved Rate" value={+(rate * 100).toFixed(2)} suffix="%" />}
         {payment !== null && <SavingsMetric label="Monthly Payment" value={payment} prefix="$" />}
       </div>

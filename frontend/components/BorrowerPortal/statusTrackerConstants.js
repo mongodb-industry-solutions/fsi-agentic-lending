@@ -81,9 +81,8 @@ export const STAGES = [
     icon: '4',
     getType: (ctx) => ctx.creditInterventions?.length > 0 ? 'intervention' : 'clean',
     getDetail: (ctx) => {
-      if (typeof ctx.creditScore === 'number') return `Credit score: ${ctx.creditScore}. Income verified against tax records.`;
       if (ctx.creditInterventions?.length > 0) return `AI investigated ${ctx.creditInterventions.length} discrepanc${ctx.creditInterventions.length !== 1 ? 'ies' : 'y'} in your credit and income records.`;
-      return 'Analyzing your credit and income data...';
+      return 'Reviewing your credit and income against your submitted records.';
     },
     getInterventions: (ctx) => ctx.creditInterventions || [],
     getAgentStatus: () => 'Our AI assistant is analyzing your credit and income data...',
@@ -94,26 +93,12 @@ export const STAGES = [
     icon: '5',
     getType: (ctx) => ctx.riskInterventions?.length > 0 ? 'intervention' : 'clean',
     getDetail: (ctx) => {
-      if (typeof ctx.riskScore === 'number') {
-        const parts = [`Risk score: ${ctx.riskScore}/100 (${ctx.riskTier || 'N/A'})`];
-        if (typeof ctx.gds === 'number') parts.push(`GDS: ${(ctx.gds * 100).toFixed(1)}%`);
-        if (typeof ctx.tds === 'number') parts.push(`TDS: ${(ctx.tds * 100).toFixed(1)}%`);
-        return parts.join('. ') + '.';
-      }
-      return 'Running underwriting risk assessment...';
+      if (ctx.riskInterventions?.length > 0) return 'AI resolved a data issue and is finalizing your affordability assessment.';
+      return 'Assessing your affordability against our lending criteria.';
     },
     getInterventions: (ctx) => ctx.riskInterventions || [],
-    getMetrics: (ctx) => {
-      if (typeof ctx.riskScore !== 'number') return null;
-      const metrics = [
-        { label: 'Risk Score', value: `${ctx.riskScore}/100` },
-        { label: 'Risk Tier', value: ctx.riskTier || 'N/A' },
-      ];
-      if (typeof ctx.gds === 'number') metrics.push({ label: 'GDS Ratio', value: `${(ctx.gds * 100).toFixed(1)}%` });
-      if (typeof ctx.tds === 'number') metrics.push({ label: 'TDS Ratio', value: `${(ctx.tds * 100).toFixed(1)}%` });
-      if (typeof ctx.creditScore === 'number') metrics.push({ label: 'Credit Score', value: String(ctx.creditScore) });
-      return metrics;
-    },
+    // Quantitative underwriting metrics (risk score, tier, GDS/TDS) are officer-only
+    // and intentionally not surfaced to the borrower — no getMetrics here.
     getAgentStatus: (ctx) => (ctx.riskInterventions?.length > 0)
       ? 'AI assistant corrected a scoring issue — recalculating...'
       : 'Our AI assistant is running the underwriting risk assessment...',
@@ -125,19 +110,9 @@ export const STAGES = [
     getType: () => 'clean',
     getDetail: (ctx) => {
       const resolved = ctx.totalResolved || 0;
-      if (typeof ctx.riskScore === 'number') {
-        let msg = `Underwriting complete. Risk score: ${ctx.riskScore}/100 (${ctx.riskTier || 'N/A'}).`;
-        if (ctx.riskScore <= 50 && typeof ctx.gds === 'number' && ctx.gds <= 0.36) {
-          msg += ' All metrics within auto-approval bounds.';
-        } else if (ctx.riskScore > 80) {
-          msg += ' Risk exceeds acceptable threshold.';
-        } else if (typeof ctx.gds === 'number' && ctx.gds > 0.36) {
-          msg += ' Debt service ratios require officer review.';
-        }
-        if (resolved > 0) msg += ` ${resolved} issue${resolved !== 1 ? 's' : ''} resolved by AI.`;
-        return msg;
-      }
-      return 'Preparing underwriting decision...';
+      let msg = 'Your assessment is complete and your decision is being prepared.';
+      if (resolved > 0) msg += ` ${resolved} issue${resolved !== 1 ? 's' : ''} resolved automatically by AI along the way.`;
+      return msg;
     },
     getAgentStatus: () => 'Analysis complete — preparing your results...',
   },
@@ -156,13 +131,10 @@ export const STAGES = [
     getType: () => 'clean',
     getDetail: (ctx) => {
       if (ctx.isDeclined) {
-        return `Application declined.${ctx.decisionReasoning ? ' ' + ctx.decisionReasoning : ''}`;
+        return `Application declined.${ctx.declineReason ? ' ' + ctx.declineReason : ''}`;
       }
       const parts = ['Congratulations! Your mortgage has been approved.'];
       if (ctx.product) parts.push(`Product: ${ctx.product}.`);
-      if (typeof ctx.riskScore === 'number') {
-        parts.push(`Risk score: ${ctx.riskScore}/100 (${ctx.riskTier || 'N/A'}).`);
-      }
       return parts.join(' ');
     },
     getAgentStatus: (ctx) => ctx.isDeclined
