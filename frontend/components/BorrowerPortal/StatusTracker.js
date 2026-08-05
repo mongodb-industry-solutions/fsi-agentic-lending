@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import { apiSSE, apiGet } from '../../lib/api';
-import { STAGES, STATUS_TO_STAGE, mapEventToStageIdx } from './statusTrackerConstants';
+import { STAGES, STATUS_TO_STAGE } from './statusTrackerConstants';
 import { SavingsSummary } from './SavingsSummary';
 import { TimelineStageCard } from './TimelineStageCard';
 
@@ -124,19 +124,68 @@ function DeclineCard({ stageContext, onOpenChat }) {
   );
 }
 
+function ActionNeededBanner({ actions, onOpenChat }) {
+  if (!actions || actions.length === 0) return null;
+  return (
+    <div style={{
+      padding: spacing[3],
+      background: 'var(--hitl-amber-dim)',
+      borderRadius: 'var(--radius-md)',
+      border: '1px solid var(--hitl-amber)',
+      borderLeft: '4px solid var(--hitl-amber)',
+      marginBottom: spacing[3],
+      animation: 'cardEnter 0.4s cubic-bezier(0.33, 1, 0.68, 1) both',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6, marginBottom: spacing[2],
+      }}>
+        <span style={{ fontSize: 14 }}>⚠️</span>
+        <span style={{
+          fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13,
+          color: 'var(--hitl-amber)',
+        }}>
+          Action Needed
+        </span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[2], marginBottom: spacing[3] }}>
+        {actions.map((a, i) => (
+          <div key={i} style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+              {a.borrower_context?.summary || 'Additional information requested'}
+            </div>
+            {a.borrower_context?.action_required && (
+              <div style={{ marginTop: 2 }}>{a.borrower_context.action_required}</div>
+            )}
+          </div>
+        ))}
+      </div>
+      {onOpenChat && (
+        <button
+          type="button"
+          onClick={onOpenChat}
+          style={{
+            width: '100%', padding: '10px 16px',
+            background: 'var(--hitl-amber)', color: '#fff',
+            border: 'none', borderRadius: 'var(--radius-md)',
+            fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12,
+            cursor: 'pointer',
+          }}
+        >
+          Provide Information
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function StatusTracker({ onNotification, applicationId, applicationData, onOpenChat }) {
   const [activeStage, setActiveStage] = useState(0);
   const [timestamps, setTimestamps] = useState([]);
-  const [expandedStage, setExpandedStage] = useState(null);
   const [sseConnected, setSseConnected] = useState(false);
   const [isDeclined, setIsDeclined] = useState(false);
-  const [stampAnimated, setStampAnimated] = useState(false);
-  const [activityEvents, setActivityEvents] = useState({});
-  const [feedCollapsed, setFeedCollapsed] = useState(false);
   const [timelineCtx, setTimelineCtx] = useState(null);
   const stageContextRef = useRef({});
   const stageIdxRef = useRef(0);
-  const activitySourceRef = useRef(null);
 
   const sendNotification = useCallback((stage, time, extra) => {
     if (onNotification) onNotification({ stage, time, ...extra });
@@ -161,14 +210,13 @@ export default function StatusTracker({ onNotification, applicationId, applicati
     }
   }, [sendNotification]);
 
-  // SSE connection for real-time backend status, with REST polling fallback
+  // SSE connection for real-time backend status, with REST polling fallback.
   useEffect(() => {
     if (!applicationId) return;
     setIsDeclined(false);
     stageIdxRef.current = 0;
     setActiveStage(0);
     setTimestamps([]);
-    setActivityEvents({});
     let sseAlive = false;
     let pollInterval = null;
 
@@ -180,7 +228,6 @@ export default function StatusTracker({ onNotification, applicationId, applicati
         if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
 
         if (event.type === 'status' && event.status) {
-          if (process.env.NODE_ENV === 'development') console.log('[StatusTracker] Real-time status:', event.status);
           applyStatus(event.status);
         }
       }
@@ -209,34 +256,7 @@ export default function StatusTracker({ onNotification, applicationId, applicati
     };
   }, [applicationId, applyStatus]);
 
-  // SSE: agent activity feed
-  useEffect(() => {
-    if (!applicationId) return;
-
-    const source = apiSSE(
-      `/applications/${applicationId}/activity`,
-      (data) => {
-        if (data.type === 'connected' || data.type === 'error') return;
-
-        const stageIdx = mapEventToStageIdx(data, stageIdxRef.current);
-        if (stageIdx === null) return;
-
-        const stageId = STAGES[stageIdx]?.id || 'received';
-        setActivityEvents((prev) => {
-          const existing = prev[stageId] || [];
-          return { ...prev, [stageId]: [...existing, data] };
-        });
-      },
-      () => {}
-    );
-
-    activitySourceRef.current = source;
-    return () => {
-      if (activitySourceRef.current) activitySourceRef.current.close();
-    };
-  }, [applicationId]);
-
-  // Fetch timeline context from backend — debounced re-fetch as stages advance
+  // Fetch borrower-safe timeline context — debounced re-fetch as stages advance.
   useEffect(() => {
     if (!applicationId) return;
     let ignore = false;
@@ -248,57 +268,51 @@ export default function StatusTracker({ onNotification, applicationId, applicati
     return () => { ignore = true; clearTimeout(timer); };
   }, [applicationId, activeStage]);
 
-  // Build context object for stage template functions
+  // Build context for milestone template functions. Only borrower-safe fields.
   const stageContext = useMemo(() => {
     const app = timelineCtx?.application || {};
     const interventions = timelineCtx?.interventions || [];
-    const summary = timelineCtx?.activity_summary || {};
-    const history = timelineCtx?.status_history || [];
-    // Borrower-safe signal for narrative tone: did the app pass through officer
-    // review? Derived from status history, not from any underwriting metric.
-    const wasReviewed = history.some((h) => h.status === 'review');
-
-    const docTypes = ['missing_document', 'document_processing_error'];
-    const creditTypes = ['credit_score_required', 'credit_data_unavailable'];
-    const riskTypes = ['stress_test_failure', 'income_data_required'];
-    const actionTypes = ['additional_info_required'];
-
     const active = interventions.filter((i) => i.status !== 'superseded');
+
+    // Any pending item the loan officer requested that the borrower must act on
+    // (upload a document, provide info). Surfaced as the "Action Needed" callout.
+    const pendingActions = active.filter(
+      (i) => i.status === 'pending' && i.borrower_context?.action_required
+    );
 
     return {
       appId: applicationId,
       loanAmount: app.loan_amount,
       product: app.product,
       // Underwriting internals (risk score/tier, GDS/TDS, credit score, raw
-      // decision reasoning) are officer-only and are not sent to the borrower.
-      // Only a qualitative decline_reason is surfaced, for declined apps.
+      // decision reasoning) are officer-only and are never sent to the borrower.
       declineReason: app.decline_reason,
-      wasReviewed,
-      docCount: app.doc_count || 0,
       borrowerNames: app.borrower_names || [],
       approvedRate: app.approved_rate,
       monthlyPayment: app.monthly_payment,
       isDeclined,
-      totalResolved: summary.issues_resolved || 0,
-      docInterventions: active.filter((i) => docTypes.includes(i.type)),
-      creditInterventions: active.filter((i) => creditTypes.includes(i.type)),
-      riskInterventions: active.filter((i) => riskTypes.includes(i.type)),
-      pendingInterventions: active.filter((i) => actionTypes.includes(i.type) && i.status === 'pending'),
+      pendingActions,
     };
   }, [timelineCtx, applicationId, isDeclined]);
   stageContextRef.current = stageContext;
 
-  const isComplete = activeStage >= STAGES.length - 1;
+  // "Approved" (positive/complete state) is reached at the Decision milestone,
+  // not only at Funded — so the approval summary shows as soon as it's approved.
+  const isApproved = !isDeclined && activeStage >= STATUS_TO_STAGE.approved;
   const currentStage = STAGES[activeStage];
 
-  const statusLabel = isDeclined ? 'Declined' : isComplete ? 'Complete' : 'Processing';
-  const statusColor = isDeclined ? 'var(--danger)' : isComplete ? 'var(--success)' : 'var(--mongo)';
-
-  const interventionsResolved = stageContext.totalResolved;
+  const statusLabel = isDeclined
+    ? 'Not Approved'
+    : activeStage >= STATUS_TO_STAGE.funded
+      ? 'Funded'
+      : isApproved
+        ? 'Approved'
+        : 'In Progress';
+  const statusColor = isDeclined ? 'var(--danger)' : isApproved ? 'var(--success)' : 'var(--mongo)';
 
   const currentAgentStatus = currentStage?.getAgentStatus
     ? currentStage.getAgentStatus(stageContext)
-    : 'Processing...';
+    : 'We’re reviewing your application.';
 
   // Prefer backend data over stale form data for summary card
   const displayName = stageContext.borrowerNames?.length > 0
@@ -309,13 +323,8 @@ export default function StatusTracker({ onNotification, applicationId, applicati
   const displayAmount = stageContext.loanAmount || (applicationData ? Number(applicationData.loanAmount) : null);
   const displayProduct = stageContext.product || applicationData?.productType || '';
 
-  const assistantColor = isComplete
-    ? 'var(--success)'
-    : 'var(--agent-cyan)';
-
-  const assistantBg = isComplete
-    ? 'var(--success-dim)'
-    : 'var(--agent-cyan-dim)';
+  const assistantColor = isApproved ? 'var(--success)' : 'var(--agent-cyan)';
+  const assistantBg = isApproved ? 'var(--success-dim)' : 'var(--agent-cyan-dim)';
 
   if (!sseConnected) {
     return (
@@ -375,7 +384,7 @@ export default function StatusTracker({ onNotification, applicationId, applicati
             fontSize: 13,
             color: 'var(--text-secondary)',
           }}>
-            Connecting to backend...
+            Loading your application status...
           </div>
           <div style={{
             fontSize: 11,
@@ -384,7 +393,7 @@ export default function StatusTracker({ onNotification, applicationId, applicati
             maxWidth: 300,
             lineHeight: 1.5,
           }}>
-            Waiting for real-time status updates from the processing pipeline.
+            Fetching the latest status of your application.
           </div>
         </div>
       </div>
@@ -393,7 +402,6 @@ export default function StatusTracker({ onNotification, applicationId, applicati
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: `20px ${spacing[4]}px` }}>
-      {/* Status tracking header removed — borrower-facing view */}
       {/* Summary card */}
       <div style={{
         padding: spacing[3],
@@ -410,7 +418,7 @@ export default function StatusTracker({ onNotification, applicationId, applicati
             {displayName}
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
-            {[applicationId, displayAmount ? `$${Number(displayAmount).toLocaleString('en-US')}` : null, displayProduct].filter(Boolean).join(' \u00b7 ')}
+            {[applicationId, displayAmount ? `$${Number(displayAmount).toLocaleString('en-US')}` : null, displayProduct].filter(Boolean).join(' · ')}
           </div>
         </div>
         <div style={{
@@ -426,7 +434,7 @@ export default function StatusTracker({ onNotification, applicationId, applicati
         </div>
       </div>
 
-      {/* AI Assistant Status Card */}
+      {/* Personal Lending Assistant status line — the single assistant identity */}
       <div style={{
         padding: `12px ${spacing[3]}px`,
         background: assistantBg,
@@ -437,7 +445,7 @@ export default function StatusTracker({ onNotification, applicationId, applicati
         alignItems: 'center',
         gap: 10,
       }}>
-        {!isComplete && (
+        {!isApproved && (
           <div style={{
             width: 8, height: 8, borderRadius: '50%',
             background: assistantColor,
@@ -446,32 +454,26 @@ export default function StatusTracker({ onNotification, applicationId, applicati
             flexShrink: 0,
           }} />
         )}
-        {isComplete && (
+        {isApproved && (
           <span style={{ fontSize: 14, flexShrink: 0 }}>✅</span>
         )}
         <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{
-              fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12,
-              color: assistantColor, marginBottom: 2,
-            }}>
-              {isComplete ? 'All Steps Complete' : 'Personal Lending Assistant'}
-            </div>
-            {interventionsResolved > 0 && (
-              <span style={{
-                padding: '1px 6px', borderRadius: 8,
-                background: 'var(--success-dim)', color: 'var(--success)',
-                fontSize: 9, fontWeight: 700, fontFamily: 'var(--font-mono)',
-              }}>
-                {interventionsResolved} issue{interventionsResolved !== 1 ? 's' : ''} resolved
-              </span>
-            )}
+          <div style={{
+            fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12,
+            color: assistantColor, marginBottom: 2,
+          }}>
+            {isApproved ? 'All Set' : 'Personal Lending Assistant'}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
             {currentAgentStatus}
           </div>
         </div>
       </div>
+
+      {/* Action needed — pending info the loan officer requested */}
+      {!isApproved && !isDeclined && (
+        <ActionNeededBanner actions={stageContext.pendingActions} onOpenChat={onOpenChat} />
+      )}
 
       {/* Segmented progress rail */}
       <div style={{ display: 'flex', gap: 2, padding: `0 0 ${spacing[4]}px`, flexShrink: 0 }}>
@@ -481,15 +483,15 @@ export default function StatusTracker({ onNotification, applicationId, applicati
           return (
             <div key={stage.id} style={{
               flex: 1, height: 4, borderRadius: 2,
-              background: isSegComplete ? 'var(--mongo)' : isSegActive ? 'var(--hitl-amber)' : 'var(--border-dim)',
+              background: isSegComplete ? 'var(--mongo)' : isSegActive ? (isDeclined ? 'var(--danger)' : 'var(--hitl-amber)') : 'var(--border-dim)',
               transition: 'background 0.4s ease',
-              animation: isSegActive ? 'pulse 1.5s infinite' : undefined,
+              animation: isSegActive && !isDeclined ? 'pulse 1.5s infinite' : undefined,
             }} />
           );
         })}
       </div>
 
-      {/* Timeline */}
+      {/* Milestone timeline */}
       <div style={{ position: 'relative', paddingLeft: spacing[5] }}>
         <div style={{ position: 'absolute', left: 11, top: 0, bottom: 0, width: 2, background: 'var(--border-dim)', borderRadius: 1 }}>
           <div style={{
@@ -509,20 +511,13 @@ export default function StatusTracker({ onNotification, applicationId, applicati
             index={i}
             activeStage={activeStage}
             timestamps={timestamps}
-            expandedStage={expandedStage}
-            activityEvents={activityEvents}
             isDeclined={isDeclined}
-            stampAnimated={stampAnimated}
-            onStampAnimated={() => setStampAnimated(true)}
-            feedCollapsed={feedCollapsed}
-            onToggleFeed={() => setFeedCollapsed((p) => !p)}
-            onToggleExpand={setExpandedStage}
           />
         ))}
       </div>
 
-      {/* Post-Approval Context + Savings Summary */}
-      {isComplete && !isDeclined && (
+      {/* Post-Approval Context + Summary */}
+      {isApproved && !isDeclined && (
         <>
           <ApprovalContextCard stageContext={stageContext} />
           <SavingsSummary stageContext={stageContext} />

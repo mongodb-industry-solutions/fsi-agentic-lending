@@ -8,7 +8,6 @@ import DocumentUpload from './DocumentUpload';
 import StatusTracker from './StatusTracker';
 import DocumentContext from './DocumentContext';
 import ApplicationAgent from './ApplicationAgent';
-import TechnologyTheatre from './TechnologyTheatre';
 import NotificationToast, {
   useToasts,
 } from '../NotificationToast/NotificationToast';
@@ -28,7 +27,7 @@ function getDemoSessionId() {
 const SUBMIT_STEPS = [
   { label: 'Creating application...', done: 'Application created' },
   { label: 'Attaching documents...', done: 'Documents attached' },
-  { label: 'Launching AI agents...', done: 'AI agents running' },
+  { label: 'Submitting for review...', done: 'Submitted for review' },
 ];
 
 function FloatingChatDrawer({ open, onToggle }) {
@@ -289,12 +288,6 @@ export default function BorrowerPortal() {
 
   // Trigger immediate DocumentContext refresh after InterventionCard uploads
   const [docRefreshTrigger, setDocRefreshTrigger] = useState(0);
-
-  // Tool activity state lifted from ApplicationAgent for TechnologyTheatre
-  const [toolActivity, setToolActivity] = useState({ active: [], history: [] });
-  const handleToolActivity = useCallback((active, completed) => {
-    setToolActivity({ active: active || [], history: completed || [] });
-  }, []);
 
   // Persist key state to sessionStorage for page refresh resilience
   useEffect(() => {
@@ -568,18 +561,10 @@ export default function BorrowerPortal() {
           <ApplicationAgent
             applicationId={applicationId}
             applicationStatus={applicationStatus}
-            onToolActivity={handleToolActivity}
             borrowerProfile={borrowerProfile}
             onDocumentUploaded={() => setDocRefreshTrigger(p => p + 1)}
           />
         </div>
-
-        {/* Lower zone: Technology Theatre */}
-        <TechnologyTheatre
-          applicationId={applicationId}
-          activeTools={toolActivity.active}
-          toolHistory={toolActivity.history}
-        />
 
         <NotificationToast toasts={toasts} onDismiss={removeToast} />
       </div>
