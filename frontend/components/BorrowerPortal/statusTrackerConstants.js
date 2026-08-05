@@ -30,12 +30,15 @@ export const STAGES = [
         return ctx.pendingActions[0].borrower_context?.summary
           || 'We need a little more information to continue your review.';
       }
+      if (ctx.rawStatus === 'review') return 'A loan officer is reviewing your application.';
       return 'We’re reviewing your documents, credit, and affordability.';
     },
     getInterventions: (ctx) => ctx.pendingActions || [],
-    getAgentStatus: (ctx) => (ctx.pendingActions?.length > 0
-      ? 'We need a little more information to continue your review.'
-      : 'We’re reviewing your application.'),
+    getAgentStatus: (ctx) => {
+      if (ctx.pendingActions?.length > 0) return 'We need a little more information to continue your review.';
+      if (ctx.rawStatus === 'review') return 'A loan officer is reviewing your application.';
+      return 'We’re reviewing your application.';
+    },
   },
   {
     id: 'decision',

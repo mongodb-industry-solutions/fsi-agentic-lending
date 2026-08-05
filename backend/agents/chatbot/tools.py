@@ -147,32 +147,6 @@ def get_pending_interventions(application_id: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def get_affordability_data(application_id: str) -> dict:
-    """Get loan parameters for the affordability calculator. Borrower-safe."""
-    db = get_db()
-    app = db["applications"].find_one(
-        {"application_id": application_id},
-        {
-            "_id": 0, "loan_amount": 1, "purchase_price": 1,
-            "down_payment": 1, "combined_income": 1,
-            "primary_income": 1, "co_applicant_income": 1,
-            "annual_property_tax": 1, "existing_monthly_debt": 1,
-            "product": 1,
-        },
-    )
-    if not app:
-        return {}
-    return {
-        "loan_amount": app.get("loan_amount", 0),
-        "purchase_price": app.get("purchase_price", 0),
-        "down_payment": app.get("down_payment", 0),
-        "combined_income": app.get("combined_income", 0),
-        "annual_property_tax": app.get("annual_property_tax", 0),
-        "existing_monthly_debt": app.get("existing_monthly_debt", 0),
-        "product": app.get("product", ""),
-    }
-
-
 def get_document_checklist_data(application_id: str) -> dict:
     """Get document checklist with real-time status for each requirement."""
     reqs = get_document_requirements()
@@ -190,48 +164,6 @@ def get_document_checklist_data(application_id: str) -> dict:
         })
     complete = sum(1 for i in items if i["status"] in ("verified", "processed", "parsed"))
     return {"items": items, "complete": complete, "total": len(items)}
-
-
-def get_rate_comparison_data(application_id: str = None) -> dict:
-    """Get rate comparison options with real loan amount from application."""
-    loan_amount = 450000
-    if application_id:
-        db = get_db()
-        app = db["applications"].find_one(
-            {"application_id": application_id},
-            {"_id": 0, "loan_amount": 1},
-        )
-        if app:
-            loan_amount = app.get("loan_amount", 450000)
-    return {
-        "loan_amount": loan_amount,
-        "options": [
-            {
-                "name": "Fixed 3yr",
-                "rate": 5.49,
-                "term_years": 3,
-                "amort_years": 25,
-                "stress_test_rate": 7.49,
-                "recommended": False,
-            },
-            {
-                "name": "Fixed 5yr",
-                "rate": 4.99,
-                "term_years": 5,
-                "amort_years": 25,
-                "stress_test_rate": 6.99,
-                "recommended": True,
-            },
-            {
-                "name": "Variable",
-                "rate": 5.20,
-                "term_years": 5,
-                "amort_years": 25,
-                "stress_test_rate": 7.20,
-                "recommended": False,
-            },
-        ],
-    }
 
 
 def get_closing_timeline_data(application_id: str) -> dict:

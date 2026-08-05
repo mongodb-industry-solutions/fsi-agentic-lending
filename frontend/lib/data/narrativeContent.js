@@ -246,7 +246,7 @@ export const architectureContent = {
       collections: 'applications, documents, interventions, underwriting_policies, conversations',
       capabilities: [
         'Stage-aware conversation (tone shifts by status)',
-        '6 generative UI components (calculators, checklists, timelines)',
+        '2 generative UI components (document checklist, closing timeline)',
         'Policy RAG with source citations',
         'Safety-filtered data (no raw risk scores to borrowers)',
         'Intervention awareness + re-evaluation triggers',
@@ -290,11 +290,7 @@ export const architectureContent = {
     description:
       'The Application Agent renders interactive React components inline in chat. The backend detects trigger keywords, fetches borrower-safe data, and emits ui_component SSE events. The frontend maps component names to React components via a registry. The LLM receives a description of visible components so it complements rather than duplicates the visual.',
     components: [
-      { name: 'AffordabilityCalculator', interactive: true, desc: 'Sliders for down payment, rate, term — live GDS/TDS + stress test' },
       { name: 'DocumentChecklist', interactive: false, desc: 'Visual status badges for each required document type' },
-      { name: 'RateComparison', interactive: false, desc: 'Fixed vs variable rate options with monthly payments' },
-      { name: 'PaymentSchedule', interactive: true, desc: 'Amortization table with annual/monthly toggle' },
-      { name: 'ScenarioComparison', interactive: false, desc: 'Side-by-side down payment scenario analysis' },
       { name: 'ClosingTimeline', interactive: false, desc: 'Post-approval steps: rate lock → signing → funding' },
     ],
   },
