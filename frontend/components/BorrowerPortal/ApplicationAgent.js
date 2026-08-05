@@ -210,7 +210,7 @@ function CapabilitiesPanel({ id, panelRef, onDismiss, onInvoke }) {
   );
 }
 
-export default function ApplicationAgent({ applicationId, applicationStatus, onToolActivity, borrowerProfile, onDocumentUploaded }) {
+export default function ApplicationAgent({ applicationId, applicationStatus, borrowerProfile, onDocumentUploaded }) {
   const {
     messages,
     input, setInput,
@@ -295,30 +295,6 @@ export default function ApplicationAgent({ applicationId, applicationStatus, onT
   useEffect(() => () => {
     if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
   }, []);
-
-  // Report tool activity to parent for TechnologyTheatre.
-  // Polish: dedup by (label, elapsed_ms) so two back-to-back invocations of
-  // the same tool in one reply (e.g., policy_search called twice for
-  // different queries) don't collapse into a single history entry.
-  const toolHistoryRef = useRef([]);
-  // Clear accumulated tool history when the user switches borrowers so
-  // TechnologyTheatre doesn't show ghost invocations from a previous session.
-  useEffect(() => {
-    toolHistoryRef.current = [];
-  }, [applicationId]);
-  useEffect(() => {
-    if (!onToolActivity) return;
-    for (const t of activeTools) {
-      if (t.status !== 'complete') continue;
-      const dup = toolHistoryRef.current.find(
-        h => h.label === t.label && h.elapsed_ms === t.elapsed_ms && h.found === t.found
-      );
-      if (!dup) {
-        toolHistoryRef.current = [...toolHistoryRef.current, { ...t, completedAt: new Date().toISOString() }];
-      }
-    }
-    onToolActivity(activeTools, toolHistoryRef.current);
-  }, [activeTools, onToolActivity]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {

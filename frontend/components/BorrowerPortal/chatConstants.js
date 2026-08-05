@@ -184,9 +184,9 @@ export const STATUS_SUGGESTIONS = {
     { text: 'What happens during document verification?', category: 'status' },
   ],
   underwriting: [
-    { text: 'What is the mortgage stress test?', category: 'financial' },
-    { text: 'How is my risk score calculated?', category: 'financial' },
-    { text: 'What are the GDS and TDS ratios?', category: 'financial' },
+    { text: 'How long does the review take?', category: 'status' },
+    { text: 'What happens during the review?', category: 'status' },
+    { text: 'Can I provide additional documents?', category: 'documents' },
   ],
   review: [
     { text: 'What does officer review mean?', category: 'status' },
@@ -345,7 +345,7 @@ export function getProactiveComponentSuggestion(lastMessage, status) {
 export function getPlaceholder(status, interventions) {
   if (interventions?.some(i => !i._resolved)) return 'Ask about your pending action items...';
   if (status === 'approved') return 'Ask about next steps or closing...';
-  if (status === 'underwriting') return 'Ask about your risk assessment...';
+  if (status === 'underwriting') return 'Ask about your application review...';
   if (status === 'review') return 'Ask about the review process...';
   return 'Ask about your application...';
 }

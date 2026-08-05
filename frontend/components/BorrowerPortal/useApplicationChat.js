@@ -5,9 +5,9 @@ import { apiPost, apiGet } from '../../lib/api';
 import { API_BASE, createWelcomeMessage } from './chatConstants';
 
 const STATUS_CHANGE_MESSAGES = {
-  processing: 'Your documents are now being verified by our AI agents.',
-  underwriting: 'Document verification complete \u2014 underwriting has begun.',
-  review: 'Your application is now under officer review.',
+  processing: 'Your application is now being reviewed.',
+  underwriting: 'Your application review is underway.',
+  review: 'Your application is now under review by a loan officer.',
   approved: 'Your application has been approved.',
   declined: 'Your application decision is ready.',
   closing: 'Your application is moving to the closing stage.',

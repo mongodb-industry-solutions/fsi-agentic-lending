@@ -29,9 +29,9 @@ export function SavingsMetric({ label, value, prefix = '', suffix = '' }) {
 }
 
 export function SavingsSummary({ stageContext = {} }) {
-  const resolved = stageContext.totalResolved || 0;
   const rate = typeof stageContext.approvedRate === 'number' ? stageContext.approvedRate : null;
   const payment = typeof stageContext.monthlyPayment === 'number' ? stageContext.monthlyPayment : null;
+  const loanAmount = typeof stageContext.loanAmount === 'number' ? stageContext.loanAmount : null;
 
   return (
     <div style={{
@@ -46,28 +46,19 @@ export function SavingsSummary({ stageContext = {} }) {
         fontFamily: 'var(--font-display)', fontWeight: 700,
         fontSize: 13, color: 'var(--success)', marginBottom: spacing[2],
       }}>
-        AI Impact Summary
+        Your Approval Summary
       </div>
       <div style={{
         fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5,
         marginBottom: spacing[3],
       }}>
-        {(() => {
-          const wasOfficerReviewed = stageContext.wasReviewed;
-          if (wasOfficerReviewed) {
-            return resolved > 0
-              ? `AI prepared your case and resolved ${resolved} issue${resolved !== 1 ? 's' : ''} — officer confirmed approval with full context.`
-              : 'AI prepared your case end-to-end — officer confirmed approval with full context.';
-          }
-          return resolved > 0
-            ? `Fully autonomous approval — ${resolved} issue${resolved !== 1 ? 's' : ''} resolved automatically with zero officer touchpoints.`
-            : 'Fully autonomous approval — processed end-to-end by the AI pipeline with zero officer touchpoints.';
-        })()}
+        Your mortgage is approved. Here are your key terms — your Personal Lending
+        Assistant can explain any of them and walk you through the next steps.
       </div>
       <div style={{ display: 'flex', gap: spacing[2], flexWrap: 'wrap' }}>
-        <SavingsMetric label="Issues Resolved" value={resolved} />
         {rate !== null && <SavingsMetric label="Approved Rate" value={+(rate * 100).toFixed(2)} suffix="%" />}
         {payment !== null && <SavingsMetric label="Monthly Payment" value={payment} prefix="$" />}
+        {loanAmount !== null && <SavingsMetric label="Loan Amount" value={loanAmount} prefix="$" />}
       </div>
     </div>
   );

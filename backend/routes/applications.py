@@ -235,8 +235,10 @@ async def stream_activity(app_id: str):
                                 seen_poll_ids.add(doc_id)
                         event = {
                             "type": "activity",
-                            "agent": doc.get("agent", ""),
-                            "action": doc.get("action", ""),
+                            # Borrower never sees backend agent identity/actions —
+                            # everything is attributed to the single assistant.
+                            "agent": "assistant",
+                            "action": "",
                             "detail": _borrower_safe_activity_detail(
                                 doc.get("agent", ""), doc.get("action", ""), doc.get("detail", "")
                             ),
@@ -313,8 +315,10 @@ async def stream_activity(app_id: str):
                     doc = change.get("fullDocument", {})
                     event = {
                         "type": "activity",
-                        "agent": doc.get("agent", ""),
-                        "action": doc.get("action", ""),
+                        # Borrower never sees backend agent identity/actions —
+                        # everything is attributed to the single assistant.
+                        "agent": "assistant",
+                        "action": "",
                         "detail": _borrower_safe_activity_detail(
                             doc.get("agent", ""), doc.get("action", ""), doc.get("detail", "")
                         ),
