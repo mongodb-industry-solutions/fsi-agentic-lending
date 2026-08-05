@@ -424,25 +424,17 @@ Risk Tier: {risk_tier}
 
     if decision == "escalate":
         update_application_status(app_id, "review", f"Escalated to officer review — {decision_reasoning}")
-        borrower_reasons = []
-        if purchase_price > ESCALATE_PURCHASE_PRICE:
-            borrower_reasons.append("your property value requires additional review")
-        if effective_gds > ESCALATE_GDS or effective_tds > ESCALATE_TDS:
-            borrower_reasons.append("your debt-to-income ratios are being reviewed for accuracy")
-        if risk_tier in ("B", "C"):
-            borrower_reasons.append("additional verification is needed for your application profile")
+        # Advisory only — the borrower has nothing to do while an officer reviews.
+        # The message is deliberately reason-free (no ratios/scores/thresholds);
+        # the full reasoning stays officer-only via internal_extras.
         if create_intervention(
             app_id,
             intervention_type="additional_info_required",
             source_node="underwriter",
             risk_flag="escalation_review",
             severity="advisory",
-            borrower_summary="Your application has been escalated for a detailed review by a loan officer.",
-            action_required="No immediate action needed. " + (
-                "The review was triggered because " + " and ".join(borrower_reasons) + "."
-                if borrower_reasons else
-                "A loan officer will reach out if additional information is required."
-            ),
+            borrower_summary="A loan officer is reviewing your application.",
+            action_required="No action is needed from you right now — we'll reach out if we need anything else.",
             internal_extras={
                 "decision_reasoning": decision_reasoning,
                 "risk_score": risk_score,

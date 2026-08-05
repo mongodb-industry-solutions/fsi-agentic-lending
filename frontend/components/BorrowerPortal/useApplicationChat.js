@@ -4,13 +4,21 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { apiPost, apiGet } from '../../lib/api';
 import { API_BASE, createWelcomeMessage } from './chatConstants';
 
-const STATUS_CHANGE_MESSAGES = {
-  processing: 'Your application is now being reviewed.',
-  underwriting: 'Your application review is underway.',
-  review: 'Your application is now under review by a loan officer.',
-  approved: 'Your application has been approved.',
-  declined: 'Your application decision is ready.',
-  closing: 'Your application is moving to the closing stage.',
+// Milestone-level proactive messages. The internal working statuses
+// (processing/credit/underwriting/review) collapse into a single "in review"
+// announcement so the borrower isn't spammed as the pipeline walks through
+// them (or re-walks them on a re-run / SSE reconnect). Each milestone is
+// announced at most once per application.
+const STATUS_MILESTONES = {
+  processing: { key: 'in-review', text: 'Your application is now being reviewed.' },
+  credit: { key: 'in-review', text: 'Your application is now being reviewed.' },
+  underwriting: { key: 'in-review', text: 'Your application is now being reviewed.' },
+  review: { key: 'in-review', text: 'Your application is now being reviewed.' },
+  approved: { key: 'approved', text: 'Your application has been approved.' },
+  declined: { key: 'declined', text: 'Your application decision is ready.' },
+  closing: { key: 'closing', text: 'Your application is moving to the closing stage.' },
+  funded: { key: 'funded', text: 'Your loan is now active.' },
+  active: { key: 'funded', text: 'Your loan is now active.' },
 };
 
 export function useApplicationChat(applicationId, applicationStatus) {
@@ -115,28 +123,29 @@ export function useApplicationChat(applicationId, applicationStatus) {
     setResolvingId(null);
   }, [applicationId]);
 
-  // Proactive system messages on status changes.
-  // Bug 3 follow-up: reset prevStatusRef when applicationId changes so the
-  // first render after an app switch doesn't emit a transition banner
-  // because the previous app happened to be in a different stage.
-  const prevStatusRef = useRef(null);
+  // Proactive system messages on milestone changes. Announce each high-level
+  // milestone at most once per application, so re-runs / SSE reconnects that
+  // re-walk processing → underwriting → review don't re-spam the borrower.
   const prevAppIdForStatusRef = useRef(null);
+  const announcedMilestonesRef = useRef(new Set());
   useEffect(() => {
     if (!applicationId) return;
+    // On app switch, reset and seed the current milestone as already-announced
+    // so resuming an in-flight app doesn't retroactively emit a banner.
     if (prevAppIdForStatusRef.current !== applicationId) {
       prevAppIdForStatusRef.current = applicationId;
-      prevStatusRef.current = applicationStatus;
+      announcedMilestonesRef.current = new Set();
+      const seed = STATUS_MILESTONES[applicationStatus];
+      if (seed) announcedMilestonesRef.current.add(seed.key);
       return;
     }
-    if (prevStatusRef.current && prevStatusRef.current !== applicationStatus) {
-      const msg = STATUS_CHANGE_MESSAGES[applicationStatus];
-      if (msg) {
-        setMessages(prev => [...prev, {
-          role: 'system', content: msg, timestamp: new Date().toISOString(),
-        }]);
-      }
+    const milestone = STATUS_MILESTONES[applicationStatus];
+    if (milestone && !announcedMilestonesRef.current.has(milestone.key)) {
+      announcedMilestonesRef.current.add(milestone.key);
+      setMessages(prev => [...prev, {
+        role: 'system', content: milestone.text, timestamp: new Date().toISOString(),
+      }]);
     }
-    prevStatusRef.current = applicationStatus;
   }, [applicationStatus, applicationId]);
 
   // Abort any in-flight streaming fetch on unmount

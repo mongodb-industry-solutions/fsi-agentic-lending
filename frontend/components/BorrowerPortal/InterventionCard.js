@@ -93,21 +93,28 @@ export function InterventionCard({ intervention, onResolve, resolving, applicati
     }
   }, [intervention.created_at, isResolved]);
 
+  // Urgency is measured from when the card is first shown (not from created_at)
+  // so a resumed/old application doesn't instantly read as hours-overdue.
+  const shownAtRef = useRef(Date.now());
   useEffect(() => {
     if (isResolved) return;
-    const createdAt = intervention.created_at ? new Date(intervention.created_at).getTime() : Date.now();
-    const tick = () => setElapsed(Date.now() - createdAt);
+    const tick = () => setElapsed(Date.now() - shownAtRef.current);
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [intervention.created_at, isResolved]);
+  }, [isResolved]);
 
   const isMissingDoc = intervention.type === 'missing_document' || intervention.type === 'document_processing_error';
   const isReupload = intervention.type === 'document_processing_error';
   const isInfoOnly = intervention.type === 'credit_data_unavailable'
     || intervention.type === 'credit_score_required';
   const isIncomeIssue = intervention.type === 'income_data_required';
-  const isUrgent = !isResolved && !isInfoOnly && !isIncomeIssue && elapsed > 30000;
+  // Advisory escalation — the app is with a loan officer; the borrower has
+  // nothing to do. Render calm and informational, never urgent.
+  const isAdvisory = intervention.type === 'additional_info_required';
+  // "Calm" bucket: no borrower action, no urgency timer, no Acknowledge-as-action.
+  const isCalm = isInfoOnly || isIncomeIssue || isAdvisory;
+  const isUrgent = !isResolved && !isCalm && elapsed > 30000;
   const missingDocTypes = isMissingDoc ? (ctx.document_types_accepted || []) : [];
   const allDocsUploaded = isMissingDoc && missingDocTypes.length > 0
     && missingDocTypes.every(t => uploadedTypes.includes(t));
@@ -203,8 +210,8 @@ export function InterventionCard({ intervention, onResolve, resolving, applicati
     return s === 'uploading' || s === 'extracting' || s === 'processing';
   };
 
-  const cardColor = isResolved ? 'var(--success)' : (isInfoOnly || isIncomeIssue) ? 'var(--tool-blue)' : 'var(--hitl-amber)';
-  const cardBg = isResolved ? 'var(--success-dim)' : (isInfoOnly || isIncomeIssue) ? 'var(--tool-blue-dim)' : 'var(--hitl-amber-dim)';
+  const cardColor = isResolved ? 'var(--success)' : isCalm ? 'var(--tool-blue)' : 'var(--hitl-amber)';
+  const cardBg = isResolved ? 'var(--success-dim)' : isCalm ? 'var(--tool-blue-dim)' : 'var(--hitl-amber-dim)';
 
   return (
     <>
@@ -228,14 +235,14 @@ export function InterventionCard({ intervention, onResolve, resolving, applicati
             background: cardColor,
             color: '#FFFFFF',
           }}>
-            {isResolved ? 'Resolved' : (isInfoOnly || isIncomeIssue) ? 'Information' : intervention.status || 'Action Required'}
+            {isResolved ? 'Resolved' : isCalm ? 'Information' : intervention.status || 'Action Required'}
           </span>
           {isUrgent && (
             <span style={{
               fontSize: 8, fontWeight: 700, fontFamily: 'var(--font-mono)',
               color: 'var(--hitl-amber)', animation: 'pulse 1.5s infinite',
             }}>
-              Pending {Math.floor(elapsed / 1000)}s
+              Pending
             </span>
           )}
           <span style={{
@@ -396,8 +403,9 @@ export function InterventionCard({ intervention, onResolve, resolving, applicati
           </div>
         )}
 
-        {/* Acknowledge button only for generic interventions (not doc, credit, or income) */}
-        {!isMissingDoc && !isInfoOnly && !isIncomeIssue && !isResolved && (
+        {/* Acknowledge button only for genuinely actionable generic interventions
+            (not doc uploads, and not the calm/informational bucket) */}
+        {!isMissingDoc && !isCalm && !isResolved && (
           <button
             type="button"
             onClick={() => onResolve(intervention._id)}

@@ -274,18 +274,21 @@ export default function StatusTracker({ onNotification, applicationId, applicati
     const interventions = timelineCtx?.interventions || [];
     const active = interventions.filter((i) => i.status !== 'superseded');
 
-    // Any pending item the loan officer requested that the borrower must act on
-    // (upload a document, provide info). Surfaced as the "Action Needed" callout.
+    // Only surface interventions the borrower can actually ACT on (upload a
+    // document). Advisory/escalation/credit-info interventions are informational
+    // — they must not appear as "Action Needed" (the borrower has nothing to do).
+    const ACTIONABLE_TYPES = ['missing_document', 'document_processing_error'];
     const pendingActions = active.filter(
-      (i) => i.status === 'pending' && i.borrower_context?.action_required
+      (i) => i.status === 'pending' && ACTIONABLE_TYPES.includes(i.type)
     );
 
     return {
       appId: applicationId,
       loanAmount: app.loan_amount,
       product: app.product,
-      // Underwriting internals (risk score/tier, GDS/TDS, credit score, raw
-      // decision reasoning) are officer-only and are never sent to the borrower.
+      // Raw status drives "a loan officer is reviewing" framing only — never a
+      // number. Underwriting internals stay officer-only.
+      rawStatus: app.status,
       declineReason: app.decline_reason,
       borrowerNames: app.borrower_names || [],
       approvedRate: app.approved_rate,
