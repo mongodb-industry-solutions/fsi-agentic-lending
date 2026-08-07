@@ -6,6 +6,7 @@ from agents.helpers.interventions import create_intervention
 @patch("agents.helpers.interventions.get_db")
 def test_create_intervention_returns_true_on_success(mock_get_db):
     mock_col = MagicMock()
+    mock_col.find_one.return_value = None  # no existing duplicate → proceed to insert
     mock_col.insert_one.return_value = MagicMock(inserted_id="abc123")
     mock_get_db.return_value = {"interventions": mock_col}
 
@@ -31,6 +32,7 @@ def test_create_intervention_returns_true_on_success(mock_get_db):
 @patch("agents.helpers.interventions.get_db")
 def test_create_intervention_returns_false_on_error(mock_get_db):
     mock_col = MagicMock()
+    mock_col.find_one.return_value = None  # no existing duplicate → reach insert_one
     mock_col.insert_one.side_effect = Exception("DB error")
     mock_get_db.return_value = {"interventions": mock_col}
 

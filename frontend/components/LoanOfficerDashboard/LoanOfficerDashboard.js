@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
+import Avatar from 'boring-avatars';
+import Modal from '@leafygreen-ui/modal';
 import ApplicationQueue from './ApplicationQueue';
 import AgentActivityLog from './AgentActivityLog';
 import IntentPreview from './IntentPreview';
@@ -17,10 +19,55 @@ import { ManualWorkspace } from './ManualWorkspace';
 import { HITLReviewCard } from './HITLReviewCard';
 import { PolicyExplorer } from './PolicyExplorer';
 import { PortfolioIntelligence } from './PortfolioIntelligence';
-import { LiveUnderwritingResults } from './LiveUnderwritingResults';
-import { StageProgressBar } from './StageProgressBar';
+import { PipelineStepTracker } from './PipelineStepTracker';
 import { useLoanOfficerWorkflow } from './useLoanOfficerWorkflow';
 import TechRail from './TechRail';
+
+const OFFICER_AVATAR_COLORS = ['#00684A', '#00ED64', '#0498EC', '#016BF8', '#B45AF2'];
+
+function OfficerIdentityCard({ officer }) {
+  const name = officer?.full_name || 'Loan Officer';
+  const title = officer?.title || 'Loan Officer';
+  const nmls = officer?.nmls_id;
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '10px 12px',
+      borderBottom: '1px solid var(--border-dim)',
+      background: 'var(--bg-surface)',
+      flexShrink: 0,
+    }}>
+      <Avatar size={34} name={officer?.avatar_seed || name} variant="beam" colors={OFFICER_AVATAR_COLORS} />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{
+          fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13,
+          color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
+          {name}
+        </div>
+        <div style={{
+          fontSize: 10, color: 'var(--text-secondary)', fontWeight: 600,
+          display: 'flex', alignItems: 'center', gap: 5, marginTop: 1,
+        }}>
+          <span>{title}</span>
+          {nmls && (
+            <>
+              <span style={{ color: 'var(--border-base)' }}>{'·'}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>NMLS #{nmls}</span>
+            </>
+          )}
+        </div>
+      </div>
+      <span style={{
+        fontSize: 7, fontWeight: 700, fontFamily: 'var(--font-mono)',
+        padding: '2px 6px', borderRadius: 3, textTransform: 'uppercase', letterSpacing: '0.5px',
+        background: 'var(--success-dim)', color: 'var(--success)', flexShrink: 0,
+      }}>
+        On shift
+      </span>
+    </div>
+  );
+}
 
 function AgentRailHeader({ agentStats, elapsedSeconds, hitlReached, applicationId }) {
   const isActive = applicationId && agentStats.totalReceived > 0;
@@ -104,6 +151,7 @@ export default function LoanOfficerDashboard({ active = true }) {
   const [lastCorrelatedEvent, setLastCorrelatedEvent] = useState(null);
   const [agentStats, setAgentStats] = useState({ totalReceived: 0 });
   const [canvasHighlightNode, setCanvasHighlightNode] = useState(null);
+  const [diagramOpen, setDiagramOpen] = useState(false);
   const highlightTimerRef = useRef(null);
 
   // Cleanup highlight timer on unmount
@@ -122,6 +170,7 @@ export default function LoanOfficerDashboard({ active = true }) {
     liveApplications,
     selectedAppDetail,
     dashboardStats,
+    officer,
     stageTimestamps,
     handleProceed,
     handleManual,
@@ -236,115 +285,28 @@ export default function LoanOfficerDashboard({ active = true }) {
             </div>
           )}
 
-          {/* Stage Progress Bar */}
-          {selectedApp && (workflowPhase === 'executing' || workflowPhase === 'preview') && (
-            <StageProgressBar
-              stage={workflowPhase === 'preview' ? -1 : workflowStage}
-              hitlReached={hitlReached}
-              approved={approved}
-              approvalDetails={approvalDetails}
-              stageTimestamps={stageTimestamps}
-            />
-          )}
-
           {/* Main scrollable content region */}
           {selectedApp && workflowPhase === 'preview' ? (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto', background: 'var(--bg-base)' }}>
               {selectedAppDetail && (
                 <ApplicationDetail appDetail={selectedAppDetail} />
               )}
-              {/* Inline rail-mode canvas preview */}
-              <div style={{
-                position: 'relative',
-                height: 280,
-                margin: `${spacing[3]}px`,
-                borderRadius: 8,
-                border: '1px solid var(--border-dim)',
-                background: 'var(--bg-surface)',
-                overflow: 'hidden',
-                flexShrink: 0,
-              }}>
-                <WorkflowCanvas
-                  fit="rail"
-                  activeNodes={[]}
-                  activeEdges={[]}
-                  pulsingNodes={[]}
-                  currentScene="origination"
-                  highlightNode={canvasHighlightNode}
-                  liveAgentOutput={liveAgentOutput}
-                  hitlActive={false}
-                  hitlStartTime={null}
-                  hitlResolution={null}
-                  hitlResolutionTime={null}
-                />
-              </div>
               <div style={{ padding: spacing[3] }}>
                 <IntentPreview applicationId={selectedApp} onProceed={handleProceed} onManual={handleManual} />
               </div>
             </div>
-          ) : selectedApp && workflowPhase === 'executing' ? (() => {
-            // When there's no HITL card and no DecisionSummary below, let the
-            // canvas flex-fill the region so we don't leave a dead band of
-            // empty surface mid-pipeline. When either is present, the canvas
-            // takes its natural height and the panel below scrolls.
-            const hasPanelBelow = (hitlReached && !approved) || approved;
-            return (
+          ) : selectedApp && workflowPhase === 'executing' ? (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto', background: 'var(--bg-base)' }}>
-              {/* Inline rail-mode canvas — syncs to workflowStage */}
-              <div style={{
-                position: 'relative',
-                height: hasPanelBelow ? 320 : undefined,
-                minHeight: 320,
-                flex: hasPanelBelow ? '0 0 auto' : 1,
-                margin: `${spacing[2]}px ${spacing[3]}px`,
-                borderRadius: 8,
-                border: '1px solid var(--border-dim)',
-                background: 'var(--bg-surface)',
-                overflow: 'hidden',
-                flexShrink: 0,
-              }}>
-                <WorkflowCanvas
-                  fit="rail"
-                  activeNodes={currentWorkflow.activeNodes}
-                  activeEdges={currentWorkflow.activeEdges}
-                  pulsingNodes={hitlReached ? ['hitlGate'] : currentWorkflow.pulsingNodes}
-                  currentScene={currentWorkflow.currentScene}
-                  highlightNode={canvasHighlightNode}
-                  liveAgentOutput={liveAgentOutput}
-                  hitlActive={hitlReached && !approved}
-                  hitlStartTime={hitlStartTime}
-                  hitlResolution={approved && hitlReached ? (approvalDetails?.mode === 'declined' ? 'declined' : 'approved') : null}
-                  hitlResolutionTime={hitlResolutionTime}
-                />
-                <PolicyBoundsIndicator exceeded={hitlReached} />
-                <LiveUnderwritingResults data={liveAgentOutput} />
-                {/* Caption bar */}
-                <div style={{
-                  position: 'absolute', bottom: 8, left: 8, right: 8,
-                  padding: '6px 10px',
-                  background: 'var(--bg-overlay-alpha)',
-                  backdropFilter: 'blur(8px)',
-                  borderRadius: 6,
-                  border: '1px solid var(--border-dim)',
-                  fontSize: 10,
-                  color: 'var(--text-secondary)',
-                  display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-                }}>
-                  <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {hitlReached ? 'HITL Gate' : `Stage: ${currentWorkflow.label}`}
-                  </span>
-                  {(() => {
-                    const parts = [];
-                    if (liveAgentOutput.primary_credit_score) parts.push(`Credit ${liveAgentOutput.primary_credit_score}`);
-                    if (liveAgentOutput.document_count) parts.push(`${liveAgentOutput.document_count} docs`);
-                    if (liveAgentOutput.risk_score != null) parts.push(`Risk ${liveAgentOutput.risk_score}/100`);
-                    if (liveAgentOutput.gds_ratio != null) parts.push(`GDS ${(liveAgentOutput.gds_ratio * 100).toFixed(1)}%`);
-                    return parts.length > 0 ? (
-                      <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>{parts.join(' \u00b7 ')}</span>
-                    ) : null;
-                  })()}
-                </div>
-              </div>
+              <PipelineStepTracker
+                stage={workflowStage}
+                hitlReached={hitlReached}
+                approved={approved}
+                approvalDetails={approvalDetails}
+                stageTimestamps={stageTimestamps}
+                liveAgentOutput={liveAgentOutput}
+                activityEvents={activityEvents}
+                onViewDiagram={() => setDiagramOpen(true)}
+              />
 
               {/* HITL Review panel — inside scroll container, no maxHeight clip */}
               {hitlReached && !approved && (
@@ -369,13 +331,13 @@ export default function LoanOfficerDashboard({ active = true }) {
                     appDetail={selectedAppDetail}
                     approvalDetails={approvalDetails}
                     appName={appName}
+                    officer={officer}
                     onClose={() => setSelectedApp(null)}
                   />
                 </div>
               )}
             </div>
-            );
-          })() : selectedApp && workflowPhase === 'manual' ? (
+          ) : selectedApp && workflowPhase === 'manual' ? (
             <div style={{ flex: 1, overflow: 'hidden' }}>
               <ManualWorkspace appDetail={selectedAppDetail} queueData={selectedAppData} onApprove={handleApprove} onDecline={handleDecline} addToast={addToast} />
             </div>
@@ -501,6 +463,7 @@ export default function LoanOfficerDashboard({ active = true }) {
           borderLeft: `3px solid ${hitlReached && !approved ? 'var(--hitl-amber)' : 'var(--agent-cyan)'}`,
           transition: 'border-color 400ms ease',
         }}>
+          <OfficerIdentityCard officer={officer} />
           <AgentRailHeader
             agentStats={agentStats}
             elapsedSeconds={elapsedSeconds}
@@ -542,6 +505,39 @@ export default function LoanOfficerDashboard({ active = true }) {
           streamConnected={streamConnected}
         />
       </div>
+
+      {/* Pipeline diagram — full node graph, opened on demand from the step tracker */}
+      <Modal open={diagramOpen} setOpen={setDiagramOpen} size="large">
+        <div style={{
+          fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15,
+          color: 'var(--text-primary)', marginBottom: 4,
+        }}>
+          Pipeline Diagram
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
+          {selectedApp ? `Stage: ${currentWorkflow.label}` : 'LangGraph orchestration'}
+        </div>
+        <div style={{
+          position: 'relative', height: '62vh', minHeight: 360,
+          borderRadius: 8, border: '1px solid var(--border-dim)',
+          background: 'var(--bg-surface)', overflow: 'hidden',
+        }}>
+          <WorkflowCanvas
+            fit="rail"
+            activeNodes={currentWorkflow.activeNodes}
+            activeEdges={currentWorkflow.activeEdges}
+            pulsingNodes={hitlReached ? ['hitlGate'] : currentWorkflow.pulsingNodes}
+            currentScene={currentWorkflow.currentScene}
+            highlightNode={canvasHighlightNode}
+            liveAgentOutput={liveAgentOutput}
+            hitlActive={hitlReached && !approved}
+            hitlStartTime={hitlStartTime}
+            hitlResolution={approved && hitlReached ? (approvalDetails?.mode === 'declined' ? 'declined' : 'approved') : null}
+            hitlResolutionTime={hitlResolutionTime}
+          />
+          <PolicyBoundsIndicator exceeded={hitlReached} />
+        </div>
+      </Modal>
 
       <NotificationToast toasts={toasts} onDismiss={removeToast} />
     </div>

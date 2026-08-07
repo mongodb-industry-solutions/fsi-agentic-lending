@@ -11,7 +11,10 @@ def test_health_ok(client, mock_db):
 
 def test_health_mongo_down(client, mock_db):
     mock_db.command.side_effect = Exception("Connection refused")
-    response = client.get("/")
+    # main binds `get_db` at import time, so patch the name main actually calls —
+    # patching db.mdb.get_db alone won't reach it once main is already imported.
+    with patch("main.get_db", return_value=mock_db):
+        response = client.get("/")
     assert response.status_code == 503
 
 
