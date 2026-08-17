@@ -314,7 +314,7 @@ function RenewalDetail({ renewal, generating, signing, onGenerate, onSign, onVie
       {renewal.status === "due" && (
         <div style={panel}>
           <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: spacing[3], lineHeight: 1.5 }}>
-            This loan's 5-year term is maturing. Run the Renewal Agent to generate a personalized offer and draft the renewal agreement.
+            This loan&apos;s 5-year term is maturing. Run the Renewal Agent to generate a personalized offer and draft the renewal agreement.
           </div>
           <button
             type="button"
