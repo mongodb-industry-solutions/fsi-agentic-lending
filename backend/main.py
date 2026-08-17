@@ -50,6 +50,7 @@ from routes.hitl import router as hitl_router
 from routes.agent import router as agent_router
 from routes.chat import router as chat_router
 from routes.officers import router as officers_router
+from routes.renewals import router as renewals_router
 
 app.include_router(applications_router, prefix="/api")
 app.include_router(documents_router, prefix="/api")
@@ -57,6 +58,7 @@ app.include_router(hitl_router, prefix="/api")
 app.include_router(agent_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(officers_router, prefix="/api")
+app.include_router(renewals_router, prefix="/api")
 
 
 @app.on_event("shutdown")

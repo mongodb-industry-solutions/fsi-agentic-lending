@@ -4,6 +4,7 @@ import { useState } from "react";
 import Header from "../components/Header/Header";
 import BorrowerPortal from "../components/BorrowerPortal/BorrowerPortal";
 import LoanOfficerDashboard from "../components/LoanOfficerDashboard/LoanOfficerDashboard";
+import RenewalDashboard from "../components/RenewalDashboard/RenewalDashboard";
 import DemoFlow from "../components/DemoFlow/DemoFlow";
 import InfoWizardPanel from "../components/educational/InfoWizardPanel";
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -30,6 +31,9 @@ export default function Home() {
         </div>
         <div className="screen-content" style={{ display: activeScreen === 'officer' ? 'block' : 'none' }}>
           <ErrorBoundary><LoanOfficerDashboard active={activeScreen === 'officer'} /></ErrorBoundary>
+        </div>
+        <div className="screen-content" style={{ display: activeScreen === 'renewal' ? 'block' : 'none' }}>
+          <ErrorBoundary><RenewalDashboard active={activeScreen === 'renewal'} /></ErrorBoundary>
         </div>
         {activeScreen === 'demo' && (
           <div className="screen-content">

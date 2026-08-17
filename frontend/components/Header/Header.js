@@ -10,6 +10,7 @@ import styles from './Header.module.css';
 const SCREENS = [
   { id: "borrower", label: "Borrower Portal", shortLabel: "Borrower" },
   { id: "officer", label: "Loan Officer", shortLabel: "Officer" },
+  { id: "renewal", label: "Renewal", shortLabel: "Renewal" },
   { id: "demo", label: "Demo Flow", shortLabel: "Demo" },
 ];
 
