@@ -85,4 +85,11 @@ COLLECTIONS = {
             {"keys": [("locked_at", 1)], "expireAfterSeconds": 600},
         ],
     },
+    "renewals": {
+        "description": "Existing loans approaching maturity — Renewal Agent scans, offers new terms, and auto-renews on e-signature",
+        "indexes": [
+            {"keys": [("renewal_id", 1)], "unique": True},
+            {"keys": [("status", 1), ("maturity_date", 1)]},
+        ],
+    },
 }

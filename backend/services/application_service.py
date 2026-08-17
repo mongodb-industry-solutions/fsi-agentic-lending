@@ -346,6 +346,15 @@ def upsert_demo_application(profile_id: str, demo_session_id: str, data: dict) -
 def reset_all_demo_data() -> dict:
     """Wipe all demo-created applications and related data. Preserves seeded data."""
     db = _get_db()
+    # Restore renewals to pristine "due" state. They live in their own collection,
+    # independent of the origination apps, so the wipe below never touches them.
+    try:
+        from scripts.seed_renewals import seed_renewals
+        seed_renewals(reset=True)
+        db["agent_activity"].delete_many({"agent": "renewal_agent"})
+    except Exception as e:
+        logger.warning(f"Could not reset renewals: {e}")
+
     # Single predicate for "non-seed app" — used for both the find and the final
     # delete so they can't drift out of sync.
     seed_ids = list(SEED_APPLICATION_IDS.values())
