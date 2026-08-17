@@ -407,19 +407,26 @@ Risk Tier: {risk_tier}
     log_agent_activity(app_id, "underwriter", "decision", decision_reasoning)
 
     # Persist underwriting results to application document for HITL context
+    _persist = {
+        "risk_score": risk_score,
+        "risk_tier": risk_tier,
+        "gds_ratio": round(gds, 4),
+        "tds_ratio": round(tds, 4),
+        "stress_gds": round(stress["stress_gds"], 4),
+        "stress_tds": round(stress["stress_tds"], 4),
+        "primary_credit_score": primary_score,
+        "ltv": round(ltv, 2),
+        "decision_reasoning": decision_reasoning,
+    }
+    # LLM recommendation for the reviewing officer (shown at the HITL decision gate).
+    if structured_analysis:
+        _persist["recommended_action"] = structured_analysis.get("recommended_action")
+        _persist["recommendation_reason"] = structured_analysis.get("recommendation_reason")
+        _persist["recommendation_confidence"] = structured_analysis.get("confidence")
+        _persist["recommended_conditions"] = structured_analysis.get("recommended_conditions", [])
     _get_db()["applications"].update_one(
         {"application_id": app_id},
-        {"$set": {
-            "risk_score": risk_score,
-            "risk_tier": risk_tier,
-            "gds_ratio": round(gds, 4),
-            "tds_ratio": round(tds, 4),
-            "stress_gds": round(stress["stress_gds"], 4),
-            "stress_tds": round(stress["stress_tds"], 4),
-            "primary_credit_score": primary_score,
-            "ltv": round(ltv, 2),
-            "decision_reasoning": decision_reasoning,
-        }}
+        {"$set": _persist},
     )
 
     if decision == "escalate":

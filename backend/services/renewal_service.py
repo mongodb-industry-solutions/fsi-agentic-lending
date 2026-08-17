@@ -73,11 +73,40 @@ def _days_to_maturity(maturity: datetime, now: datetime) -> int:
 
 
 # ── Scan ─────────────────────────────────────────────────────────────────────
+def _restore_renewed_seeds(db, now: datetime) -> int:
+    """Reset any already-renewed seed loans back to their pristine 'due' state.
+
+    Signing pushes a loan's maturity +5 years, so it drops out of the scan window
+    permanently — after a few demos the queue would deplete to zero. Restoring
+    renewed seed loans on each scan keeps the demo infinitely repeatable: the
+    "Re-scan portfolio" click brings the full set back. (The just-signed loan's
+    "renewed" confirmation still shows until the user explicitly re-scans, since
+    signing patches local UI state without refetching.)
+    """
+    from scripts.seed_renewals import _RENEWAL_SEEDS, _build_doc
+
+    seed_by_id = {s["renewal_id"]: s for s in _RENEWAL_SEEDS}
+    restored = 0
+    for r in db["renewals"].find({"status": "renewed", "seed": True}, {"renewal_id": 1}):
+        seed = seed_by_id.get(r["renewal_id"])
+        if not seed:
+            continue
+        db["renewals"].replace_one({"renewal_id": r["renewal_id"]}, _build_doc(seed, now))
+        db["agent_activity"].delete_many({"application_id": r["renewal_id"], "agent": "renewal_agent"})
+        restored += 1
+    return restored
+
+
 def scan_due_renewals() -> dict:
-    """Return loans maturing within the renewal window, soonest first."""
+    """Return loans maturing within the renewal window, soonest first.
+
+    Restores previously-renewed seed loans first so the demo queue never depletes.
+    """
     db = get_db()
     now = datetime.now(timezone.utc)
     horizon = now + timedelta(days=RENEWAL_WINDOW_DAYS)
+
+    _restore_renewed_seeds(db, now)
 
     docs = list(
         db["renewals"]
@@ -264,10 +293,24 @@ def build_renewal_pdf(renewal_id: str) -> bytes | None:
     GOLD = (201, 150, 59)
     GRAY = (80, 80, 80)
 
-    def s(text: str) -> str:
-        return (text or "").replace("—", "--").replace("–", "-") \
-            .replace("’", "'").replace("‘", "'") \
-            .replace("“", '"').replace("”", '"')
+    def s(text) -> str:
+        """Sanitize for fpdf core Helvetica (latin-1 only).
+
+        LLM-generated rationale can contain characters outside latin-1 (em/en
+        dashes, smart quotes, bullets, ellipsis, non-breaking space, accents),
+        which would raise UnicodeEncodeError and 500 the PDF endpoint. Replace the
+        common ones nicely, then hard-fall-back any remaining char to latin-1.
+        """
+        if not isinstance(text, str):
+            text = str(text or "")
+        replacements = {
+            "—": "--", "–": "-", "’": "'", "‘": "'",
+            "“": '"', "”": '"', "•": "*", "…": "...",
+            " ": " ", "‑": "-",
+        }
+        for k, v in replacements.items():
+            text = text.replace(k, v)
+        return text.encode("latin-1", "replace").decode("latin-1")
 
     pdf = FPDF(orientation="P", unit="mm", format="Letter")
     pdf.set_auto_page_break(auto=True, margin=25)

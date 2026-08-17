@@ -8,9 +8,63 @@ import { formatCurrency, getAppDisplayName, GDS_LIMIT, TDS_LIMIT } from './utils
 const GDS_PCT_LABEL = `${(GDS_LIMIT * 100).toFixed(0)}%`;
 const TDS_PCT_LABEL = `${(TDS_LIMIT * 100).toFixed(0)}%`;
 
+// LLM-generated recommendation the underwriter persists for the reviewing officer.
+const RECOMMENDATION_META = {
+  approve: { label: 'Approve', color: 'var(--success)', bg: 'var(--success-dim)' },
+  approve_with_conditions: { label: 'Approve with conditions', color: 'var(--mongo)', bg: 'var(--mongo-dim)' },
+  decline: { label: 'Decline', color: 'var(--danger)', bg: 'var(--danger-dim)' },
+  manual_review: { label: 'Manual review', color: 'var(--hitl-amber)', bg: 'var(--hitl-amber-dim)' },
+};
+
+function AIRecommendationHero({ app, fallbackReason }) {
+  const action = app.recommended_action;
+  const reason = app.recommendation_reason || fallbackReason || 'Review the application and make a decision.';
+  const confidence = app.recommendation_confidence;
+  const conditions = app.recommended_conditions || [];
+  const meta = RECOMMENDATION_META[action] || { label: 'Officer review', color: 'var(--hitl-amber)', bg: 'var(--hitl-amber-dim)' };
+  return (
+    <div style={{
+      padding: spacing[3], borderRadius: 8,
+      background: meta.bg, border: `1px solid ${meta.color}`,
+      marginBottom: spacing[3],
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: meta.color }}>
+          AI Recommendation
+        </span>
+        <span style={{
+          padding: '3px 12px', borderRadius: 12, background: meta.color, color: '#fff',
+          fontSize: 13, fontWeight: 800, fontFamily: 'var(--font-display)',
+        }}>
+          {meta.label}
+        </span>
+        {typeof confidence === 'number' && (
+          <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>
+            {Math.round(confidence * 100)}% confidence
+          </span>
+        )}
+      </div>
+      <div style={{ fontSize: 15, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+        {reason}
+      </div>
+      {conditions.length > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
+            Suggested conditions
+          </div>
+          {conditions.map((c, i) => (
+            <div key={i} style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{'•'} {c}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove, onDecline, addToast, liveAgentOutput = {} }) {
   const [showProvenance, setShowProvenance] = useState(false);
   const [showModify, setShowModify] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
   const [fetchingContext, setFetchingContext] = useState(false);
   const [hitlContext, setHitlContext] = useState(null);
   const [modFields, setModFields] = useState({ rate: 4.89, conditions: '', requestDocs: false, loanAmount: '' });
@@ -70,7 +124,14 @@ export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove,
   const handleApproveRecommended = async () => {
     if (submitting) return;
     setSubmitting(true);
-    try { await onApprove({ mode: 'recommended', rate: recommendation?.detail?.match(/[\d.]+%/)?.[0] || 'as recommended' }); } finally { setSubmitting(false); }
+    const recConditions = (app.recommended_conditions || []).join('; ');
+    try {
+      await onApprove({
+        mode: 'recommended',
+        rate: recommendation?.detail?.match(/[\d.]+%/)?.[0] || 'as recommended',
+        ...(recConditions ? { conditions: recConditions } : {}),
+      });
+    } finally { setSubmitting(false); }
   };
 
   const modSummary = showModify ? (() => {
@@ -106,6 +167,26 @@ export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove,
         <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>LangGraph interrupt()</span>
       </div>
 
+      {/* AI recommendation — the key context for the officer's decision, up top */}
+      <AIRecommendationHero app={app} fallbackReason={recommendation?.detail} />
+
+      {/* Underwriting detail — collapsed by default so the recommendation + decision lead */}
+      <button
+        type="button"
+        onClick={() => setShowDetail((p) => !p)}
+        aria-expanded={showDetail}
+        style={{
+          width: '100%', padding: '8px 12px', marginBottom: spacing[3],
+          background: 'var(--bg-raised)', border: '1px solid var(--border-dim)', borderRadius: 6,
+          cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'var(--font-display)',
+        }}
+      >
+        <span>Underwriting detail — risk assessment, thresholds & activity</span>
+        <span style={{ transform: showDetail ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s', display: 'inline-block' }}>{'▾'}</span>
+      </button>
+
+      {showDetail && (<>
       {/* 3-Part Agent Reasoning Card */}
       <div style={{
         marginBottom: 12, borderRadius: 8, overflow: 'hidden',
@@ -397,6 +478,8 @@ export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove,
         </div>
       )}
 
+      </>)}
+
       {/* Inline modification form */}
       {showModify && (
         <div style={{
@@ -489,7 +572,7 @@ export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove,
           <button type="button" onClick={handleModifySubmit} disabled={submitting} style={{
             flex: '1 1 auto', padding: 10, borderRadius: 8, border: 'none',
             background: 'var(--agent-cyan)', color: '#fff', fontFamily: 'var(--font-display)',
-            fontWeight: 700, fontSize: 11, cursor: submitting ? 'default' : 'pointer',
+            fontWeight: 700, fontSize: 13, cursor: submitting ? 'default' : 'pointer',
             opacity: submitting ? 0.6 : 1,
           }}>
             {submitting ? 'Submitting...' : 'Submit Modified Terms'}
@@ -498,7 +581,7 @@ export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove,
           <button type="button" onClick={handleApproveRecommended} disabled={submitting} style={{
             flex: '1 1 auto', padding: 10, borderRadius: 8, border: 'none',
             background: 'var(--mongo)', color: '#fff', fontFamily: 'var(--font-display)',
-            fontWeight: 700, fontSize: 11, cursor: submitting ? 'default' : 'pointer',
+            fontWeight: 700, fontSize: 13, cursor: submitting ? 'default' : 'pointer',
             opacity: submitting ? 0.6 : 1,
           }}>
             {submitting ? 'Approving...' : 'Approve as Recommended'}
@@ -509,7 +592,7 @@ export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove,
           border: `1px solid ${showModify ? 'var(--agent-cyan)' : 'var(--border-base)'}`,
           background: showModify ? 'var(--agent-cyan-dim)' : 'var(--bg-raised)',
           color: showModify ? 'var(--agent-cyan)' : 'var(--text-primary)',
-          fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
+          fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
         }}>
           {showModify ? 'Back' : 'Modify & Approve'}
         </button>
@@ -549,7 +632,7 @@ export function HITLReviewCard({ applicationId, appDetail, queueData, onApprove,
           flex: '1 1 auto', padding: 10, borderRadius: 8,
           border: '1px solid var(--danger)', background: 'transparent',
           color: 'var(--danger)', fontFamily: 'var(--font-display)',
-          fontWeight: 600, fontSize: 11, cursor: submitting ? 'default' : 'pointer',
+          fontWeight: 600, fontSize: 13, cursor: submitting ? 'default' : 'pointer',
           opacity: submitting ? 0.6 : 1,
         }}>
           Decline

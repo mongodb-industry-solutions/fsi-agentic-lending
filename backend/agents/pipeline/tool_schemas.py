@@ -40,6 +40,15 @@ UNDERWRITING_ANALYSIS_TOOL = {
                         "maximum": 1,
                         "description": "Confidence in the analysis (0-1)",
                     },
+                    "recommended_action": {
+                        "type": "string",
+                        "enum": ["approve", "approve_with_conditions", "decline", "manual_review"],
+                        "description": "Your recommended action for the reviewing loan officer at the decision gate",
+                    },
+                    "recommendation_reason": {
+                        "type": "string",
+                        "description": "One concise sentence (officer-facing) explaining WHY you recommend this action — reference the actual ratios/tier/credit driving it",
+                    },
                     "narrative_summary": {
                         "type": "string",
                         "description": "Human-readable narrative summary of the underwriting analysis",
