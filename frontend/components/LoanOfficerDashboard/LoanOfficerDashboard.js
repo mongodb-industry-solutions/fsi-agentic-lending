@@ -152,6 +152,7 @@ export default function LoanOfficerDashboard({ active = true }) {
   const [agentStats, setAgentStats] = useState({ totalReceived: 0 });
   const [canvasHighlightNode, setCanvasHighlightNode] = useState(null);
   const [diagramOpen, setDiagramOpen] = useState(false);
+  const [showPipeline, setShowPipeline] = useState(false);
   const highlightTimerRef = useRef(null);
 
   // Cleanup highlight timer on unmount
@@ -248,11 +249,11 @@ export default function LoanOfficerDashboard({ active = true }) {
           {/* App header */}
           <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-base)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' }}>
-              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14 }}>
+              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 17 }}>
                 {selectedApp ? (selectedAppData?.name || appName) : 'Select an application'}
               </span>
               {selectedApp && (
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)' }}>
                   {selectedApp}
                 </span>
               )}
@@ -295,8 +296,12 @@ export default function LoanOfficerDashboard({ active = true }) {
                 <IntentPreview applicationId={selectedApp} onProceed={handleProceed} onManual={handleManual} />
               </div>
             </div>
-          ) : selectedApp && workflowPhase === 'executing' ? (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto', background: 'var(--bg-base)' }}>
+          ) : selectedApp && workflowPhase === 'executing' ? (() => {
+            // Action-first: once a decision is pending (HITL) or made (approved),
+            // that hero leads and the pipeline tracker collapses beneath it. While
+            // the pipeline is still running, the tracker is the main content.
+            const decided = (hitlReached && !approved) || approved;
+            const tracker = (
               <PipelineStepTracker
                 stage={workflowStage}
                 hitlReached={hitlReached}
@@ -307,10 +312,12 @@ export default function LoanOfficerDashboard({ active = true }) {
                 activityEvents={activityEvents}
                 onViewDiagram={() => setDiagramOpen(true)}
               />
-
-              {/* HITL Review panel — inside scroll container, no maxHeight clip */}
+            );
+            return (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto', background: 'var(--bg-base)' }}>
+              {/* Key action — top and center */}
               {hitlReached && !approved && (
-                <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)' }}>
+                <div style={{ padding: spacing[3] }}>
                   <HITLReviewCard
                     applicationId={selectedApp}
                     appDetail={selectedAppDetail}
@@ -322,10 +329,8 @@ export default function LoanOfficerDashboard({ active = true }) {
                   />
                 </div>
               )}
-
-              {/* Decision Summary */}
               {approved && (
-                <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)' }}>
+                <div style={{ padding: spacing[3] }}>
                   <DecisionSummary
                     applicationId={selectedApp}
                     appDetail={selectedAppDetail}
@@ -336,8 +341,30 @@ export default function LoanOfficerDashboard({ active = true }) {
                   />
                 </div>
               )}
+
+              {/* Pipeline progress — primary while running, collapsed once decided */}
+              {decided ? (
+                <div style={{ padding: `0 ${spacing[3]}px ${spacing[3]}px` }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowPipeline((p) => !p)}
+                    aria-expanded={showPipeline}
+                    style={{
+                      width: '100%', padding: '8px 12px',
+                      background: 'var(--bg-raised)', border: '1px solid var(--border-dim)', borderRadius: 6,
+                      cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'var(--font-display)',
+                    }}
+                  >
+                    <span>Pipeline progress</span>
+                    <span style={{ transform: showPipeline ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s', display: 'inline-block' }}>{'▾'}</span>
+                  </button>
+                  {showPipeline && <div style={{ marginTop: spacing[2] }}>{tracker}</div>}
+                </div>
+              ) : tracker}
             </div>
-          ) : selectedApp && workflowPhase === 'manual' ? (
+            );
+          })() : selectedApp && workflowPhase === 'manual' ? (
             <div style={{ flex: 1, overflow: 'hidden' }}>
               <ManualWorkspace appDetail={selectedAppDetail} queueData={selectedAppData} onApprove={handleApprove} onDecline={handleDecline} addToast={addToast} />
             </div>

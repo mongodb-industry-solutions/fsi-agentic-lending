@@ -70,7 +70,7 @@ function StatePill({ state }) {
 function SubStep({ label, status }) {
   const color = status === 'done' ? 'var(--success)' : status === 'active' ? 'var(--agent-cyan)' : 'var(--text-dim)';
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, padding: '3px 0' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '3px 0' }}>
       <span style={{
         width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
         border: `1.5px solid ${color}`,
@@ -124,7 +124,7 @@ function StageBox({
           {state === 'complete' ? '✓' : state === 'hitl' ? '!' : index + 1}
         </span>
         <span style={{
-          fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13,
+          fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15,
           color: state === 'future' ? 'var(--text-dim)' : 'var(--text-primary)', flex: 1,
         }}>
           {stage.label}
@@ -168,7 +168,7 @@ function StageBox({
               style={{
                 marginTop: 10, padding: '5px 10px', borderRadius: 6,
                 border: '1px solid var(--agent-cyan)', background: 'var(--agent-cyan-dim)',
-                color: 'var(--agent-cyan)', fontSize: 10, fontWeight: 700, cursor: 'pointer',
+                color: 'var(--agent-cyan)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
                 fontFamily: 'var(--font-display)',
               }}
             >
