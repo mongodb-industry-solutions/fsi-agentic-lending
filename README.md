@@ -356,6 +356,14 @@ Full-featured officer workspace with real-time data flows and human-in-the-loop 
 - **Servicing** — portfolio stats grid, top-3 Early Warning System signals, live event feed, 4-step renewal intervention card. Real-time data from `/portfolio/stats`. Focus nodes: `timeSeries`, `changeStream`, `vectorSearch`, `mongoAtlas` (servicingAgent node retired from canvas).
 - **Completion Screen** — full WorkflowCanvas with all nodes completed (green edges, checkmarks), `TechRecap` card with 5 collapsible sections (Performance Stats, Tech Stack, Cross-Lifecycle Intelligence, By the Numbers).
 
+### 4. Renewal Dashboard
+
+Self-contained **Renewal Agent** workflow for existing customers whose term is nearing maturity — independent of the origination pipeline. The agent scans the portfolio, drafts a personalized renewal offer, and auto-renews the loan on e-signature.
+
+- **Renewal Queue** — the Renewal Agent scans for loans maturing within the next 3 months (seeded from the `renewals` collection), listed soonest-first with current rate/payment, maturity date, and days remaining.
+- **Offer Generation** — running the agent computes a new rate (current market rate + retention discount), recomputes the payment on the remaining amortization, drafts a **renewal agreement PDF** (fpdf2), and shows the reasoning steps with a Bedrock-generated rationale (deterministic fallback when Bedrock is unavailable).
+- **E-Signature → Auto-Renew** — "Send to borrower & e-sign" records a (simulated) signature and rolls the offered terms onto the loan, pushing maturity out 5 years. **Re-scan** restores renewed seed loans to `due` so the demo is repeatable.
+
 ## Demo Borrower Profiles
 
 5 seeded profiles exercise every pipeline decision path:
@@ -452,7 +460,7 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 
 ## API Endpoints
 
-### REST (28 endpoints)
+### REST (32 endpoints)
 
 | Method | Path                                         | Description                                                                             |
 | ------ | -------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -484,6 +492,10 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | GET    | `/api/portfolio/ews`                         | Early Warning System signals from time-series (auto-samples a loan_id if none provided) |
 | GET    | `/api/portfolio/events`                      | Recent events (payments + agent actions)                                                |
 | POST   | `/api/demo/reset`                            | Reset demo state (requires `X-Demo-Reset: confirm` header)                              |
+| GET    | `/api/renewals`                              | Renewal Agent scan — loans maturing within 3 months (restores renewed seed loans)      |
+| POST   | `/api/renewals/{id}/offer`                   | Run the Renewal Agent — compute new terms + draft the renewal agreement                 |
+| POST   | `/api/renewals/{id}/sign`                    | Record e-signature and auto-renew the loan onto the new terms                           |
+| GET    | `/api/renewals/{id}/document.pdf`            | Serve the generated renewal agreement PDF (regenerated from stored offer terms)         |
 
 ### SSE (4 endpoints)
 
@@ -500,7 +512,7 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | ------------------------- | -------------------------------------------------------------------------------------- |
 | WS `/api/applications/ws` | Real-time application queue (Change Stream, 15s heartbeat, 60s dead-client detection)  |
 
-## MongoDB Collections (12 + 3 infra)
+## MongoDB Collections (13 + 3 infra)
 
 | Collection              | Type            | Purpose                           | Key Feature                                                                    |
 | ----------------------- | --------------- | --------------------------------- | ------------------------------------------------------------------------------ |
@@ -514,6 +526,7 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | `hitl_audit`            | Standard        | Officer decision audit log        | Immutable — no update/delete operations, indexed by officer_id                 |
 | `officers`              | Standard        | Loan officer identity             | Seeded singleton (Curtis Dean) — the reviewing officer, served by `/officers/current` |
 | `pipeline_locks`        | Standard        | Distributed concurrency locks     | TTL-based (600s expiry) to prevent concurrent pipeline execution               |
+| `renewals`              | Standard        | Loans nearing maturity            | Powers the standalone Renewal Agent (scan → offer → e-sign → auto-renew)        |
 | `payments`              | **Time Series** | Payment history                   | $setWindowFields rolling 90-day analysis                                       |
 | `agent_activity`        | **Time Series** | Agent action log                  | Real-time SSE streaming via Change Stream                                      |
 | `checkpoints`           | LangGraph       | Graph state snapshots             | MongoDBSaver interrupt/resume                                                  |
