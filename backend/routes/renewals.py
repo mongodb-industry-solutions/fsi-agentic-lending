@@ -1,8 +1,10 @@
 """Renewal Agent routes — scan due loans, generate offers, e-sign & auto-renew."""
 import asyncio
+import json
 import logging
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from services import renewal_service
@@ -29,6 +31,34 @@ async def generate_offer(renewal_id: str):
     if result is None:
         raise HTTPException(status_code=404, detail=f"Renewal {renewal_id} not found")
     return result
+
+
+@router.get("/renewals/{renewal_id}/offer-stream")
+async def generate_offer_stream(renewal_id: str):
+    """SSE — stream the Renewal Agent's offer generation live.
+
+    Emits one `step` event per phase (each tagged with the tech that did the work
+    and its latency), a `pending` step around the Bedrock rationale call, then a
+    final `done` event with the full offer. The non-streamed POST /offer remains
+    as a fallback and shares the same underlying generator.
+    """
+    exists = await asyncio.to_thread(renewal_service.renewal_exists, renewal_id)
+    if not exists:
+        raise HTTPException(status_code=404, detail=f"Renewal {renewal_id} not found")
+
+    def event_gen():
+        for ev in renewal_service.generate_offer_events(renewal_id):
+            yield f"data: {json.dumps(ev)}\n\n"
+
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # defeat proxy buffering so events arrive live
+        },
+    )
 
 
 @router.post("/renewals/{renewal_id}/sign")
