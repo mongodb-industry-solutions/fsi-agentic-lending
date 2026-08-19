@@ -85,7 +85,6 @@ export default function RenewalDashboard({ active = true }) {
   const [selectedId, setSelectedId] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [signing, setSigning] = useState(false);
-  const [docOpen, setDocOpen] = useState(false);
 
   const fetchRenewals = useCallback(async () => {
     setLoading(true);
@@ -245,46 +244,16 @@ export default function RenewalDashboard({ active = true }) {
                 signing={signing}
                 onGenerate={handleGenerate}
                 onSign={handleSign}
-                onViewDoc={() => setDocOpen(true)}
               />
             )}
           </div>
         </div>
       </div>
-
-      {docOpen && selected && (
-        <div
-          onClick={() => setDocOpen(false)}
-          style={{
-            position: "fixed", inset: 0, zIndex: 910, background: "rgba(0,0,0,0.6)",
-            display: "flex", alignItems: "center", justifyContent: "center", padding: spacing[4],
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "var(--bg-base)", borderRadius: "var(--radius-lg)", width: "min(820px, 92vw)", height: "88vh", display: "flex", flexDirection: "column", overflow: "hidden", border: "1px solid var(--border-base)" }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: spacing[3], borderBottom: "1px solid var(--border-dim)" }}>
-              <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 14, color: "var(--text-primary)" }}>
-                Renewal Agreement — {selected.borrower_name}
-              </span>
-              <button type="button" onClick={() => setDocOpen(false)} style={{ cursor: "pointer", background: "none", border: "none", color: "var(--text-secondary)", display: "flex" }}>
-                <Icon glyph="X" size={18} />
-              </button>
-            </div>
-            <iframe
-              title="Renewal document"
-              src={`/api/backend/renewals/${selected.renewal_id}/document.pdf`}
-              style={{ flex: 1, border: "none", width: "100%", background: "#fff" }}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-function RenewalDetail({ renewal, generating, signing, onGenerate, onSign, onViewDoc }) {
+function RenewalDetail({ renewal, generating, signing, onGenerate, onSign }) {
   const offer = renewal.offer;
   const isRenewed = renewal.status === "renewed";
 
@@ -379,19 +348,6 @@ function RenewalDetail({ renewal, generating, signing, onGenerate, onSign, onVie
           </div>
 
           <div style={{ display: "flex", gap: spacing[2], marginTop: spacing[3], flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={onViewDoc}
-              style={{
-                display: "flex", alignItems: "center", gap: spacing[1],
-                padding: `${spacing[2]}px ${spacing[3]}px`, borderRadius: "var(--radius-sm)",
-                border: "1px solid var(--border-base)", background: "var(--bg-base)",
-                color: "var(--text-primary)", fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 12,
-                cursor: "pointer",
-              }}
-            >
-              <Icon glyph="File" size={14} /> View renewal document
-            </button>
             {!isRenewed && (
               <button
                 type="button"

@@ -3,8 +3,7 @@ Renewal Agent service.
 
 A lightweight, standalone agent (no LangGraph pipeline) that:
   1. Scans existing loans approaching maturity (within 3 months).
-  2. Generates a personalized renewal offer with a new rate + drafts a
-     renewal agreement PDF.
+  2. Generates a personalized renewal offer with a new rate + rationale.
   3. Auto-renews the loan once the borrower e-signs.
 
 Kept deliberately simple for the demo: the `renewals` collection is
@@ -167,7 +166,7 @@ def _draft_rationale(renewal: dict, new_rate: float, new_payment: int) -> str:
 
 
 def generate_offer(renewal_id: str) -> dict | None:
-    """Run the Renewal Agent for one loan: compute new terms + draft the document."""
+    """Run the Renewal Agent for one loan: compute new terms + prepare the offer."""
     db = get_db()
     renewal = db["renewals"].find_one({"renewal_id": renewal_id})
     if not renewal:
@@ -202,9 +201,9 @@ def generate_offer(renewal_id: str) -> dict | None:
         f"({'-' if payment_delta < 0 else '+'}${abs(payment_delta):,} vs current)."
     )
 
-    # 3. Draft the rationale + renewal document.
+    # 3. Draft the rationale + prepare the offer for signature.
     rationale = _draft_rationale(renewal, new_rate, new_payment)
-    steps.append("Drafted the renewal agreement and prepared it for e-signature.")
+    steps.append("Prepared the personalized renewal offer for e-signature.")
 
     offer = {
         "new_rate": new_rate,
@@ -276,130 +275,3 @@ def sign_and_renew(renewal_id: str, signer_name: str | None = None) -> dict | No
 
     updated = db["renewals"].find_one({"renewal_id": renewal_id})
     return _serialize(updated)
-
-
-# ── Renewal agreement PDF ────────────────────────────────────────────────────
-def build_renewal_pdf(renewal_id: str) -> bytes | None:
-    """Generate the renewal agreement PDF on the fly from stored offer terms."""
-    db = get_db()
-    renewal = db["renewals"].find_one({"renewal_id": renewal_id})
-    if not renewal or not renewal.get("offer"):
-        return None
-
-    from fpdf import FPDF
-
-    offer = renewal["offer"]
-    DARK_BLUE = (27, 58, 92)
-    GOLD = (201, 150, 59)
-    GRAY = (80, 80, 80)
-
-    def s(text) -> str:
-        """Sanitize for fpdf core Helvetica (latin-1 only).
-
-        LLM-generated rationale can contain characters outside latin-1 (em/en
-        dashes, smart quotes, bullets, ellipsis, non-breaking space, accents),
-        which would raise UnicodeEncodeError and 500 the PDF endpoint. Replace the
-        common ones nicely, then hard-fall-back any remaining char to latin-1.
-        """
-        if not isinstance(text, str):
-            text = str(text or "")
-        replacements = {
-            "—": "--", "–": "-", "’": "'", "‘": "'",
-            "“": '"', "”": '"', "•": "*", "…": "...",
-            " ": " ", "‑": "-",
-        }
-        for k, v in replacements.items():
-            text = text.replace(k, v)
-        return text.encode("latin-1", "replace").decode("latin-1")
-
-    pdf = FPDF(orientation="P", unit="mm", format="Letter")
-    pdf.set_auto_page_break(auto=True, margin=25)
-    pdf.add_page()
-
-    # Header band
-    pdf.set_fill_color(*DARK_BLUE)
-    pdf.rect(0, 0, pdf.w, 28, "F")
-    pdf.set_xy(10, 7)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 8, "LendFlow Mortgage Renewal", ln=True)
-    pdf.set_xy(pdf.w - 90, 8)
-    pdf.set_text_color(*GOLD)
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(80, 7, "RENEWAL AGREEMENT", align="R")
-    pdf.set_xy(pdf.w - 90, 15)
-    pdf.set_font("Helvetica", "", 8)
-    pdf.set_text_color(255, 255, 255)
-    pdf.cell(80, 4, s(renewal["renewal_id"]), align="R")
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_y(38)
-
-    def row(label: str, value: str, bold_value: bool = False):
-        pdf.set_font("Helvetica", "", 10)
-        pdf.set_text_color(*GRAY)
-        pdf.cell(70, 8, s(label))
-        pdf.set_font("Helvetica", "B" if bold_value else "", 10)
-        pdf.set_text_color(0, 0, 0)
-        pdf.cell(0, 8, s(value), ln=True)
-
-    def section(title: str):
-        pdf.ln(2)
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.set_text_color(*DARK_BLUE)
-        pdf.cell(0, 8, s(title), ln=True)
-        pdf.set_draw_color(*GOLD)
-        pdf.line(10, pdf.get_y(), pdf.w - 10, pdf.get_y())
-        pdf.ln(2)
-        pdf.set_text_color(0, 0, 0)
-
-    section("Borrower & Property")
-    row("Borrower", renewal.get("borrower_name", ""))
-    row("Property", renewal.get("property_address", ""))
-    row("Outstanding balance", f"${renewal.get('loan_amount', 0):,}")
-
-    section("Current Term (Maturing)")
-    row("Rate", f"{offer['current_rate'] * 100:.2f}%")
-    row("Monthly payment", f"${offer['current_payment']:,}")
-
-    section("Renewed Term (Offered)")
-    row("Product", f"{offer['new_term']} ({offer['amortization_years']}yr Amort)")
-    row("New rate", f"{offer['new_rate'] * 100:.2f}%", bold_value=True)
-    row("New monthly payment", f"${offer['new_payment']:,}", bold_value=True)
-    delta = offer["payment_delta"]
-    row("Change vs current", f"{'-' if delta < 0 else '+'}${abs(delta):,} / month")
-
-    section("Renewal Summary")
-    pdf.set_font("Helvetica", "", 10)
-    pdf.multi_cell(0, 6, s(offer.get("rationale", "")))
-
-    # Signature block
-    pdf.ln(10)
-    sig = renewal.get("signature")
-    pdf.set_draw_color(0, 0, 0)
-    pdf.line(10, pdf.get_y() + 12, 90, pdf.get_y() + 12)
-    if sig:
-        pdf.set_xy(10, pdf.get_y() + 4)
-        pdf.set_font("Helvetica", "I", 11)
-        pdf.set_text_color(*DARK_BLUE)
-        pdf.cell(80, 6, s(sig.get("signer_name", "")), ln=False)
-    pdf.set_xy(10, pdf.get_y() + 14)
-    pdf.set_font("Helvetica", "", 8)
-    pdf.set_text_color(*GRAY)
-    status_line = (
-        f"E-signed {sig['signed_at'].date()} (simulated)"
-        if sig and isinstance(sig.get("signed_at"), datetime)
-        else "Borrower signature"
-    )
-    pdf.cell(80, 5, s(status_line))
-
-    # Footer — disable auto page-break so the full-width band can't spill a blank page
-    pdf.set_auto_page_break(False)
-    pdf.set_fill_color(*DARK_BLUE)
-    pdf.rect(0, pdf.h - 18, pdf.w, 18, "F")
-    pdf.set_xy(0, pdf.h - 13)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 7)
-    pdf.cell(0, 6, "SYNTHETIC DOCUMENT -- FOR DEMONSTRATION PURPOSES ONLY", align="C")
-
-    out = pdf.output()
-    return bytes(out)
