@@ -362,7 +362,7 @@ Full-featured officer workspace with real-time data flows and human-in-the-loop 
 Self-contained **Renewal Agent** workflow for existing customers whose term is nearing maturity — independent of the origination pipeline. The agent scans the portfolio, drafts a personalized renewal offer, and auto-renews the loan on e-signature.
 
 - **Renewal Queue** — the Renewal Agent scans for loans maturing within the next 3 months (seeded from the `renewals` collection), listed soonest-first with current rate/payment, maturity date, and days remaining.
-- **Offer Generation** — running the agent computes a new rate (current market rate + retention discount), recomputes the payment on the remaining amortization, and shows the reasoning steps with a Bedrock-generated rationale (deterministic fallback when Bedrock is unavailable).
+- **Offer Generation** — running the agent computes a new rate (current market rate + retention discount), recomputes the payment on the remaining amortization, and shows the reasoning steps with a Bedrock-generated rationale (deterministic fallback when Bedrock is unavailable). The agent's background work now streams **live** to the foreground via `GET /api/renewals/{id}/offer-stream`: each phase appears as it happens — scan → pull market rate + retention discount → recompute payment → draft rationale (a visible AWS Bedrock "drafting…" wait) → persist — with per-step **tech tags** (MongoDB · renewals, Compute · amortization, AWS Bedrock · Claude, MongoDB · agent_activity) and **latency badges**. The non-streamed `POST /api/renewals/{id}/offer` remains as a fallback.
 - **E-Signature → Auto-Renew** — "Send to borrower & e-sign" records a (simulated) signature and rolls the offered terms onto the loan, pushing maturity out 5 years. **Re-scan** restores renewed seed loans to `due` so the demo is repeatable.
 
 ## Demo Borrower Profiles
@@ -497,7 +497,7 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | POST   | `/api/renewals/{id}/offer`                   | Run the Renewal Agent — compute new terms + draft the renewal agreement                 |
 | POST   | `/api/renewals/{id}/sign`                    | Record e-signature and auto-renew the loan onto the new terms                           |
 
-### SSE (4 endpoints)
+### SSE (5 endpoints)
 
 | Path                                  | Description                                                                                                            |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -505,6 +505,7 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | GET `/api/applications/{id}/status`   | Stream status changes (Change Stream)                                                                                  |
 | GET `/api/agent/{id}/run-stream`      | Combined run + stream (LangGraph astream_events) — used by officer dashboard for workflow progression + HITL detection |
 | GET `/api/agent/{id}/stream`          | Activity-only stream with backlog (last 50 events) — used for reconnection after HITL resume                           |
+| GET `/api/renewals/{id}/offer-stream` | Live Renewal Agent offer generation — one `step` event per phase (tech tag + per-step latency), then `done` with the full offer |
 
 ### WebSocket (1 endpoint)
 
