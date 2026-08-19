@@ -11,6 +11,7 @@ self-contained and independent of the origination `applications` flow.
 """
 import logging
 import os
+import time
 from datetime import datetime, timedelta, timezone
 
 from db.mdb import get_db
@@ -165,12 +166,26 @@ def _draft_rationale(renewal: dict, new_rate: float, new_payment: int) -> str:
         return fallback
 
 
-def generate_offer(renewal_id: str) -> dict | None:
-    """Run the Renewal Agent for one loan: compute new terms + prepare the offer."""
+def renewal_exists(renewal_id: str) -> bool:
+    """Cheap existence check (used by the streaming route to 404 before opening SSE)."""
+    return get_db()["renewals"].count_documents({"renewal_id": renewal_id}, limit=1) > 0
+
+
+def generate_offer_events(renewal_id: str):
+    """Run the Renewal Agent, yielding a live event per phase, then a final offer.
+
+    Single source of truth for offer generation. Each `step` event carries the
+    tech that did the work (MongoDB / Compute / AWS Bedrock) and its latency, so
+    the frontend can surface the agent's background work in the foreground. The
+    Bedrock rationale is bracketed by a `pending` step (shown while the model
+    thinks) and its completing step. Ends with a `done` event containing the
+    fully serialized renewal (offer attached).
+    """
     db = get_db()
     renewal = db["renewals"].find_one({"renewal_id": renewal_id})
     if not renewal:
-        return None
+        yield {"type": "error", "message": f"Renewal {renewal_id} not found"}
+        return
 
     now = datetime.now(timezone.utc)
     amort = renewal.get("amortization_years", 25)
@@ -178,33 +193,56 @@ def generate_offer(renewal_id: str) -> dict | None:
     current_rate = renewal.get("current_rate", 0)
 
     steps = []
+    n = 0
 
-    # 1. Determine the renewal rate. Base = current market rate; loyal borrowers
-    #    (existing customers, in good standing) get a small retention discount.
+    def _done_step(key, title, tech, t0):
+        nonlocal n
+        n += 1
+        record = {"n": n, "title": title, "tech": tech,
+                  "elapsed_ms": int((time.monotonic() - t0) * 1000)}
+        steps.append(record)
+        return {"type": "step", "key": key, **record}
+
+    # 0. Scan — the record we just read from the renewals collection.
+    t = time.monotonic()
+    yield _done_step("scan", f"Loan {renewal_id} is maturing — retrieved from the portfolio.",
+                     "MongoDB · renewals", t)
+
+    # 1. Determine the renewal rate: market rate + retention discount for a loyal customer.
+    t = time.monotonic()
     market = _market_rate()
     retention_discount = 0.0010  # 10 bps loyalty adjustment
     new_rate = round(max(market - retention_discount, 0.0), 4)
-    steps.append(
-        f"Pulled current 5yr fixed market rate ({market * 100:.2f}%) and applied a "
-        f"10 bps retention discount for an existing customer in good standing."
-    )
+    yield _done_step(
+        "rate",
+        f"Pulled 5yr fixed market rate ({market * 100:.2f}%) and applied a 10 bps "
+        f"retention discount → {new_rate * 100:.2f}%.",
+        "Compute · market rate", t)
 
     # 2. Recompute the payment on the remaining amortization.
+    t = time.monotonic()
     new_payment = _amortized_payment(loan_amount, new_rate, amort)
     current_payment = renewal.get("current_payment") or _amortized_payment(
-        loan_amount, current_rate, amort
-    )
+        loan_amount, current_rate, amort)
     payment_delta = new_payment - current_payment
-    steps.append(
-        f"Recalculated the monthly payment on the ${loan_amount:,} balance over the "
-        f"remaining {amort}-year amortization: ${new_payment:,}/mo "
-        f"({'-' if payment_delta < 0 else '+'}${abs(payment_delta):,} vs current)."
-    )
+    yield _done_step(
+        "payment",
+        f"Recomputed payment on ${loan_amount:,} over the remaining {amort}-year "
+        f"amortization: ${new_payment:,}/mo "
+        f"({'-' if payment_delta < 0 else '+'}${abs(payment_delta):,} vs current).",
+        "Compute · amortization", t)
 
-    # 3. Draft the rationale + prepare the offer for signature.
+    # 3. Draft the rationale via Bedrock — the one slow phase; show it live.
+    yield {"type": "step", "key": "rationale", "n": n + 1,
+           "title": "Drafting a personalized rationale with AWS Bedrock Claude…",
+           "tech": "AWS Bedrock · Claude", "pending": True}
+    t = time.monotonic()
     rationale = _draft_rationale(renewal, new_rate, new_payment)
-    steps.append("Prepared the personalized renewal offer for e-signature.")
+    yield _done_step("rationale", "Drafted a personalized renewal rationale.",
+                     "AWS Bedrock · Claude", t)
 
+    # 4. Persist the offer + write the reasoning trail to the activity log.
+    t = time.monotonic()
     offer = {
         "new_rate": new_rate,
         "new_payment": new_payment,
@@ -218,20 +256,30 @@ def generate_offer(renewal_id: str) -> dict | None:
         "steps": steps,
         "generated_at": now,
     }
-
     db["renewals"].update_one(
         {"renewal_id": renewal_id},
         {"$set": {"offer": offer, "status": "offer_sent", "updated_at": now}},
     )
-
-    # Log the agent's reasoning trail (namespaced by renewal_id).
     log_agent_activity(renewal_id, "renewal_agent", "renewal_scan",
                        f"Loan {renewal_id} maturing — generating renewal offer.")
-    for step in steps:
-        log_agent_activity(renewal_id, "renewal_agent", "renewal_offer", step)
+    for s in steps:
+        log_agent_activity(renewal_id, "renewal_agent", "renewal_offer", s["title"])
+    yield _done_step("persist", "Saved the offer and wrote the reasoning trail.",
+                     "MongoDB · renewals + agent_activity", t)
 
     updated = db["renewals"].find_one({"renewal_id": renewal_id})
-    return _serialize(updated)
+    yield {"type": "done", "renewal": _serialize(updated)}
+
+
+def generate_offer(renewal_id: str) -> dict | None:
+    """Non-streamed path: run the agent to completion and return the updated renewal."""
+    result = None
+    for ev in generate_offer_events(renewal_id):
+        if ev.get("type") == "done":
+            result = ev.get("renewal")
+        elif ev.get("type") == "error":
+            return None
+    return result
 
 
 # ── Sign & auto-renew ────────────────────────────────────────────────────────
