@@ -88,7 +88,7 @@ export function PortfolioIntelligence() {
               padding: '1px 4px', borderRadius: 3,
               background: 'var(--tool-blue-dim)', color: 'var(--tool-blue)',
             }}>
-              TIME-SERIES
+              PAYMENTS
             </span>
           </div>
           {/* Collapsed preview */}

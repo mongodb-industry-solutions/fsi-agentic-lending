@@ -42,12 +42,7 @@ COLLECTIONS = {
         ],
     },
     "payments": {
-        "description": "Time-series of loan payment history",
-        "time_series": {
-            "timeField": "timestamp",
-            "metaField": "loan_id",
-            "granularity": "hours",
-        },
+        "description": "Loan payment history",
         "indexes": [
             {"keys": [("loan_id", 1), ("timestamp", -1)]},
         ],

@@ -23,36 +23,23 @@ def main():
     db_connector = MongoDBConnector()
     db = db_connector.client[os.getenv("DATABASE_NAME", "lendflow")]
 
-    # Create time-series collection for payments
-    print("Creating payments time-series collection...")
-    ts_payments_config = COLLECTIONS["payments"]["time_series"]
-    try:
-        db.create_collection(
-            "payments",
-            timeseries={
-                "timeField": ts_payments_config["timeField"],
-                "metaField": ts_payments_config["metaField"],
-                "granularity": ts_payments_config["granularity"],
-            },
-        )
-        print("  Created payments time-series collection")
-    except Exception as e:
-        if "already exists" in str(e):
-            print("  payments already exists, skipping")
-        else:
-            raise
+    # Migrate legacy time-series payments collection to a normal collection.
+    # Time-series collections can't be converted in place, so drop it — payment
+    # data is fully re-seeded by scripts.ingest_pdfs.
+    coll_infos = {c["name"]: c for c in db.list_collections()}
+    payments_info = coll_infos.get("payments")
+    if payments_info and payments_info.get("type") == "timeseries":
+        print("Dropping legacy time-series payments collection (will be re-seeded)...")
+        db.drop_collection("payments")
 
-    # Ensure standard collections exist (conversations, interventions, etc.)
+    # Ensure standard collections exist (payments, conversations, interventions, etc.)
     for coll_name in COLLECTIONS:
-        if "time_series" not in COLLECTIONS[coll_name]:
-            if coll_name not in db.list_collection_names():
-                db.create_collection(coll_name)
-                print(f"  Created collection: {coll_name}")
+        if coll_name not in db.list_collection_names():
+            db.create_collection(coll_name)
+            print(f"  Created collection: {coll_name}")
 
     # Create standard indexes
     for coll_name, coll_config in COLLECTIONS.items():
-        if "time_series" in coll_config:
-            continue  # Time-series indexes managed at collection creation
         for idx in coll_config.get("indexes", []):
             print(f"Creating index on {coll_name}: {idx['keys']}")
             db[coll_name].create_index(
