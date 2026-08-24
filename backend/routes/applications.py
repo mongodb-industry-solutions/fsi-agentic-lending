@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 from models.schemas import ApplicationCreateRequest
 from services import application_service
 from db.mdb import get_db
+from db.collections_config import NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +121,7 @@ async def portfolio_ews(loan_id: str = None):
     from services.dashboard_service import get_ews_signals
     if not loan_id:
         db = get_db()
-        sample = db["payments"].find_one({}, {"loan_id": 1})
+        sample = db[NAMES.payments].find_one({}, {"loan_id": 1})
         if not sample:
             return []
         loan_id = sample["loan_id"]
@@ -189,14 +190,14 @@ async def stream_activity(app_id: str):
         # Initial open; if the cluster can't serve change streams, degrade to polling
         try:
             stream = await asyncio.to_thread(
-                lambda: db["agent_activity"].watch(pipeline, full_document="updateLookup")
+                lambda: db[NAMES.agent_activity].watch(pipeline, full_document="updateLookup")
             )
         except Exception:
             use_polling = True
             # Seed polling high-water mark so we don't replay history every reconnect
             latest = await asyncio.to_thread(
                 lambda: list(
-                    db["agent_activity"]
+                    db[NAMES.agent_activity]
                     .find({"application_id": app_id})
                     .sort("timestamp", -1)
                     .limit(1)
@@ -218,7 +219,7 @@ async def stream_activity(app_id: str):
                         query["timestamp"] = {"$gte": last_poll_ts}
                     new_docs = await asyncio.to_thread(
                         lambda q=query: list(
-                            db["agent_activity"].find(q).sort("timestamp", 1).limit(100)
+                            db[NAMES.agent_activity].find(q).sort("timestamp", 1).limit(100)
                         )
                     )
                     for doc in new_docs:
@@ -262,7 +263,7 @@ async def stream_activity(app_id: str):
                         # Seed polling HWM so we don't replay history
                         latest = await asyncio.to_thread(
                             lambda: list(
-                                db["agent_activity"]
+                                db[NAMES.agent_activity]
                                 .find({"application_id": app_id})
                                 .sort("timestamp", -1)
                                 .limit(1)
@@ -275,7 +276,7 @@ async def stream_activity(app_id: str):
                         continue
                     try:
                         stream = await asyncio.to_thread(
-                            lambda: db["agent_activity"].watch(
+                            lambda: db[NAMES.agent_activity].watch(
                                 pipeline,
                                 full_document="updateLookup",
                                 resume_after=last_resume_token,
@@ -377,7 +378,7 @@ async def stream_status(app_id: str):
 
         # Snapshot-on-connect: send current status first
         app = await asyncio.to_thread(
-            db["applications"].find_one, {"application_id": app_id}
+            db[NAMES.applications].find_one, {"application_id": app_id}
         )
         if app:
             yield f"data: {json.dumps({'type': 'status', 'status': app.get('status', 'unknown'), 'status_detail': app.get('status_detail', '')})}\n\n"
@@ -401,7 +402,7 @@ async def stream_status(app_id: str):
 
         try:
             stream = await asyncio.to_thread(
-                lambda: db["applications"].watch(pipeline, full_document="updateLookup")
+                lambda: db[NAMES.applications].watch(pipeline, full_document="updateLookup")
             )
         except Exception:
             use_polling = True
@@ -410,7 +411,7 @@ async def stream_status(app_id: str):
             while True:
                 if use_polling:
                     current = await asyncio.to_thread(
-                        db["applications"].find_one, {"application_id": app_id}
+                        db[NAMES.applications].find_one, {"application_id": app_id}
                     )
                     if current:
                         cur_status = current.get("status")
@@ -443,7 +444,7 @@ async def stream_status(app_id: str):
                         continue
                     try:
                         stream = await asyncio.to_thread(
-                            lambda: db["applications"].watch(
+                            lambda: db[NAMES.applications].watch(
                                 pipeline,
                                 full_document="updateLookup",
                                 resume_after=last_resume_token,
@@ -534,7 +535,7 @@ async def get_timeline_context(app_id: str):
     # Borrower-safe intervention data
     interventions = await asyncio.to_thread(
         lambda: list(
-            db["interventions"]
+            db[NAMES.interventions]
             .find(
                 {"application_id": app_id},
                 {"_id": 0, "type": 1, "status": 1, "borrower_context": 1, "created_at": 1, "resolved_at": 1},
@@ -546,7 +547,7 @@ async def get_timeline_context(app_id: str):
     # Activity summary counts
     activity_counts = await asyncio.to_thread(
         lambda: list(
-            db["agent_activity"].aggregate([
+            db[NAMES.agent_activity].aggregate([
                 {"$match": {"application_id": app_id}},
                 {"$group": {
                     "_id": None,
@@ -738,7 +739,7 @@ async def applications_ws(websocket: WebSocket):
             # Initial open; degrade to polling if change streams are unavailable
             try:
                 stream = await asyncio.to_thread(
-                    lambda: db["applications"].watch(pipeline, full_document="updateLookup")
+                    lambda: db[NAMES.applications].watch(pipeline, full_document="updateLookup")
                 )
             except Exception:
                 stream = None
@@ -756,7 +757,7 @@ async def applications_ws(websocket: WebSocket):
                         break
                     try:
                         stream = await asyncio.to_thread(
-                            lambda: db["applications"].watch(
+                            lambda: db[NAMES.applications].watch(
                                 pipeline,
                                 full_document="updateLookup",
                                 resume_after=last_resume_token,

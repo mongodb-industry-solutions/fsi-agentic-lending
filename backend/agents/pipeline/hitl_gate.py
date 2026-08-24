@@ -5,6 +5,7 @@ from langgraph.types import interrupt
 from agents.state import LendFlowState
 from agents.pipeline.tools import log_agent_activity, update_application_status
 from services.officer_service import get_officer_display
+from db.collections_config import NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,7 @@ def hitl_gate(state: LendFlowState, **kwargs) -> dict:
         state_updates["decision_reasoning"] = f"Re-underwriting: officer adjusted loan to ${overrides['loan_amount']:,.0f}"
         from db.mdb import get_db as _get_db
         db = _get_db()
-        db["applications"].update_one(
+        db[NAMES.applications].update_one(
             {"application_id": app_id},
             {"$set": {"loan_amount": overrides["loan_amount"]}}
         )

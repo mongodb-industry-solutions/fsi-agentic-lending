@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timezone
 
 from db.mdb import get_db
+from db.collections_config import NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ def create_intervention(
     try:
         db = get_db()
 
-        existing = db["interventions"].find_one({
+        existing = db[NAMES.interventions].find_one({
             "application_id": application_id,
             "type": intervention_type,
             "status": "pending",
@@ -42,7 +43,7 @@ def create_intervention(
         if internal_extras:
             internal_context.update(internal_extras)
 
-        db["interventions"].insert_one({
+        db[NAMES.interventions].insert_one({
             "application_id": application_id,
             "type": intervention_type,
             "status": "pending",

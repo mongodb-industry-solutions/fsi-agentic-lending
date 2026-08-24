@@ -16,6 +16,7 @@ from agents.pipeline.tool_schemas import UNDERWRITING_ANALYSIS_TOOL
 from agents.llm import get_llm
 from agents.helpers.interventions import create_intervention
 from db.mdb import get_db as _get_db
+from db.collections_config import NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -424,7 +425,7 @@ Risk Tier: {risk_tier}
         _persist["recommendation_reason"] = structured_analysis.get("recommendation_reason")
         _persist["recommendation_confidence"] = structured_analysis.get("confidence")
         _persist["recommended_conditions"] = structured_analysis.get("recommended_conditions", [])
-    _get_db()["applications"].update_one(
+    _get_db()[NAMES.applications].update_one(
         {"application_id": app_id},
         {"$set": _persist},
     )

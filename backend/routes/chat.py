@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from db.mdb import get_db
+from db.collections_config import NAMES
 from agents.chatbot.agent import chat as agent_chat, chat_stream as agent_chat_stream, safety_filter
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ async def send_message(application_id: str, req: ChatMessageRequest):
     # Get or create conversation (atomic upsert to avoid TOCTOU race)
     from pymongo import ReturnDocument
     conversation = await asyncio.to_thread(
-        db["conversations"].find_one_and_update,
+        db[NAMES.conversations].find_one_and_update,
         {"application_id": application_id},
         {"$setOnInsert": {
             "application_id": application_id,
@@ -62,7 +63,7 @@ async def send_message(application_id: str, req: ChatMessageRequest):
 
     # Append both messages to conversation
     await asyncio.to_thread(
-        db["conversations"].update_one,
+        db[NAMES.conversations].update_one,
         {"application_id": application_id},
         {
             "$push": {
@@ -98,7 +99,7 @@ async def send_message_stream(application_id: str, req: ChatMessageRequest):
 
     from pymongo import ReturnDocument
     conversation = await asyncio.to_thread(
-        db["conversations"].find_one_and_update,
+        db[NAMES.conversations].find_one_and_update,
         {"application_id": application_id},
         {"$setOnInsert": {
             "application_id": application_id,
@@ -168,7 +169,7 @@ async def send_message_stream(application_id: str, req: ChatMessageRequest):
         now = datetime.now(timezone.utc)
 
         await asyncio.to_thread(
-            db["conversations"].update_one,
+            db[NAMES.conversations].update_one,
             {"application_id": application_id},
             {
                 "$push": {
@@ -204,7 +205,7 @@ async def get_history(application_id: str):
     """Get conversation history for an application."""
     db = get_db()
     conversation = await asyncio.to_thread(
-        db["conversations"].find_one,
+        db[NAMES.conversations].find_one,
         {"application_id": application_id},
         {"messages": 1, "_id": 0},
     )
@@ -237,7 +238,7 @@ async def resolve_intervention(application_id: str, intervention_id: str):
         raise HTTPException(status_code=404, detail=result["error"])
 
     # Check if all blocking interventions are now resolved — auto-trigger re-evaluate
-    interventions_col = get_db()["interventions"]
+    interventions_col = get_db()[NAMES.interventions]
     pending_blocking = await asyncio.to_thread(
         lambda: interventions_col.count_documents({
             "application_id": application_id,

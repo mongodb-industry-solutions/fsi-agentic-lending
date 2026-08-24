@@ -7,6 +7,7 @@ from langgraph.types import Command
 from models.schemas import HITLDecisionRequest
 from services import application_service
 from db.mdb import get_db as _get_db
+from db.collections_config import NAMES
 from agents.graph import get_graph
 from agents.pipeline.tools import log_agent_activity
 from services.pipeline_lock import acquire_pipeline_lock as _acquire_pipeline_lock, release_pipeline_lock as _release_pipeline_lock
@@ -27,7 +28,7 @@ async def get_hitl_context(app_id: str):
     # Get recent agent activity
     activity = await asyncio.to_thread(
         lambda: list(
-            db["agent_activity"]
+            db[NAMES.agent_activity]
             .find(
                 {"application_id": app_id},
                 {"_id": 0, "agent": 1, "action": 1, "detail": 1, "timestamp": 1},
@@ -79,7 +80,7 @@ async def submit_hitl_decision(app_id: str, req: HITLDecisionRequest):
 
     db = _get_db()
     await asyncio.to_thread(
-        db["hitl_audit"].insert_one,
+        db[NAMES.hitl_audit].insert_one,
         {
             "application_id": app_id,
             "officer_id": req.officer_id,

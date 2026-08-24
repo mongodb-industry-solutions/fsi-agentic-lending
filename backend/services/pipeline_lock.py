@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 from pymongo.errors import DuplicateKeyError
 from db.mdb import get_db as _get_db
+from db.collections_config import NAMES
 
 
 def acquire_pipeline_lock(app_id: str) -> bool:
@@ -14,7 +15,7 @@ def acquire_pipeline_lock(app_id: str) -> bool:
     """
     db = _get_db()
     try:
-        db["pipeline_locks"].insert_one({
+        db[NAMES.pipeline_locks].insert_one({
             "_id": app_id,
             "locked_at": datetime.now(timezone.utc),
         })
@@ -25,4 +26,4 @@ def acquire_pipeline_lock(app_id: str) -> bool:
 
 def release_pipeline_lock(app_id: str):
     db = _get_db()
-    db["pipeline_locks"].delete_one({"_id": app_id})
+    db[NAMES.pipeline_locks].delete_one({"_id": app_id})
