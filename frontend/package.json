@@ -42,5 +42,9 @@
     "eslint": "^9",
     "eslint-config-next": "^15.5.7",
     "license-checker": "^25.0.1"
+  },
+  "overrides": {
+    "postcss": "^8.5.26",
+    "sharp": "^0.35.3"
   }
 }

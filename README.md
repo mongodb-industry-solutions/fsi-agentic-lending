@@ -324,21 +324,22 @@ Phase-based flow: **profile selection → application form → real-time trackin
 
 ### 2. Loan Officer Dashboard
 
-Full-featured officer workspace with real-time data flows and human-in-the-loop decisioning. Dual-rail architecture on the right side. Unlike the borrower, the officer sees **full underwriting detail and the multi-agent pipeline** — all the transparency the borrower view deliberately hides.
+Full-featured officer workspace with real-time data flows and human-in-the-loop decisioning, recently redesigned to be **action-first and simplified**: the decision the officer needs to make leads, and the technical depth is available on demand rather than always-on. Dual-rail architecture on the right side. Unlike the borrower, the officer sees **full underwriting detail and the multi-agent pipeline** — all the transparency the borrower view deliberately hides.
 
 - **Officer Identity** — a single seeded loan officer (**Curtis Dean**, "Loan Officer", NMLS #) lives in the `officers` collection, served by `GET /officers/current`. Shown as an `OfficerIdentityCard` (avatar + name + title + NMLS) atop the Agent Rail, and their `officer_id` is sent on every HITL decision.
 - **Application Queue** — real-time via WebSocket + Change Stream, filterable and sortable, amber accent on review-needed apps.
 - **Application Detail** — borrower info, risk assessment, credit reports, documents. Includes **Pipeline Explorer** (7-stage aggregation viz) and **Document Search** (Atlas Vector Search).
-- **Pipeline Step Tracker** — the executing-phase centerpiece: one consolidated, expandable **3-stage tracker** (Origination / Underwriting / Decision Review). Each stage is a collapsible box — collapsed shows a state pill + elapsed time; expanded shows the real sub-steps + live metrics (risk score, GDS/TDS, credit score) — with the active stage auto-expanded. The full **Workflow Canvas** (Canvas 2D engine, parallel `doc_verifier`/`credit_puller` nodes, comet trails, HITL barrier drama) is demoted behind a **"View diagram"** button that opens it in a LeafyGreen Modal. (Replaces the earlier always-on inline canvas, `StageProgressBar`, and `LiveUnderwritingResults` overlay.)
+- **Action-First Center Column** — the executing phase leads with the decision the officer must make: while the pipeline is still running the **Pipeline Step Tracker** stays primary; once a decision is pending (HITL) or made (approved/declined), the **HITL Review** or **Decision Summary** becomes the top hero and the pipeline tracker collapses beneath it behind a **"Pipeline progress"** toggle. Larger typography in the middle section for review-focused legibility.
+- **Pipeline Step Tracker** — one consolidated, expandable **3-stage tracker** (Origination / Underwriting / Decision Review). Each stage is a collapsible box — collapsed shows a state pill + elapsed time; expanded shows the real sub-steps + live metrics (risk score, GDS/TDS, credit score) — with the active stage auto-expanded. The full **Workflow Canvas** (Canvas 2D engine, parallel `doc_verifier`/`credit_puller` nodes, comet trails, HITL barrier drama) is demoted behind a **"View diagram"** button that opens it in a LeafyGreen Modal. (Replaces the earlier always-on inline canvas, `StageProgressBar`, and `LiveUnderwritingResults` overlay.)
 - **Empty-state Architecture Card** — when no application is selected, a 3-column (Origination / Underwriting / Decision) card lists each stage's agents with capability badges.
 - **Agent Activity Log** — SSE feed with color-coded left-borders by action type, noise-action filter, deferred status-gated REST fallback, multi-line markdown-aware reasoning, metric summary strip, HITL gate entry, agent transition dividers, pause/resume.
 - **Policy Explorer** — Atlas Vector Search with relevance bars, search provenance, term highlighting, HITL auto-search.
 - **Portfolio Intelligence** — Payment trends (SVG trend line), severity-tiered EWS cards, events timeline.
 - **Intent Preview** — agent's planned execution steps with dependency connectors and data readiness badges, aligned to the real pipeline (doc verify, credit pull, synthesis, risk score, policy RAG, decision gate).
-- **HITL Review** — risk metrics from LangGraph checkpoint, explicit **Threshold Analysis** panel (price / effective GDS / effective TDS / risk tier vs. policy limits), approve/decline/modify with officer overrides and re-underwriting. GDS/TDS limits centralized in `LoanOfficerDashboard/utils.js` (`GDS_LIMIT`, `TDS_LIMIT`).
+- **HITL Review** — leads with an **AI Recommendation hero** (LLM-generated recommended action badge + one-line reason + confidence + suggested conditions, persisted by the underwriter and surfaced via `/hitl/{id}/context`); "Approve as recommended" carries those suggested conditions. The dense underwriting detail (reasoning, the explicit **Threshold Analysis** panel — price / effective GDS / effective TDS / risk tier vs. policy limits — risk table, activity) collapses behind a toggle. Approve/decline/modify with officer overrides and re-underwriting. GDS/TDS limits centralized in `LoanOfficerDashboard/utils.js` (`GDS_LIMIT`, `TDS_LIMIT`).
 - **Decision Summary** — provenance chain, audit trail, before/after comparison for modified decisions. Non-auto decisions are attributed ("Reviewed by Curtis Dean").
 - **Agent Rail** (320px) — `OfficerIdentityCard` (officer persona) above the branded "AI Agent Layer" header with live pulse and stats, cyan-to-amber border on HITL. Agent events highlight corresponding canvas nodes.
-- **Tech Rail** (340px, collapsible) — Change Stream console (ops/sec, cross-rail correlation), Aggregation Pipeline visualizer, Document Model inspector.
+- **Tech Rail** (340px, **collapsed by default** — the MongoDB internals are opt-in, with the choice persisted to `localStorage`; the collapsed strip offers a single expand toggle) — Change Stream console (ops/sec, cross-rail correlation), Aggregation Pipeline visualizer, Document Model inspector.
 
 ### 3. Demo Flow
 
@@ -355,6 +356,14 @@ Full-featured officer workspace with real-time data flows and human-in-the-loop 
 - **Funding** — disbursement timeline with 4-step document evolution, double-entry accounting table.
 - **Servicing** — portfolio stats grid, top-3 Early Warning System signals, live event feed, 4-step renewal intervention card. Real-time data from `/portfolio/stats`. Focus nodes: `timeSeries`, `changeStream`, `vectorSearch`, `mongoAtlas` (servicingAgent node retired from canvas).
 - **Completion Screen** — full WorkflowCanvas with all nodes completed (green edges, checkmarks), `TechRecap` card with 5 collapsible sections (Performance Stats, Tech Stack, Cross-Lifecycle Intelligence, By the Numbers).
+
+### 4. Renewal Dashboard
+
+Self-contained **Renewal Agent** workflow for existing customers whose term is nearing maturity — independent of the origination pipeline. The agent scans the portfolio, drafts a personalized renewal offer, and auto-renews the loan on e-signature.
+
+- **Renewal Queue** — the Renewal Agent scans for loans maturing within the next 3 months (seeded from the `renewals` collection), listed soonest-first with current rate/payment, maturity date, and days remaining.
+- **Offer Generation** — running the agent computes a new rate (current market rate + retention discount), recomputes the payment on the remaining amortization, and shows the reasoning steps with a Bedrock-generated rationale (deterministic fallback when Bedrock is unavailable). The agent's background work now streams **live** to the foreground via `GET /api/renewals/{id}/offer-stream`: each phase appears as it happens — scan → pull market rate + retention discount → recompute payment → draft rationale (a visible AWS Bedrock "drafting…" wait) → persist — with per-step **tech tags** (MongoDB · renewals, Compute · amortization, AWS Bedrock · Claude, MongoDB · agent_activity) and **latency badges**. The non-streamed `POST /api/renewals/{id}/offer` remains as a fallback.
+- **E-Signature → Auto-Renew** — "Send to borrower & e-sign" records a (simulated) signature and rolls the offered terms onto the loan, pushing maturity out 5 years. **Re-scan** restores renewed seed loans to `due` so the demo is repeatable.
 
 ## Demo Borrower Profiles
 
@@ -452,7 +461,7 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 
 ## API Endpoints
 
-### REST (28 endpoints)
+### REST (31 endpoints)
 
 | Method | Path                                         | Description                                                                             |
 | ------ | -------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -484,8 +493,11 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | GET    | `/api/portfolio/ews`                         | Early Warning System signals from time-series (auto-samples a loan_id if none provided) |
 | GET    | `/api/portfolio/events`                      | Recent events (payments + agent actions)                                                |
 | POST   | `/api/demo/reset`                            | Reset demo state (requires `X-Demo-Reset: confirm` header)                              |
+| GET    | `/api/renewals`                              | Renewal Agent scan — loans maturing within 3 months (restores renewed seed loans)      |
+| POST   | `/api/renewals/{id}/offer`                   | Run the Renewal Agent — compute new terms + draft the renewal agreement                 |
+| POST   | `/api/renewals/{id}/sign`                    | Record e-signature and auto-renew the loan onto the new terms                           |
 
-### SSE (4 endpoints)
+### SSE (5 endpoints)
 
 | Path                                  | Description                                                                                                            |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -493,6 +505,7 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | GET `/api/applications/{id}/status`   | Stream status changes (Change Stream)                                                                                  |
 | GET `/api/agent/{id}/run-stream`      | Combined run + stream (LangGraph astream_events) — used by officer dashboard for workflow progression + HITL detection |
 | GET `/api/agent/{id}/stream`          | Activity-only stream with backlog (last 50 events) — used for reconnection after HITL resume                           |
+| GET `/api/renewals/{id}/offer-stream` | Live Renewal Agent offer generation — one `step` event per phase (tech tag + per-step latency), then `done` with the full offer |
 
 ### WebSocket (1 endpoint)
 
@@ -500,7 +513,7 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | ------------------------- | -------------------------------------------------------------------------------------- |
 | WS `/api/applications/ws` | Real-time application queue (Change Stream, 15s heartbeat, 60s dead-client detection)  |
 
-## MongoDB Collections (12 + 3 infra)
+## MongoDB Collections (13 + 3 infra)
 
 | Collection              | Type            | Purpose                           | Key Feature                                                                    |
 | ----------------------- | --------------- | --------------------------------- | ------------------------------------------------------------------------------ |
@@ -514,6 +527,7 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | `hitl_audit`            | Standard        | Officer decision audit log        | Immutable — no update/delete operations, indexed by officer_id                 |
 | `officers`              | Standard        | Loan officer identity             | Seeded singleton (Curtis Dean) — the reviewing officer, served by `/officers/current` |
 | `pipeline_locks`        | Standard        | Distributed concurrency locks     | TTL-based (600s expiry) to prevent concurrent pipeline execution               |
+| `renewals`              | Standard        | Loans nearing maturity            | Powers the standalone Renewal Agent (scan → offer → e-sign → auto-renew)        |
 | `payments`              | **Time Series** | Payment history                   | $setWindowFields rolling 90-day analysis                                       |
 | `agent_activity`        | **Time Series** | Agent action log                  | Real-time SSE streaming via Change Stream                                      |
 | `checkpoints`           | LangGraph       | Graph state snapshots             | MongoDBSaver interrupt/resume                                                  |

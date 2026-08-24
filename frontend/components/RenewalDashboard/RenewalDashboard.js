@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { palette } from "@leafygreen-ui/palette";
 import { spacing } from "@leafygreen-ui/tokens";
 import Icon from "@leafygreen-ui/icon";
-import { apiGet, apiPost } from "../../lib/api";
+import { apiGet, apiPost, apiSSE } from "../../lib/api";
 
 const fmtCurrency = (n) =>
   typeof n === "number" ? `$${Math.round(n).toLocaleString("en-CA")}` : "—";
@@ -85,7 +85,7 @@ export default function RenewalDashboard({ active = true }) {
   const [selectedId, setSelectedId] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [signing, setSigning] = useState(false);
-  const [docOpen, setDocOpen] = useState(false);
+  const [agentSteps, setAgentSteps] = useState([]);
 
   const fetchRenewals = useCallback(async () => {
     setLoading(true);
@@ -104,16 +104,59 @@ export default function RenewalDashboard({ active = true }) {
 
   const selected = renewals.find((r) => r.renewal_id === selectedId) || null;
 
+  // Clear the live reasoning trail when switching loans (falls back to the
+  // persisted offer.steps for a loan whose offer was generated earlier).
+  useEffect(() => {
+    setAgentSteps([]);
+  }, [selectedId]);
+
   const patchSelected = (updated) => {
     setRenewals((prev) => prev.map((r) => (r.renewal_id === updated.renewal_id ? updated : r)));
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = () => {
     if (!selected) return;
+    const rid = selected.renewal_id;
     setGenerating(true);
-    const res = await apiPost(`/renewals/${selected.renewal_id}/offer`, {});
-    if (res) patchSelected(res);
-    setGenerating(false);
+    setAgentSteps([]);
+
+    let settled = false;
+    const finish = (renewal) => {
+      if (settled) return;
+      settled = true;
+      if (renewal) patchSelected(renewal);
+      setGenerating(false);
+    };
+
+    // Stream the agent's work live so each phase (and the Bedrock "drafting"
+    // wait) surfaces in the foreground as it happens. If the stream can't be
+    // established (e.g. a proxy buffers SSE), fall back to the non-streamed POST.
+    apiSSE(
+      `/renewals/${rid}/offer-stream`,
+      (ev) => {
+        if (ev.type === "step") {
+          setAgentSteps((prev) => {
+            const others = prev.filter((s) => s.key !== ev.key);
+            return [
+              ...others,
+              { key: ev.key, n: ev.n, title: ev.title, tech: ev.tech, elapsed_ms: ev.elapsed_ms, pending: !!ev.pending },
+            ].sort((a, b) => a.n - b.n);
+          });
+        } else if (ev.type === "done") {
+          finish(ev.renewal);
+        } else if (ev.type === "error") {
+          finish(null);
+        }
+      },
+      {
+        autoCloseOn: ["done", "error"],
+        onError: async () => {
+          if (settled) return;
+          const res = await apiPost(`/renewals/${rid}/offer`, {});
+          finish(res || null);
+        },
+      },
+    );
   };
 
   const handleSign = async () => {
@@ -243,50 +286,26 @@ export default function RenewalDashboard({ active = true }) {
                 renewal={selected}
                 generating={generating}
                 signing={signing}
+                agentSteps={agentSteps}
                 onGenerate={handleGenerate}
                 onSign={handleSign}
-                onViewDoc={() => setDocOpen(true)}
               />
             )}
           </div>
         </div>
       </div>
-
-      {docOpen && selected && (
-        <div
-          onClick={() => setDocOpen(false)}
-          style={{
-            position: "fixed", inset: 0, zIndex: 910, background: "rgba(0,0,0,0.6)",
-            display: "flex", alignItems: "center", justifyContent: "center", padding: spacing[4],
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "var(--bg-base)", borderRadius: "var(--radius-lg)", width: "min(820px, 92vw)", height: "88vh", display: "flex", flexDirection: "column", overflow: "hidden", border: "1px solid var(--border-base)" }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: spacing[3], borderBottom: "1px solid var(--border-dim)" }}>
-              <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 14, color: "var(--text-primary)" }}>
-                Renewal Agreement — {selected.borrower_name}
-              </span>
-              <button type="button" onClick={() => setDocOpen(false)} style={{ cursor: "pointer", background: "none", border: "none", color: "var(--text-secondary)", display: "flex" }}>
-                <Icon glyph="X" size={18} />
-              </button>
-            </div>
-            <iframe
-              title="Renewal document"
-              src={`/api/backend/renewals/${selected.renewal_id}/document.pdf`}
-              style={{ flex: 1, border: "none", width: "100%", background: "#fff" }}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-function RenewalDetail({ renewal, generating, signing, onGenerate, onSign, onViewDoc }) {
+function RenewalDetail({ renewal, generating, signing, agentSteps = [], onGenerate, onSign }) {
   const offer = renewal.offer;
   const isRenewed = renewal.status === "renewed";
+
+  // Prefer the live stream this session; otherwise fall back to the persisted
+  // reasoning trail on the offer (both share the {n,title,tech,elapsed_ms} shape).
+  const persistedSteps = Array.isArray(offer?.steps) ? offer.steps : [];
+  const reasoningSteps = agentSteps.length > 0 ? agentSteps : persistedSteps;
 
   const panel = {
     background: "var(--bg-surface)",
@@ -314,7 +333,7 @@ function RenewalDetail({ renewal, generating, signing, onGenerate, onSign, onVie
       {renewal.status === "due" && (
         <div style={panel}>
           <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: spacing[3], lineHeight: 1.5 }}>
-            This loan&apos;s 5-year term is maturing. Run the Renewal Agent to generate a personalized offer and draft the renewal agreement.
+            This loan&apos;s 5-year term is maturing. Run the Renewal Agent to generate a personalized offer — its steps stream in live below.
           </div>
           <button
             type="button"
@@ -334,17 +353,34 @@ function RenewalDetail({ renewal, generating, signing, onGenerate, onSign, onVie
         </div>
       )}
 
-      {/* Agent reasoning */}
-      {(offer?.steps?.length > 0) && (
+      {/* Agent reasoning — live stream (with tech tags + latency), or persisted trail */}
+      {reasoningSteps.length > 0 && (
         <div style={panel}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--agent-cyan)", marginBottom: spacing[2], display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--agent-cyan)", marginBottom: spacing[3], display: "flex", alignItems: "center", gap: 6 }}>
             <Icon glyph="Sparkle" size={13} fill="var(--agent-cyan)" /> Renewal Agent reasoning
+            {generating && <span style={{ color: "var(--text-dim)", fontWeight: 500, textTransform: "none", letterSpacing: 0 }}>· working…</span>}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: spacing[2] }}>
-            {offer.steps.map((step, i) => (
-              <div key={i} style={{ display: "flex", gap: spacing[2], fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-                <span style={{ color: "var(--agent-cyan)", fontWeight: 700 }}>{i + 1}.</span>
-                <span>{step}</span>
+            {reasoningSteps.map((step) => (
+              <div key={step.key ?? step.n} style={{ display: "flex", gap: spacing[2], fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.45, opacity: step.pending ? 0.85 : 1 }}>
+                <span style={{ color: "var(--agent-cyan)", fontWeight: 700, minWidth: 14 }}>{step.n}.</span>
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span>{step.title}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: spacing[1], flexWrap: "wrap" }}>
+                    {step.tech && (
+                      <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 7px", borderRadius: "var(--radius-xl)", background: "var(--agent-cyan-dim)", color: "var(--agent-cyan)", fontFamily: "var(--font-mono, monospace)" }}>
+                        {step.tech}
+                      </span>
+                    )}
+                    {step.pending ? (
+                      <span style={{ fontSize: 10, color: "var(--agent-cyan)", fontWeight: 600 }}>drafting…</span>
+                    ) : (
+                      typeof step.elapsed_ms === "number" && (
+                        <span style={{ fontSize: 10, color: "var(--text-dim)", fontFamily: "var(--font-mono, monospace)" }}>{step.elapsed_ms} ms</span>
+                      )
+                    )}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -379,19 +415,6 @@ function RenewalDetail({ renewal, generating, signing, onGenerate, onSign, onVie
           </div>
 
           <div style={{ display: "flex", gap: spacing[2], marginTop: spacing[3], flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={onViewDoc}
-              style={{
-                display: "flex", alignItems: "center", gap: spacing[1],
-                padding: `${spacing[2]}px ${spacing[3]}px`, borderRadius: "var(--radius-sm)",
-                border: "1px solid var(--border-base)", background: "var(--bg-base)",
-                color: "var(--text-primary)", fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 12,
-                cursor: "pointer",
-              }}
-            >
-              <Icon glyph="File" size={14} /> View renewal document
-            </button>
             {!isRenewed && (
               <button
                 type="button"
