@@ -11,6 +11,7 @@ can be added later without changing callers.
 import logging
 
 from db.mdb import get_db as _get_db
+from db.collections_config import NAMES
 from services.application_service import serialize_doc
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,7 @@ DEFAULT_OFFICER = {
 def seed_officer(db=None) -> None:
     """Idempotently upsert the singleton loan officer."""
     db = db or _get_db()
-    db["officers"].update_one(
+    db[NAMES.officers].update_one(
         {"officer_id": OFFICER_ID},
         {"$set": DEFAULT_OFFICER},
         upsert=True,
@@ -44,7 +45,7 @@ def get_current_officer() -> dict:
     """Return the current reviewing officer (serialized), seeded or fallback."""
     try:
         db = _get_db()
-        doc = db["officers"].find_one({"officer_id": OFFICER_ID}, {"_id": 0})
+        doc = db[NAMES.officers].find_one({"officer_id": OFFICER_ID}, {"_id": 0})
         if doc:
             return serialize_doc(doc)
     except Exception as e:  # pragma: no cover - defensive; fall back to constant
@@ -61,7 +62,7 @@ def get_officer_display(officer_id: str) -> str:
         return "an officer"
     try:
         db = _get_db()
-        doc = db["officers"].find_one({"officer_id": officer_id}, {"_id": 0, "full_name": 1, "title": 1})
+        doc = db[NAMES.officers].find_one({"officer_id": officer_id}, {"_id": 0, "full_name": 1, "title": 1})
         if doc and doc.get("full_name"):
             title = doc.get("title")
             return f"{doc['full_name']} ({title})" if title else doc["full_name"]

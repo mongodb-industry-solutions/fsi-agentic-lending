@@ -15,6 +15,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from db.mdb import get_db
+from db.collections_config import NAMES
 from agents.pipeline.tools import log_agent_activity
 
 logger = logging.getLogger(__name__)
@@ -87,12 +88,12 @@ def _restore_renewed_seeds(db, now: datetime) -> int:
 
     seed_by_id = {s["renewal_id"]: s for s in _RENEWAL_SEEDS}
     restored = 0
-    for r in db["renewals"].find({"status": "renewed", "seed": True}, {"renewal_id": 1}):
+    for r in db[NAMES.renewals].find({"status": "renewed", "seed": True}, {"renewal_id": 1}):
         seed = seed_by_id.get(r["renewal_id"])
         if not seed:
             continue
-        db["renewals"].replace_one({"renewal_id": r["renewal_id"]}, _build_doc(seed, now))
-        db["agent_activity"].delete_many({"application_id": r["renewal_id"], "agent": "renewal_agent"})
+        db[NAMES.renewals].replace_one({"renewal_id": r["renewal_id"]}, _build_doc(seed, now))
+        db[NAMES.agent_activity].delete_many({"application_id": r["renewal_id"], "agent": "renewal_agent"})
         restored += 1
     return restored
 
@@ -109,7 +110,7 @@ def scan_due_renewals() -> dict:
     _restore_renewed_seeds(db, now)
 
     docs = list(
-        db["renewals"]
+        db[NAMES.renewals]
         .find({"maturity_date": {"$lte": horizon}})
         .sort("maturity_date", 1)
     )
@@ -168,7 +169,7 @@ def _draft_rationale(renewal: dict, new_rate: float, new_payment: int) -> str:
 
 def renewal_exists(renewal_id: str) -> bool:
     """Cheap existence check (used by the streaming route to 404 before opening SSE)."""
-    return get_db()["renewals"].count_documents({"renewal_id": renewal_id}, limit=1) > 0
+    return get_db()[NAMES.renewals].count_documents({"renewal_id": renewal_id}, limit=1) > 0
 
 
 def generate_offer_events(renewal_id: str):
@@ -182,7 +183,7 @@ def generate_offer_events(renewal_id: str):
     fully serialized renewal (offer attached).
     """
     db = get_db()
-    renewal = db["renewals"].find_one({"renewal_id": renewal_id})
+    renewal = db[NAMES.renewals].find_one({"renewal_id": renewal_id})
     if not renewal:
         yield {"type": "error", "message": f"Renewal {renewal_id} not found"}
         return
@@ -256,7 +257,7 @@ def generate_offer_events(renewal_id: str):
         "steps": steps,
         "generated_at": now,
     }
-    db["renewals"].update_one(
+    db[NAMES.renewals].update_one(
         {"renewal_id": renewal_id},
         {"$set": {"offer": offer, "status": "offer_sent", "updated_at": now}},
     )
@@ -267,7 +268,7 @@ def generate_offer_events(renewal_id: str):
     yield _done_step("persist", "Saved the offer and wrote the reasoning trail.",
                      "MongoDB · renewals + agent_activity", t)
 
-    updated = db["renewals"].find_one({"renewal_id": renewal_id})
+    updated = db[NAMES.renewals].find_one({"renewal_id": renewal_id})
     yield {"type": "done", "renewal": _serialize(updated)}
 
 
@@ -286,7 +287,7 @@ def generate_offer(renewal_id: str) -> dict | None:
 def sign_and_renew(renewal_id: str, signer_name: str | None = None) -> dict | None:
     """Record the (simulated) e-signature and auto-renew the loan onto new terms."""
     db = get_db()
-    renewal = db["renewals"].find_one({"renewal_id": renewal_id})
+    renewal = db[NAMES.renewals].find_one({"renewal_id": renewal_id})
     if not renewal:
         return None
 
@@ -303,7 +304,7 @@ def sign_and_renew(renewal_id: str, signer_name: str | None = None) -> dict | No
         "method": "e-signature (simulated)",
     }
 
-    db["renewals"].update_one(
+    db[NAMES.renewals].update_one(
         {"renewal_id": renewal_id},
         {"$set": {
             "status": "renewed",
@@ -321,5 +322,5 @@ def sign_and_renew(renewal_id: str, signer_name: str | None = None) -> dict | No
                        f"Borrower e-signed. Loan auto-renewed at "
                        f"{offer['new_rate'] * 100:.2f}% through {new_maturity.date()}.")
 
-    updated = db["renewals"].find_one({"renewal_id": renewal_id})
+    updated = db[NAMES.renewals].find_one({"renewal_id": renewal_id})
     return _serialize(updated)

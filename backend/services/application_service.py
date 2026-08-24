@@ -4,6 +4,7 @@ import os
 from datetime import datetime, timezone
 from bson import ObjectId
 from db.mdb import get_db as _get_db
+from db.collections_config import NAMES
 from models.schemas import ApplicationStatus
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ def create_application(data: dict, profile_id: str = None, demo_session_id: str 
         "application_id": None,
         "created_at": now,
     }
-    primary_id = db["borrowers"].insert_one(primary_borrower).inserted_id
+    primary_id = db[NAMES.borrowers].insert_one(primary_borrower).inserted_id
     borrower_ids = [primary_id]
     borrower_names = [data["primary_name"]]
 
@@ -56,7 +57,7 @@ def create_application(data: dict, profile_id: str = None, demo_session_id: str 
             "application_id": None,
             "created_at": now,
         }
-        co_id = db["borrowers"].insert_one(co_borrower).inserted_id
+        co_id = db[NAMES.borrowers].insert_one(co_borrower).inserted_id
         borrower_ids.append(co_id)
         borrower_names.append(data["co_applicant_name"])
 
@@ -96,10 +97,10 @@ def create_application(data: dict, profile_id: str = None, demo_session_id: str 
     if demo_session_id:
         application["demo_session_id"] = demo_session_id
 
-    db["applications"].insert_one(application)
+    db[NAMES.applications].insert_one(application)
     logger.info(f"Created application {application_id}")
 
-    db["borrowers"].update_many(
+    db[NAMES.borrowers].update_many(
         {"_id": {"$in": borrower_ids}},
         {"$set": {"application_id": application_id}},
     )
@@ -111,7 +112,7 @@ def get_application(application_id: str) -> dict | None:
     """Get full application with related documents and credit reports."""
     db = _get_db()
 
-    app = db["applications"].find_one({"application_id": application_id})
+    app = db[NAMES.applications].find_one({"application_id": application_id})
     if not app:
         return None
     logger.info(f"Fetched application {application_id}")
@@ -119,13 +120,13 @@ def get_application(application_id: str) -> dict | None:
     app = serialize_doc(app)
 
     # Attach documents
-    docs = db["documents"].find({"application_id": application_id})
+    docs = db[NAMES.documents].find({"application_id": application_id})
     app["documents"] = [serialize_doc(d) for d in docs]
 
     # Attach credit reports
     if app.get("borrower_ids"):
         borrower_oids = [ObjectId(bid) for bid in app["borrower_ids"]]
-        reports = db["credit_reports"].find({"borrower_id": {"$in": borrower_oids}})
+        reports = db[NAMES.credit_reports].find({"borrower_id": {"$in": borrower_oids}})
         app["credit_reports"] = [serialize_doc(r) for r in reports]
 
     return app
@@ -134,7 +135,7 @@ def get_application(application_id: str) -> dict | None:
 def list_applications(skip: int = 0, limit: int = 50) -> list[dict]:
     """List all applications (summary view). Excludes seed template apps."""
     db = _get_db()
-    apps = db["applications"].find(
+    apps = db[NAMES.applications].find(
         {"seed_complete": {"$ne": True}},
         {
             "application_id": 1,
@@ -192,14 +193,14 @@ def clone_demo_documents(source_app_id: str, target_app_id: str) -> int:
     to match the target application's borrower names.
     """
     db = _get_db()
-    source_docs = list(db["documents"].find({"application_id": source_app_id}))
+    source_docs = list(db[NAMES.documents].find({"application_id": source_app_id}))
     if not source_docs:
         logger.warning(f"No source documents found for {source_app_id}")
         return 0
 
     # Look up borrower names for name-patching when cloning across profiles
-    source_app = db["applications"].find_one({"application_id": source_app_id}, {"borrower_names": 1})
-    target_app = db["applications"].find_one({"application_id": target_app_id}, {"borrower_names": 1})
+    source_app = db[NAMES.applications].find_one({"application_id": source_app_id}, {"borrower_names": 1})
+    target_app = db[NAMES.applications].find_one({"application_id": target_app_id}, {"borrower_names": 1})
     source_names = source_app.get("borrower_names", []) if source_app else []
     target_names = target_app.get("borrower_names", []) if target_app else []
     needs_patch = source_names and target_names and source_names != target_names
@@ -216,7 +217,7 @@ def clone_demo_documents(source_app_id: str, target_app_id: str) -> int:
             )
         clones.append(clone)
     if clones:
-        db["documents"].insert_many(clones)
+        db[NAMES.documents].insert_many(clones)
     logger.info(f"Cloned {len(clones)} documents from {source_app_id} to {target_app_id}")
     return len(clones)
 
@@ -228,8 +229,8 @@ def clone_demo_credit_reports(source_app_id: str, target_app_id: str) -> int:
     borrower ObjectIds, so we must copy reports and re-link them to the new IDs.
     """
     db = _get_db()
-    source_app = db["applications"].find_one({"application_id": source_app_id}, {"borrower_ids": 1})
-    target_app = db["applications"].find_one({"application_id": target_app_id}, {"borrower_ids": 1})
+    source_app = db[NAMES.applications].find_one({"application_id": source_app_id}, {"borrower_ids": 1})
+    target_app = db[NAMES.applications].find_one({"application_id": target_app_id}, {"borrower_ids": 1})
     if not source_app or not target_app:
         return 0
 
@@ -238,7 +239,7 @@ def clone_demo_credit_reports(source_app_id: str, target_app_id: str) -> int:
     if not source_bids or not target_bids:
         return 0
 
-    source_reports = list(db["credit_reports"].find({"borrower_id": {"$in": source_bids}}))
+    source_reports = list(db[NAMES.credit_reports].find({"borrower_id": {"$in": source_bids}}))
     if not source_reports:
         logger.warning(f"No source credit reports found for {source_app_id}")
         return 0
@@ -261,7 +262,7 @@ def clone_demo_credit_reports(source_app_id: str, target_app_id: str) -> int:
         clones.append(clone)
 
     if clones:
-        db["credit_reports"].insert_many(clones)
+        db[NAMES.credit_reports].insert_many(clones)
     logger.info(f"Cloned {len(clones)} credit reports from {source_app_id} to {target_app_id}")
     return len(clones)
 
@@ -272,10 +273,10 @@ def _reset_application_state(app_id: str) -> None:
     now = datetime.now(timezone.utc)
 
     # Get borrower IDs for credit report cleanup
-    app = db["applications"].find_one({"application_id": app_id}, {"borrower_ids": 1})
+    app = db[NAMES.applications].find_one({"application_id": app_id}, {"borrower_ids": 1})
     borrower_ids = app.get("borrower_ids", []) if app else []
 
-    db["applications"].update_one(
+    db[NAMES.applications].update_one(
         {"application_id": app_id},
         {
             "$set": {
@@ -292,16 +293,16 @@ def _reset_application_state(app_id: str) -> None:
             },
         },
     )
-    db["documents"].delete_many({"application_id": app_id})
+    db[NAMES.documents].delete_many({"application_id": app_id})
     if borrower_ids:
-        db["credit_reports"].delete_many({"borrower_id": {"$in": borrower_ids}})
-    db["conversations"].delete_many({"application_id": app_id})
-    db["interventions"].delete_many({"application_id": app_id})
+        db[NAMES.credit_reports].delete_many({"borrower_id": {"$in": borrower_ids}})
+    db[NAMES.conversations].delete_many({"application_id": app_id})
+    db[NAMES.interventions].delete_many({"application_id": app_id})
     db["checkpoints"].delete_many({"thread_id": app_id})
     db["checkpoint_writes"].delete_many({"thread_id": app_id})
-    db["pipeline_locks"].delete_many({"_id": app_id})
+    db[NAMES.pipeline_locks].delete_many({"_id": app_id})
     try:
-        db["agent_activity"].delete_many({"application_id": app_id})
+        db[NAMES.agent_activity].delete_many({"application_id": app_id})
     except Exception as e:
         logger.warning(f"Could not delete agent_activity for {app_id}: {e}")
     logger.info(f"Reset application state for {app_id}")
@@ -314,7 +315,7 @@ def upsert_demo_application(profile_id: str, demo_session_id: str, data: dict) -
     Otherwise create a new one and clone documents from the seeded profile.
     """
     db = _get_db()
-    existing = db["applications"].find_one({
+    existing = db[NAMES.applications].find_one({
         "profile_id": profile_id,
         "demo_session_id": demo_session_id,
     })
@@ -351,7 +352,7 @@ def reset_all_demo_data() -> dict:
     try:
         from scripts.seed_renewals import seed_renewals
         seed_renewals(reset=True)
-        db["agent_activity"].delete_many({"agent": "renewal_agent"})
+        db[NAMES.agent_activity].delete_many({"agent": "renewal_agent"})
     except Exception as e:
         logger.warning(f"Could not reset renewals: {e}")
 
@@ -359,7 +360,7 @@ def reset_all_demo_data() -> dict:
     # delete so they can't drift out of sync.
     seed_ids = list(SEED_APPLICATION_IDS.values())
     non_seed_filter = {"seed_complete": {"$ne": True}, "application_id": {"$nin": seed_ids}}
-    demo_apps = list(db["applications"].find(
+    demo_apps = list(db[NAMES.applications].find(
         non_seed_filter,
         {"application_id": 1, "borrower_ids": 1},
     ))
@@ -379,24 +380,24 @@ def reset_all_demo_data() -> dict:
         for bid in a.get("borrower_ids", []):
             borrower_ids.append(bid if isinstance(bid, ObjectId) else ObjectId(bid))
 
-    docs_del = db["documents"].delete_many({"application_id": {"$in": app_ids}})
-    convs_del = db["conversations"].delete_many({"application_id": {"$in": app_ids}})
-    intv_del = db["interventions"].delete_many({"application_id": {"$in": app_ids}})
+    docs_del = db[NAMES.documents].delete_many({"application_id": {"$in": app_ids}})
+    convs_del = db[NAMES.conversations].delete_many({"application_id": {"$in": app_ids}})
+    intv_del = db[NAMES.interventions].delete_many({"application_id": {"$in": app_ids}})
     db["checkpoints"].delete_many({"thread_id": {"$in": app_ids}})
     db["checkpoint_writes"].delete_many({"thread_id": {"$in": app_ids}})
-    db["pipeline_locks"].delete_many({"_id": {"$in": app_ids}})
+    db[NAMES.pipeline_locks].delete_many({"_id": {"$in": app_ids}})
     try:
-        db["agent_activity"].delete_many({"application_id": {"$in": app_ids}})
+        db[NAMES.agent_activity].delete_many({"application_id": {"$in": app_ids}})
     except Exception as e:
         logger.warning(f"Could not delete agent_activity: {e}")
     cr_del_count = 0
     br_del_count = 0
     if borrower_ids:
-        cr_del = db["credit_reports"].delete_many({"borrower_id": {"$in": borrower_ids}})
-        br_del = db["borrowers"].delete_many({"_id": {"$in": borrower_ids}})
+        cr_del = db[NAMES.credit_reports].delete_many({"borrower_id": {"$in": borrower_ids}})
+        br_del = db[NAMES.borrowers].delete_many({"_id": {"$in": borrower_ids}})
         cr_del_count = cr_del.deleted_count
         br_del_count = br_del.deleted_count
-    result = db["applications"].delete_many(non_seed_filter)
+    result = db[NAMES.applications].delete_many(non_seed_filter)
     logger.info(f"Reset demo: deleted {result.deleted_count} applications, {docs_del.deleted_count} documents, {convs_del.deleted_count} conversations, {intv_del.deleted_count} interventions")
     return {
         "deleted_applications": result.deleted_count,
@@ -432,7 +433,7 @@ def update_application_status(application_id: str, status: str, detail: str = ""
 
     # Validate transition (warn but don't block for demo flexibility)
     db = _get_db()
-    current = db["applications"].find_one({"application_id": application_id}, {"status": 1})
+    current = db[NAMES.applications].find_one({"application_id": application_id}, {"status": 1})
     current_status = current.get("status") if current else None
     if current_status and current_status != status:
         allowed = _VALID_TRANSITIONS.get(current_status, set())
@@ -444,7 +445,7 @@ def update_application_status(application_id: str, status: str, detail: str = ""
 
     logger.info(f"Updating application {application_id} status to '{status}'")
     now = datetime.now(timezone.utc)
-    result = db["applications"].update_one(
+    result = db[NAMES.applications].update_one(
         {"application_id": application_id},
         {
             "$set": {"status": status, "status_detail": detail, "updated_at": now},

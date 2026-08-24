@@ -5,6 +5,7 @@ Both agent pipeline tools and API routes should import from here.
 """
 import logging
 from db.mdb import get_db as _get_db
+from db.collections_config import NAMES
 from services.embedding_service import embed_query as _embed_query
 
 logger = logging.getLogger(__name__)
@@ -59,7 +60,7 @@ def search_policies(query: str, limit: int = 5, projection: dict | None = None) 
             },
             {"$project": proj},
         ]
-        return list(db["underwriting_policies"].aggregate(pipeline))
+        return list(db[NAMES.underwriting_policies].aggregate(pipeline))
     except Exception as e:
         logger.error(f"Policy vector search failed: {e}")
         return [_SEARCH_UNAVAILABLE_SENTINEL]
@@ -99,4 +100,4 @@ def search_documents(query: str, application_id: str | None = None, limit: int =
         },
     ]
     from services.application_service import serialize_doc
-    return [serialize_doc(r) for r in db["documents"].aggregate(pipeline)]
+    return [serialize_doc(r) for r in db[NAMES.documents].aggregate(pipeline)]

@@ -3,6 +3,7 @@ import logging
 import time as _time
 from datetime import datetime, timezone
 from db.mdb import get_db as _get_db
+from db.collections_config import NAMES
 from services.vector_search import (
     search_policies,
     search_documents,
@@ -14,7 +15,7 @@ from services.vector_search import (
 def get_application_documents(application_id: str) -> list[dict]:
     """Fetch all documents for an application."""
     db = _get_db()
-    docs = list(db["documents"].find(
+    docs = list(db[NAMES.documents].find(
         {"application_id": application_id},
         {"_id": 0, "doc_type": 1, "filename": 1, "extracted_text": 1, "structured_data": 1, "status": 1}
     ))
@@ -24,12 +25,12 @@ def get_application_documents(application_id: str) -> list[dict]:
 def get_credit_reports(application_id: str) -> list[dict]:
     """Fetch credit reports for all borrowers on an application."""
     db = _get_db()
-    app = db["applications"].find_one({"application_id": application_id})
+    app = db[NAMES.applications].find_one({"application_id": application_id})
     if not app:
         return []
 
     borrower_ids = app.get("borrower_ids", [])
-    reports = list(db["credit_reports"].find(
+    reports = list(db[NAMES.credit_reports].find(
         {"borrower_id": {"$in": borrower_ids}},
         {"_id": 0, "borrower_name": 1, "score": 1, "accounts": 1, "total_outstanding": 1, "payment_history": 1, "inquiries": 1, "derogatory_items": 1, "borrower_id": 1}
     ))
@@ -45,7 +46,7 @@ def get_credit_reports(application_id: str) -> list[dict]:
 def get_application_summary(application_id: str) -> dict:
     """Get application summary including income, property, loan details."""
     db = _get_db()
-    app = db["applications"].find_one(
+    app = db[NAMES.applications].find_one(
         {"application_id": application_id},
         {"_id": 0, "application_id": 1, "borrower_names": 1, "loan_amount": 1, "purchase_price": 1, "down_payment": 1, "product": 1, "property": 1, "income_summary": 1, "status": 1}
     )
@@ -69,7 +70,7 @@ def log_agent_activity(application_id: str, agent: str, action: str, detail: str
         }
         if run_id:
             entry["run_id"] = run_id
-        db["agent_activity"].insert_one(entry)
+        db[NAMES.agent_activity].insert_one(entry)
     except Exception as e:
         _logger.warning(f"Failed to log agent activity for {application_id}: {e}")
 
@@ -152,7 +153,7 @@ def run_risk_aggregation(application_id: str) -> dict:
         }},
     ]
 
-    results = list(db["applications"].aggregate(pipeline))
+    results = list(db[NAMES.applications].aggregate(pipeline))
     elapsed_ms = round((_time.monotonic() - start) * 1000)
 
     log_agent_activity(
@@ -170,7 +171,7 @@ def update_application_status(application_id: str, status: str, detail: str = ""
     """Update application status."""
     db = _get_db()
     now = datetime.now(timezone.utc)
-    db["applications"].update_one(
+    db[NAMES.applications].update_one(
         {"application_id": application_id},
         {
             "$set": {"status": status, "updated_at": now},

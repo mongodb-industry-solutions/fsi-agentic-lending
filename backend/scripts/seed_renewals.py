@@ -14,6 +14,7 @@ Usage:
 import sys
 from datetime import datetime, timedelta, timezone
 
+from db.collections_config import NAMES
 from db.mdb import get_db
 
 
@@ -102,7 +103,7 @@ def _build_doc(seed: dict, now: datetime) -> dict:
 def seed_renewals(reset: bool = False) -> dict:
     """Seed the renewals collection. Idempotent unless reset=True (wipe + re-seed)."""
     db = get_db()
-    coll = db["renewals"]
+    coll = db[NAMES.renewals]
 
     if reset:
         coll.delete_many({"seed": True})

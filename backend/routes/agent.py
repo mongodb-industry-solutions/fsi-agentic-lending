@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from db.mdb import get_db as _get_db
+from db.collections_config import NAMES
 from services import application_service
 from services.pipeline_lock import acquire_pipeline_lock as _acquire_pipeline_lock, release_pipeline_lock as _release_pipeline_lock
 from agents.graph import get_graph
@@ -53,7 +54,7 @@ async def run_agent(app_id: str, autonomy_level: str = "bounded"):
 
     # Clean stale pending interventions from previous runs
     db = _get_db()
-    db["interventions"].update_many(
+    db[NAMES.interventions].update_many(
         {"application_id": app_id, "status": "pending"},
         {"$set": {"status": "superseded"}},
     )
@@ -123,7 +124,7 @@ async def stream_agent(app_id: str, after: str | None = None):
         db = _get_db()
 
         # Check application exists
-        app = await asyncio.to_thread(db["applications"].find_one, {"application_id": app_id})
+        app = await asyncio.to_thread(db[NAMES.applications].find_one, {"application_id": app_id})
         if not app:
             yield f"data: {json.dumps({'type': 'error', 'message': 'Application not found'})}\n\n"
             return
@@ -144,7 +145,7 @@ async def stream_agent(app_id: str, after: str | None = None):
             # as newer docs when using $gte).
             backlog = await asyncio.to_thread(
                 lambda: list(
-                    db["agent_activity"]
+                    db[NAMES.agent_activity]
                     .find({"application_id": app_id})
                     .sort("timestamp", -1)
                     .limit(50)
@@ -181,7 +182,7 @@ async def stream_agent(app_id: str, after: str | None = None):
         stream = None
         try:
             stream = await asyncio.to_thread(
-                lambda: db["agent_activity"].watch(pipeline, full_document="updateLookup")
+                lambda: db[NAMES.agent_activity].watch(pipeline, full_document="updateLookup")
             )
         except Exception:
             stream = None  # Fall through to polling
@@ -206,7 +207,7 @@ async def stream_agent(app_id: str, after: str | None = None):
                             break
                         try:
                             stream = await asyncio.to_thread(
-                                lambda: db["agent_activity"].watch(
+                                lambda: db[NAMES.agent_activity].watch(
                                     pipeline,
                                     full_document="updateLookup",
                                     resume_after=last_resume_token,
@@ -278,7 +279,7 @@ async def stream_agent(app_id: str, after: str | None = None):
                         query["timestamp"] = {"$gte": last_timestamp}
                     new_docs = await asyncio.to_thread(
                         lambda q=query: list(
-                            db["agent_activity"]
+                            db[NAMES.agent_activity]
                             .find(q)
                             .sort("timestamp", 1)
                             .limit(100)
@@ -366,7 +367,7 @@ async def run_and_stream(app_id: str, autonomy_level: str = "bounded"):
 
     # Clean stale pending interventions from previous runs
     db = _get_db()
-    db["interventions"].update_many(
+    db[NAMES.interventions].update_many(
         {"application_id": app_id, "status": "pending"},
         {"$set": {"status": "superseded"}},
     )
@@ -484,7 +485,7 @@ async def re_evaluate(app_id: str, autonomy_level: str = "bounded"):
 
     db = _get_db()
     pending_blocking = await asyncio.to_thread(
-        db["interventions"].count_documents,
+        db[NAMES.interventions].count_documents,
         {"application_id": app_id, "internal_context.severity": "blocking", "status": {"$in": ["pending", "active"]}},
     )
     if pending_blocking > 0:

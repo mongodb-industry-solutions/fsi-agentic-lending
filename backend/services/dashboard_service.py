@@ -5,6 +5,7 @@ dashboard — portfolio stats, payment trends, early warning signals, and
 recent event feeds. They have no dependency on the agent layer.
 """
 from db.mdb import get_db as _get_db
+from db.collections_config import NAMES
 
 
 def get_portfolio_stats() -> dict:
@@ -32,7 +33,7 @@ def get_portfolio_stats() -> dict:
             ]},
         }},
     ]
-    result = list(db["payments"].aggregate(pipeline))
+    result = list(db[NAMES.payments].aggregate(pipeline))
     if not result:
         return {"active_loan_count": 0, "total_outstanding": 0, "delinquency_rate": 0}
     r = result[0]
@@ -85,14 +86,14 @@ def get_payment_trends(loan_id: str = None) -> list:
         }},
     ])
 
-    return list(db["payments"].aggregate(pipeline))
+    return list(db[NAMES.payments].aggregate(pipeline))
 
 
 def get_ews_signals(loan_id: str) -> list:
     """Analyze payment patterns to generate Early Warning System signals."""
     db = _get_db()
 
-    recent = list(db["payments"].find(
+    recent = list(db[NAMES.payments].find(
         {"loan_id": loan_id},
         {"_id": 0, "days_late": 1, "amount": 1, "outstanding_balance": 1, "timestamp": 1}
     ).sort("timestamp", -1).limit(12))
@@ -165,7 +166,7 @@ def get_recent_events(limit: int = 20) -> list:
     db = _get_db()
     events = []
 
-    activities = list(db["agent_activity"].find(
+    activities = list(db[NAMES.agent_activity].find(
         {}, {"_id": 0, "agent": 1, "action": 1, "detail": 1, "timestamp": 1}
     ).sort("timestamp", -1).limit(limit // 2))
 
@@ -179,7 +180,7 @@ def get_recent_events(limit: int = 20) -> list:
             "color": "var(--agent-cyan)",
         })
 
-    payments = list(db["payments"].find(
+    payments = list(db[NAMES.payments].find(
         {}, {"_id": 0, "loan_id": 1, "amount": 1, "status": 1, "days_late": 1, "timestamp": 1}
     ).sort("timestamp", -1).limit(limit // 2))
 
