@@ -216,7 +216,7 @@ End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangG
 | Database      | MongoDB Atlas (12 collections + 3 LangGraph infra)                                                                   |
 | AI/ML         | AWS Bedrock Claude Haiku 4 (tool_use for structured output), Voyage AI multimodal embeddings (voyage-multimodal-3.5) |
 | Observability | LangSmith (@traceable on all LLM calls + agent nodes)                                                                |
-| Deployment    | Docker Compose (local), Kanopy/K8s (staging/prod)                                                                    |
+| Deployment    | Docker Compose (local), K8s (staging/prod)                                                                    |
 
 ## Agent Features
 
@@ -447,10 +447,7 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | `DECLINE_RISK_SCORE`       | No       | Auto-decline threshold (default: `80`)           |
 | `ESCALATE_PURCHASE_PRICE`  | No       | HITL escalation threshold (default: `500000`)    |
 | `ESCALATE_GDS`             | No       | GDS ratio escalation threshold (default: `0.36`) |
-| `ESCALATE_TDS`             | No       | TDS ratio escalation threshold (default: `0.41`) |
-| `LANGCHAIN_TRACING_V2`     | No       | Enable LangSmith tracing (`true`)                |
-| `LANGCHAIN_API_KEY`        | No       | LangSmith API key                                |
-| `LANGCHAIN_PROJECT`        | No       | LangSmith project name                           |
+| `ESCALATE_TDS`             | No       | TDS ratio escalation threshold (default: `0.41`) |                        |
 
 ### Frontend (`frontend/.env`)
 
