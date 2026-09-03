@@ -2,8 +2,8 @@
 import logging
 from datetime import datetime, timezone
 
-from db.mdb import get_db
-from db.collections_config import NAMES
+from db.mdb import coll
+from db.storage_mapping import storage_filter, to_storage
 
 logger = logging.getLogger(__name__)
 
@@ -24,13 +24,11 @@ def create_intervention(
     Returns True on success, False on failure (logged, never raised).
     """
     try:
-        db = get_db()
-
-        existing = db[NAMES.interventions].find_one({
+        existing = coll("interventions").find_one(storage_filter("interventions", {
             "application_id": application_id,
             "type": intervention_type,
             "status": "pending",
-        })
+        }))
         if existing:
             logger.info(f"Skipping duplicate {intervention_type} intervention for {application_id}")
             return True
@@ -43,7 +41,7 @@ def create_intervention(
         if internal_extras:
             internal_context.update(internal_extras)
 
-        db[NAMES.interventions].insert_one({
+        coll("interventions").insert_one(to_storage("interventions", {
             "application_id": application_id,
             "type": intervention_type,
             "status": "pending",
@@ -56,7 +54,7 @@ def create_intervention(
             "resolution": None,
             "created_at": datetime.now(timezone.utc),
             "resolved_at": None,
-        })
+        }))
         return True
     except Exception as e:
         logger.warning(f"Failed to create {intervention_type} intervention for {application_id}: {e}")

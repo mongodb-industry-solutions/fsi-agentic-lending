@@ -3,15 +3,16 @@ import threading
 from pymongo import MongoClient
 from dotenv import load_dotenv
 
+from db.collections_config import resolve
+
 load_dotenv()
 
 
 class MongoDBConnector:
     """Singleton MongoDB connection manager.
 
-    Provides access to the database via `get_db()`. The raw CRUD helpers
-    that were previously defined here are unused — all code accesses
-    collections directly via ``get_db()["collection_name"]``.
+    Provides access to collections via `coll()`. The raw CRUD helpers that
+    were previously defined here are unused.
     """
 
     def __init__(self, uri=None, database_name=None, appname=None):
@@ -21,6 +22,13 @@ class MongoDBConnector:
         self.client = MongoClient(
             self.uri,
             appname=self.appname,
+            # tz_aware: without it pymongo returns naive datetimes, FastAPI
+            # serializes them with no offset ("2026-06-01T00:00:00"), and JS
+            # `new Date()` reads an offset-less date-time as LOCAL time — so a
+            # UTC-midnight payment renders as the previous day west of UTC.
+            # Only surfaced once loanRepayments.timestamp became a real Date;
+            # while it was an ISO string the "Z" was carried in the data.
+            tz_aware=True,
             retryWrites=True,
             retryReads=True,
             serverSelectionTimeoutMS=5000,
@@ -46,6 +54,16 @@ def get_db():
             if _instance is None:
                 _instance = MongoDBConnector()
     return _instance.db
+
+
+def coll(logical: str):
+    """Return the pymongo Collection for a logical name.
+
+    Resolves the physical collection name (``COLL_<LOGICAL>``) in the single
+    database named by ``DATABASE_NAME``. Prefer this over ``get_db()[name]``:
+    it is the only place that knows a collection's physical name.
+    """
+    return get_db()[resolve(logical)]
 
 
 def close_db():

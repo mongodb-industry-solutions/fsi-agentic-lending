@@ -14,8 +14,8 @@ Usage:
 import sys
 from datetime import datetime, timedelta, timezone
 
-from db.collections_config import NAMES
-from db.mdb import get_db
+from db.mdb import coll
+from db.storage_mapping import storage_filter, to_storage
 
 
 # ── Seed definitions ─────────────────────────────────────────────────────────
@@ -102,25 +102,26 @@ def _build_doc(seed: dict, now: datetime) -> dict:
 
 def seed_renewals(reset: bool = False) -> dict:
     """Seed the renewals collection. Idempotent unless reset=True (wipe + re-seed)."""
-    db = get_db()
-    coll = db[NAMES.renewals]
+    renewals = coll("renewals")
 
     if reset:
-        coll.delete_many({"seed": True})
+        renewals.delete_many({"seed": True})
 
     now = datetime.now(timezone.utc)
     inserted = 0
     for seed in _RENEWAL_SEEDS:
-        if not reset and coll.find_one({"renewal_id": seed["renewal_id"]}):
+        if not reset and renewals.find_one(
+            storage_filter("renewals", {"renewal_id": seed["renewal_id"]})
+        ):
             continue
-        coll.replace_one(
-            {"renewal_id": seed["renewal_id"]},
-            _build_doc(seed, now),
+        renewals.replace_one(
+            storage_filter("renewals", {"renewal_id": seed["renewal_id"]}),
+            to_storage("renewals", _build_doc(seed, now)),
             upsert=True,
         )
         inserted += 1
 
-    return {"seeded": inserted, "total": coll.count_documents({"seed": True})}
+    return {"seeded": inserted, "total": renewals.count_documents({"seed": True})}
 
 
 if __name__ == "__main__":

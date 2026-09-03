@@ -7,8 +7,8 @@ decision_reasoning are NEVER returned to the borrower-facing agent.
 import logging
 from datetime import datetime, timezone
 
-from db.mdb import get_db
-from db.collections_config import NAMES
+from db.mdb import coll, get_db
+from db.storage_mapping import from_storage, storage_filter, storage_key, to_storage
 from services.vector_search import search_policies, BORROWER_SAFE_PROJECTION
 
 logger = logging.getLogger(__name__)
@@ -87,10 +87,14 @@ def get_document_requirements(loan_type: str = "standard") -> list[dict]:
 def get_application_documents_summary(application_id: str) -> list[dict]:
     """Return lightweight document inventory for an application (no embeddings or full text)."""
     db = get_db()
-    return list(db[NAMES.documents].find(
-        {"application_id": application_id},
-        {"_id": 0, "doc_type": 1, "status": 1, "filename": 1},
-    ))
+    doc_k = lambda f: storage_key("documents", f)  # noqa: E731
+    return [
+        from_storage("documents", d)
+        for d in coll("documents").find(
+            storage_filter("documents", {"application_id": application_id}),
+            {"_id": 0, doc_k("doc_type"): 1, "status": 1, doc_k("filename"): 1},
+        )
+    ]
 
 
 def get_application_status_filtered(application_id: str) -> dict:
@@ -99,42 +103,42 @@ def get_application_status_filtered(application_id: str) -> dict:
     Uses a projection allowlist. NEVER projects: risk_score, officer_notes,
     internal_flags, decision_reasoning, risk_tier.
     """
-    db = get_db()
-    app = db[NAMES.applications].find_one(
-        {"application_id": application_id},
-        {
-            "_id": 0,
-            "application_id": 1,
-            "status": 1,
-            "status_history": 1,
-            "loan_amount": 1,
-            "purchase_price": 1,
-            "product": 1,
-            "borrower_names": 1,
-            "created_at": 1,
-            "updated_at": 1,
-        },
-    )
-    if not app:
+    # Allowlist projection. Since the BIAN migration every internal field the
+    # borrower must not see — risk_score, risk_tier, decision_reasoning — lives
+    # under the single `assessment` sub-record, so it is excluded by omission.
+    # NEVER add `assessment` here: one key would leak all ten at once.
+    k = lambda f: storage_key("applications", f)  # noqa: E731
+    projection = {
+        "_id": 0,
+        "statusSource": 1,
+        **{k(f): 1 for f in (
+            "application_id", "status_history", "loan_amount",
+            "purchase_price", "product", "borrower_names",
+            "created_at", "updated_at",
+        )},
+    }
+    stored = coll("applications").find_one({k("application_id"): application_id}, projection)
+    if not stored:
         return {"error": "Application not found"}
-    return app
+    from services.application_service import read_loan
+    return read_loan(stored)
 
 
 def get_pending_interventions(application_id: str) -> list[dict]:
     """Get pending interventions -- borrower_context only, never internal_context."""
     db = get_db()
     interventions = list(
-        db[NAMES.interventions].find(
-            {
+        coll("interventions").find(
+            storage_filter("interventions", {
                 "application_id": application_id,
                 "status": {"$in": ["pending", "active"]},
-            },
+            }),
             {
                 "_id": 1,
                 "type": 1,
                 "status": 1,
-                "borrower_context": 1,
-                "created_at": 1,
+                storage_key("interventions", "borrower_context"): 1,
+                storage_key("interventions", "created_at"): 1,
             },
         )
     )
@@ -211,14 +215,13 @@ def submit_intervention_response(
     except (InvalidId, TypeError):
         return {"error": "Invalid intervention ID format"}
 
-    db = get_db()
     query = {"_id": oid, "status": {"$in": ["pending", "active"]}}
     if application_id:
-        query["application_id"] = application_id
-    result = db[NAMES.interventions].update_one(
+        query[storage_key("interventions", "application_id")] = application_id
+    result = coll("interventions").update_one(
         query,
         {
-            "$set": {
+            "$set": to_storage("interventions", {
                 "status": "resolved",
                 "resolved_at": datetime.now(timezone.utc),
                 "resolution": {
@@ -226,7 +229,7 @@ def submit_intervention_response(
                     "documents_uploaded": documents_uploaded or [],
                     "resolved_by": "application_agent",
                 },
-            }
+            })
         },
     )
     if result.modified_count == 0:

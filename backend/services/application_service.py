@@ -1,13 +1,30 @@
-"""Application service — handles CRUD and aggregation for loan applications."""
+"""Application service — handles CRUD and aggregation for loan applications.
+
+Runtime shape is this demo's native snake_case. Documents are translated to the
+BIAN `loans` / `creditReports` shape at the storage boundary (`db.storage_mapping`).
+Query filters, projections and sort keys go through `_k()` / `_cr_k()`, which the
+document mappers cannot reach.
+"""
 import logging
 import os
 from datetime import datetime, timezone
 from bson import ObjectId
-from db.mdb import get_db as _get_db
-from db.collections_config import NAMES
-from models.schemas import ApplicationStatus
+from db.mdb import coll, get_db as _get_db
+from db.storage_mapping import from_storage, storage_filter, storage_key, to_storage
+from models.schemas import ApplicationStatus, to_bian_status
+from services import customer_service
 
 logger = logging.getLogger(__name__)
+
+
+def _k(runtime_path: str) -> str:
+    """Runtime field path -> storage path on the `loans` collection."""
+    return storage_key("applications", runtime_path)
+
+
+def _cr_k(runtime_path: str) -> str:
+    """Runtime field path -> storage path on the `creditReports` collection."""
+    return storage_key("credit_reports", runtime_path)
 
 
 def serialize_doc(doc):
@@ -17,6 +34,8 @@ def serialize_doc(doc):
     doc = dict(doc)
     if "_id" in doc:
         doc["_id"] = str(doc["_id"])
+    # borrower_ids / borrower_id are customerId strings since the BIAN
+    # migration; str() is retained only to absorb any legacy ObjectId.
     if "borrower_ids" in doc:
         doc["borrower_ids"] = [str(bid) for bid in doc["borrower_ids"]]
     if "borrower_id" in doc:
@@ -37,29 +56,66 @@ def serialize_doc(doc):
     return doc
 
 
+def history_entry(status: str, timestamp, detail: str = "") -> dict:
+    """A `maintenance.statusHistory[]` entry in STORAGE shape.
+
+    Mirrors the top-level pair: `status` is the BIAN projection, `statusSource`
+    the operational value. Written through one helper so entries created at
+    runtime match the ones produced by the data migration — otherwise the
+    officer timeline renders a mix of `UNDER_REVIEW` and `underwriting`.
+    """
+    return {
+        "status": to_bian_status(status),
+        "statusSource": status,
+        "timestamp": timestamp,
+        "detail": detail,
+    }
+
+
+def read_loan(stored: dict) -> dict:
+    """Storage `loans` document -> runtime application shape.
+
+    `statusSource` carries the operational 12-state value and wins over the
+    BIAN `status` projection, which collapses four in-flight states onto
+    UNDER_REVIEW. Documents written before the migration have no statusSource,
+    so the stored `status` is the fallback.
+
+    Applies to history entries too: without this the officer timeline renders
+    UNDER_REVIEW four times in a row instead of processing -> underwriting ->
+    review -> action_required.
+    """
+    app = from_storage("applications", stored)
+    source = app.pop("status_source", None)
+    if source:
+        app["status"] = source
+    history = app.get("status_history")
+    if isinstance(history, list):
+        app["status_history"] = [_unwrap_status(e) for e in history]
+    return app
+
+
+def _unwrap_status(entry):
+    if not isinstance(entry, dict):
+        return entry
+    entry = dict(entry)
+    source = entry.pop("status_source", None)
+    if source:
+        entry["status"] = source
+    return entry
+
+
 def create_application(data: dict, profile_id: str = None, demo_session_id: str = None) -> dict:
-    """Create a new loan application with borrower records."""
-    db = _get_db()
+    """Create a new loan application, registering its borrowers as customers."""
     now = datetime.now(timezone.utc)
 
-    primary_borrower = {
-        "full_name": data["primary_name"],
-        "application_id": None,
-        "created_at": now,
-    }
-    primary_id = db[NAMES.borrowers].insert_one(primary_borrower).inserted_id
-    borrower_ids = [primary_id]
+    # Borrowers are customers in the shared party directory, keyed by a
+    # deterministic customerId. A repeat applicant resolves to the existing
+    # entry rather than creating a second identity (playbook rule: never
+    # duplicate identities).
     borrower_names = [data["primary_name"]]
-
     if data.get("co_applicant_name"):
-        co_borrower = {
-            "full_name": data["co_applicant_name"],
-            "application_id": None,
-            "created_at": now,
-        }
-        co_id = db[NAMES.borrowers].insert_one(co_borrower).inserted_id
-        borrower_ids.append(co_id)
         borrower_names.append(data["co_applicant_name"])
+    borrower_ids = [customer_service.upsert_customer(n, now) for n in borrower_names]
 
     oid = ObjectId()
     application_id = f"APP-{str(oid)[-8:].upper()}"
@@ -97,57 +153,63 @@ def create_application(data: dict, profile_id: str = None, demo_session_id: str 
     if demo_session_id:
         application["demo_session_id"] = demo_session_id
 
-    db[NAMES.applications].insert_one(application)
+    stored = to_storage("applications", application)
+    stored["status"] = to_bian_status(application["status"])
+    stored["statusSource"] = application["status"]
+    stored["maintenance"] = {
+        "statusHistory": [history_entry("submitted", now, "Application received")],
+        "updatedAt": now,
+    }
+    coll("applications").insert_one(stored)
     logger.info(f"Created application {application_id}")
 
-    db[NAMES.borrowers].update_many(
-        {"_id": {"$in": borrower_ids}},
-        {"$set": {"application_id": application_id}},
-    )
-
+    # The reverse link the old `borrowers.application_id` provided now lives
+    # only on the loan (`borrowerIds[]`); customers are shared across
+    # applications and must not carry one application's id.
     return serialize_doc(application)
 
 
 def get_application(application_id: str) -> dict | None:
     """Get full application with related documents and credit reports."""
-    db = _get_db()
-
-    app = db[NAMES.applications].find_one({"application_id": application_id})
-    if not app:
+    stored = coll("applications").find_one({_k("application_id"): application_id})
+    if not stored:
         return None
     logger.info(f"Fetched application {application_id}")
 
-    app = serialize_doc(app)
+    app = serialize_doc(from_storage("applications", stored))
 
     # Attach documents
-    docs = db[NAMES.documents].find({"application_id": application_id})
+    docs = coll("documents").find(storage_filter("documents", {"application_id": application_id}))
     app["documents"] = [serialize_doc(d) for d in docs]
 
-    # Attach credit reports
+    # Attach credit reports — borrower ids are customerId strings.
     if app.get("borrower_ids"):
-        borrower_oids = [ObjectId(bid) for bid in app["borrower_ids"]]
-        reports = db[NAMES.credit_reports].find({"borrower_id": {"$in": borrower_oids}})
-        app["credit_reports"] = [serialize_doc(r) for r in reports]
+        reports = coll("credit_reports").find(
+            {_cr_k("borrower_id"): {"$in": app["borrower_ids"]}}
+        )
+        app["credit_reports"] = [
+            serialize_doc(from_storage("credit_reports", r)) for r in reports
+        ]
 
     return app
 
 
 def list_applications(skip: int = 0, limit: int = 50) -> list[dict]:
     """List all applications (summary view). Excludes seed template apps."""
-    db = _get_db()
-    apps = db[NAMES.applications].find(
-        {"seed_complete": {"$ne": True}},
-        {
-            "application_id": 1,
-            "borrower_names": 1,
-            "loan_amount": 1,
-            "product": 1,
-            "status": 1,
-            "created_at": 1,
-            "updated_at": 1,
-        },
-    ).sort("created_at", -1).skip(skip).limit(limit)
-    result = [serialize_doc(a) for a in apps]
+    projection = {
+        _k(f): 1
+        for f in (
+            "application_id", "borrower_names", "loan_amount",
+            "product", "created_at", "updated_at",
+        )
+    }
+    # statusSource, not status: the operational 12-state value is what the
+    # officer list renders.
+    projection["statusSource"] = 1
+    apps = coll("applications").find(
+        {_k("seed_complete"): {"$ne": True}}, projection
+    ).sort(_k("created_at"), -1).skip(skip).limit(limit)
+    result = [serialize_doc(read_loan(a)) for a in apps]
     logger.info(f"Listed {len(result)} applications")
     return result
 
@@ -192,17 +254,18 @@ def clone_demo_documents(source_app_id: str, target_app_id: str) -> int:
     When cloning across profiles, patches ``structured_data.persons[].full_name``
     to match the target application's borrower names.
     """
-    db = _get_db()
-    source_docs = list(db[NAMES.documents].find({"application_id": source_app_id}))
+    source_docs = [from_storage("documents", d) for d in coll("documents")
+        .find(storage_filter("documents", {"application_id": source_app_id}))]
     if not source_docs:
         logger.warning(f"No source documents found for {source_app_id}")
         return 0
 
     # Look up borrower names for name-patching when cloning across profiles
-    source_app = db[NAMES.applications].find_one({"application_id": source_app_id}, {"borrower_names": 1})
-    target_app = db[NAMES.applications].find_one({"application_id": target_app_id}, {"borrower_names": 1})
-    source_names = source_app.get("borrower_names", []) if source_app else []
-    target_names = target_app.get("borrower_names", []) if target_app else []
+    loans = coll("applications")
+    source_app = loans.find_one({_k("application_id"): source_app_id}, {_k("borrower_names"): 1})
+    target_app = loans.find_one({_k("application_id"): target_app_id}, {_k("borrower_names"): 1})
+    source_names = source_app.get(_k("borrower_names"), []) if source_app else []
+    target_names = target_app.get(_k("borrower_names"), []) if target_app else []
     needs_patch = source_names and target_names and source_names != target_names
 
     now = datetime.now(timezone.utc)
@@ -217,7 +280,7 @@ def clone_demo_documents(source_app_id: str, target_app_id: str) -> int:
             )
         clones.append(clone)
     if clones:
-        db[NAMES.documents].insert_many(clones)
+        coll("documents").insert_many([to_storage("documents", c) for c in clones])
     logger.info(f"Cloned {len(clones)} documents from {source_app_id} to {target_app_id}")
     return len(clones)
 
@@ -225,21 +288,25 @@ def clone_demo_documents(source_app_id: str, target_app_id: str) -> int:
 def clone_demo_credit_reports(source_app_id: str, target_app_id: str) -> int:
     """Clone credit reports from a seeded application's borrowers to a new application's borrowers.
 
-    Seeded credit reports are linked by borrower_id. New demo apps create fresh
-    borrower ObjectIds, so we must copy reports and re-link them to the new IDs.
+    Reports are linked by borrower_id (a customerId string). A demo application
+    for a different profile has different borrowers, so reports are copied and
+    re-linked positionally.
     """
-    db = _get_db()
-    source_app = db[NAMES.applications].find_one({"application_id": source_app_id}, {"borrower_ids": 1})
-    target_app = db[NAMES.applications].find_one({"application_id": target_app_id}, {"borrower_ids": 1})
+    loans = coll("applications")
+    source_app = loans.find_one({_k("application_id"): source_app_id}, {_k("borrower_ids"): 1})
+    target_app = loans.find_one({_k("application_id"): target_app_id}, {_k("borrower_ids"): 1})
     if not source_app or not target_app:
         return 0
 
-    source_bids = source_app.get("borrower_ids", [])
-    target_bids = target_app.get("borrower_ids", [])
+    source_bids = from_storage("applications", source_app).get("borrower_ids", [])
+    target_bids = from_storage("applications", target_app).get("borrower_ids", [])
     if not source_bids or not target_bids:
         return 0
 
-    source_reports = list(db[NAMES.credit_reports].find({"borrower_id": {"$in": source_bids}}))
+    source_reports = [
+        from_storage("credit_reports", r)
+        for r in coll("credit_reports").find({_cr_k("borrower_id"): {"$in": source_bids}})
+    ]
     if not source_reports:
         logger.warning(f"No source credit reports found for {source_app_id}")
         return 0
@@ -259,12 +326,46 @@ def clone_demo_credit_reports(source_app_id: str, target_app_id: str) -> int:
         clone = {k: v for k, v in report.items() if k != "_id"}
         clone["borrower_id"] = new_bid
         clone["cloned_at"] = now
-        clones.append(clone)
+        # creditReports.id is required and unique per report; the source has no
+        # identifier, so derive one that stays stable for this clone.
+        clone["id"] = f"CR-{new_bid}-{ObjectId()}"
+        clones.append(to_storage("credit_reports", clone))
 
     if clones:
-        db[NAMES.credit_reports].insert_many(clones)
+        coll("credit_reports").insert_many(clones)
     logger.info(f"Cloned {len(clones)} credit reports from {source_app_id} to {target_app_id}")
     return len(clones)
+
+
+def _cloned_reports_for(borrower_ids: list[str]) -> dict:
+    """Filter matching only the credit reports THIS APP cloned, for these borrowers.
+
+    Two reasons a plain `{borrowerId: {$in: ...}}` delete is wrong:
+
+    1. `creditReports` is keyed by borrower, not by application, and
+       `customer_service.mint_customer_id` is deterministic on the borrower's
+       name — so a demo application for "Jane Doe" resolves to the SAME
+       customerId as the seeded one. Deleting by borrower alone wipes the
+       seeded application's migrated reports, and nothing re-seeds them: every
+       later clone logs "No source credit reports found" and the pipeline
+       underwrites with no credit data. Confirmed empirically — a reload
+       reported `inserted=29`, meaning all 29 migrated reports were absent.
+
+    2. `clonedAtSource` is NOT the provenance marker it looks like. 21 of the
+       29 migrated reports already carry `cloned_at` in the source dump
+       (`repos/lending/dump/fsi-agentic-lending.credit_reports.json`) because
+       they were clones in the pre-migration demo. Keying off it would delete
+       21 migrated reports.
+
+    The id shape is the honest discriminator. `clone_demo_credit_reports`
+    derives `CR-{customerId}-{ObjectId()}`; `transform.py` emits `CR-{oid}`.
+    Only a post-migration clone has `CR-CUST-` at the front, and the anchored
+    prefix lets the unique `id` index serve the match.
+    """
+    return {
+        _cr_k("borrower_id"): {"$in": borrower_ids},
+        _cr_k("id"): {"$regex": "^CR-CUST-"},
+    }
 
 
 def _reset_application_state(app_id: str) -> None:
@@ -273,36 +374,37 @@ def _reset_application_state(app_id: str) -> None:
     now = datetime.now(timezone.utc)
 
     # Get borrower IDs for credit report cleanup
-    app = db[NAMES.applications].find_one({"application_id": app_id}, {"borrower_ids": 1})
-    borrower_ids = app.get("borrower_ids", []) if app else []
+    stored = coll("applications").find_one(
+        {_k("application_id"): app_id}, {_k("borrower_ids"): 1}
+    )
+    borrower_ids = from_storage("applications", stored).get("borrower_ids", []) if stored else []
 
-    db[NAMES.applications].update_one(
-        {"application_id": app_id},
+    coll("applications").update_one(
+        {_k("application_id"): app_id},
         {
             "$set": {
-                "status": "submitted",
-                "updated_at": now,
-                "status_history": [
-                    {"status": "submitted", "timestamp": now, "detail": "Application received (demo reset)"}
+                "status": to_bian_status("submitted"),
+                "statusSource": "submitted",
+                _k("updated_at"): now,
+                _k("status_history"): [
+                    history_entry("submitted", now, "Application received (demo reset)")
                 ],
+                "maintenance.updatedAt": now,
             },
-            "$unset": {
-                "risk_score": "", "risk_tier": "", "gds_ratio": "", "tds_ratio": "",
-                "stress_gds": "", "stress_tds": "", "primary_credit_score": "",
-                "ltv": "", "decision_reasoning": "", "status_detail": "",
-            },
+            # The whole assessment sub-record goes, rather than ten field paths.
+            "$unset": {"assessment": ""},
         },
     )
-    db[NAMES.documents].delete_many({"application_id": app_id})
+    coll("documents").delete_many(storage_filter("documents", {"application_id": app_id}))
     if borrower_ids:
-        db[NAMES.credit_reports].delete_many({"borrower_id": {"$in": borrower_ids}})
-    db[NAMES.conversations].delete_many({"application_id": app_id})
-    db[NAMES.interventions].delete_many({"application_id": app_id})
+        coll("credit_reports").delete_many(_cloned_reports_for(borrower_ids))
+    coll("conversations").delete_many(storage_filter("conversations", {"application_id": app_id}))
+    coll("interventions").delete_many(storage_filter("interventions", {"application_id": app_id}))
     db["checkpoints"].delete_many({"thread_id": app_id})
     db["checkpoint_writes"].delete_many({"thread_id": app_id})
-    db[NAMES.pipeline_locks].delete_many({"_id": app_id})
+    coll("pipeline_locks").delete_many({"_id": app_id})
     try:
-        db[NAMES.agent_activity].delete_many({"application_id": app_id})
+        coll("agent_activity").delete_many(storage_filter("agent_activity", {"application_id": app_id}))
     except Exception as e:
         logger.warning(f"Could not delete agent_activity for {app_id}: {e}")
     logger.info(f"Reset application state for {app_id}")
@@ -314,13 +416,13 @@ def upsert_demo_application(profile_id: str, demo_session_id: str, data: dict) -
     If an application already exists for (profile_id, demo_session_id), reset it.
     Otherwise create a new one and clone documents from the seeded profile.
     """
-    db = _get_db()
-    existing = db[NAMES.applications].find_one({
+    existing = coll("applications").find_one(storage_filter("applications", {
         "profile_id": profile_id,
         "demo_session_id": demo_session_id,
-    })
+    }))
 
     if existing:
+        existing = from_storage("applications", existing)
         app_id = existing["application_id"]
         profile = existing.get("profile_id")
         _reset_application_state(app_id)
@@ -352,18 +454,22 @@ def reset_all_demo_data() -> dict:
     try:
         from scripts.seed_renewals import seed_renewals
         seed_renewals(reset=True)
-        db[NAMES.agent_activity].delete_many({"agent": "renewal_agent"})
+        coll("agent_activity").delete_many({"agent": "renewal_agent"})
     except Exception as e:
         logger.warning(f"Could not reset renewals: {e}")
 
     # Single predicate for "non-seed app" — used for both the find and the final
     # delete so they can't drift out of sync.
     seed_ids = list(SEED_APPLICATION_IDS.values())
-    non_seed_filter = {"seed_complete": {"$ne": True}, "application_id": {"$nin": seed_ids}}
-    demo_apps = list(db[NAMES.applications].find(
-        non_seed_filter,
-        {"application_id": 1, "borrower_ids": 1},
-    ))
+    non_seed_filter = storage_filter("applications", {
+        "seed_complete": {"$ne": True}, "application_id": {"$nin": seed_ids},
+    })
+    demo_apps = [
+        from_storage("applications", a)
+        for a in coll("applications").find(
+            non_seed_filter, {_k("application_id"): 1, _k("borrower_ids"): 1}
+        )
+    ]
     if not demo_apps:
         return {
             "deleted_applications": 0,
@@ -375,29 +481,29 @@ def reset_all_demo_data() -> dict:
         }
 
     app_ids = [a["application_id"] for a in demo_apps]
-    borrower_ids = []
-    for a in demo_apps:
-        for bid in a.get("borrower_ids", []):
-            borrower_ids.append(bid if isinstance(bid, ObjectId) else ObjectId(bid))
+    borrower_ids = [bid for a in demo_apps for bid in a.get("borrower_ids", [])]
 
-    docs_del = db[NAMES.documents].delete_many({"application_id": {"$in": app_ids}})
-    convs_del = db[NAMES.conversations].delete_many({"application_id": {"$in": app_ids}})
-    intv_del = db[NAMES.interventions].delete_many({"application_id": {"$in": app_ids}})
+    docs_del = coll("documents").delete_many(storage_filter("documents", {"application_id": {"$in": app_ids}}))
+    convs_del = coll("conversations").delete_many(storage_filter("conversations", {"application_id": {"$in": app_ids}}))
+    intv_del = coll("interventions").delete_many(storage_filter("interventions", {"application_id": {"$in": app_ids}}))
     db["checkpoints"].delete_many({"thread_id": {"$in": app_ids}})
     db["checkpoint_writes"].delete_many({"thread_id": {"$in": app_ids}})
-    db[NAMES.pipeline_locks].delete_many({"_id": {"$in": app_ids}})
+    coll("pipeline_locks").delete_many({"_id": {"$in": app_ids}})
     try:
-        db[NAMES.agent_activity].delete_many({"application_id": {"$in": app_ids}})
+        coll("agent_activity").delete_many(storage_filter("agent_activity", {"application_id": {"$in": app_ids}}))
     except Exception as e:
         logger.warning(f"Could not delete agent_activity: {e}")
     cr_del_count = 0
-    br_del_count = 0
     if borrower_ids:
-        cr_del = db[NAMES.credit_reports].delete_many({"borrower_id": {"$in": borrower_ids}})
-        br_del = db[NAMES.borrowers].delete_many({"_id": {"$in": borrower_ids}})
+        cr_del = coll("credit_reports").delete_many(
+            _cloned_reports_for(borrower_ids)
+        )
         cr_del_count = cr_del.deleted_count
-        br_del_count = br_del.deleted_count
-    result = db[NAMES.applications].delete_many(non_seed_filter)
+    # Customers are NOT deleted. They live in the shared party directory and may
+    # be referenced by other Leafy Bank services; a lending demo reset has no
+    # business removing a bank customer.
+    br_del_count = 0
+    result = coll("applications").delete_many(non_seed_filter)
     logger.info(f"Reset demo: deleted {result.deleted_count} applications, {docs_del.deleted_count} documents, {convs_del.deleted_count} conversations, {intv_del.deleted_count} interventions")
     return {
         "deleted_applications": result.deleted_count,
@@ -432,9 +538,10 @@ def update_application_status(application_id: str, status: str, detail: str = ""
         raise ValueError(f"Invalid application status: {status}")
 
     # Validate transition (warn but don't block for demo flexibility)
-    db = _get_db()
-    current = db[NAMES.applications].find_one({"application_id": application_id}, {"status": 1})
-    current_status = current.get("status") if current else None
+    current = coll("applications").find_one(
+        {_k("application_id"): application_id}, {"statusSource": 1, "status": 1}
+    )
+    current_status = (current.get("statusSource") or current.get("status")) if current else None
     if current_status and current_status != status:
         allowed = _VALID_TRANSITIONS.get(current_status, set())
         if status not in allowed:
@@ -445,13 +552,21 @@ def update_application_status(application_id: str, status: str, detail: str = ""
 
     logger.info(f"Updating application {application_id} status to '{status}'")
     now = datetime.now(timezone.utc)
-    result = db[NAMES.applications].update_one(
-        {"application_id": application_id},
+    result = coll("applications").update_one(
+        {_k("application_id"): application_id},
         {
-            "$set": {"status": status, "status_detail": detail, "updated_at": now},
+            # Both fields move together: statusSource is the operational value
+            # every read path uses, status is the BIAN projection.
+            "$set": {
+                "status": to_bian_status(status),
+                "statusSource": status,
+                _k("status_detail"): detail,
+                _k("updated_at"): now,
+                "maintenance.updatedAt": now,
+            },
             "$push": {
-                "status_history": {
-                    "$each": [{"status": status, "timestamp": now, "detail": detail}],
+                _k("status_history"): {
+                    "$each": [history_entry(status, now, detail)],
                     "$slice": -50,
                 }
             },

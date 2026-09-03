@@ -10,7 +10,24 @@ from fastapi.responses import StreamingResponse
 from models.schemas import ApplicationCreateRequest
 from services import application_service
 from db.mdb import get_db
-from db.collections_config import NAMES
+from db.mdb import coll
+from db.storage_mapping import from_storage, storage_filter, storage_key
+from services.application_service import read_loan
+
+
+def _k(runtime_path: str) -> str:
+    """Runtime field path -> storage path on the `loans` collection."""
+    return storage_key("applications", runtime_path)
+
+
+def _a(runtime_path: str) -> str:
+    """Runtime field path -> storage path on `lendingAgentActivity`."""
+    return storage_key("agent_activity", runtime_path)
+
+
+def _read_app(stored):
+    """None-safe read_loan, for the snapshot-then-stream paths."""
+    return read_loan(stored) if stored else None
 
 logger = logging.getLogger(__name__)
 
@@ -120,11 +137,10 @@ async def portfolio_ews(loan_id: str = None):
     """Early Warning System signals from payment time-series analysis."""
     from services.dashboard_service import get_ews_signals
     if not loan_id:
-        db = get_db()
-        sample = db[NAMES.payments].find_one({}, {"loan_id": 1})
+        sample = coll("payments").find_one({}, {storage_key("payments", "loan_id"): 1})
         if not sample:
             return []
-        loan_id = sample["loan_id"]
+        loan_id = from_storage("payments", sample)["loan_id"]
     result = await asyncio.to_thread(get_ews_signals, loan_id)
     return result
 
@@ -177,7 +193,7 @@ async def stream_activity(app_id: str):
         db = get_db()
         yield f"data: {json.dumps({'type': 'connected', 'application_id': app_id})}\n\n"
 
-        pipeline = [{"$match": {"fullDocument.application_id": app_id}}]
+        pipeline = [{"$match": {f"fullDocument.{_a('application_id')}": app_id}}]
         stream = None
         last_resume_token = None
         resume_retries = 0
@@ -190,16 +206,16 @@ async def stream_activity(app_id: str):
         # Initial open; if the cluster can't serve change streams, degrade to polling
         try:
             stream = await asyncio.to_thread(
-                lambda: db[NAMES.agent_activity].watch(pipeline, full_document="updateLookup")
+                lambda: coll("agent_activity").watch(pipeline, full_document="updateLookup")
             )
         except Exception:
             use_polling = True
             # Seed polling high-water mark so we don't replay history every reconnect
             latest = await asyncio.to_thread(
                 lambda: list(
-                    db[NAMES.agent_activity]
-                    .find({"application_id": app_id})
-                    .sort("timestamp", -1)
+                    coll("agent_activity")
+                    .find(storage_filter("agent_activity", {"application_id": app_id}))
+                    .sort(_a("timestamp"), -1)
                     .limit(1)
                 )
             )
@@ -214,12 +230,12 @@ async def stream_activity(app_id: str):
         try:
             while True:
                 if use_polling:
-                    query = {"application_id": app_id}
+                    query = storage_filter("agent_activity", {"application_id": app_id})
                     if last_poll_ts is not None:
-                        query["timestamp"] = {"$gte": last_poll_ts}
+                        query[_a("timestamp")] = {"$gte": last_poll_ts}
                     new_docs = await asyncio.to_thread(
                         lambda q=query: list(
-                            db[NAMES.agent_activity].find(q).sort("timestamp", 1).limit(100)
+                            coll("agent_activity").find(q).sort(_a("timestamp"), 1).limit(100)
                         )
                     )
                     for doc in new_docs:
@@ -263,9 +279,9 @@ async def stream_activity(app_id: str):
                         # Seed polling HWM so we don't replay history
                         latest = await asyncio.to_thread(
                             lambda: list(
-                                db[NAMES.agent_activity]
-                                .find({"application_id": app_id})
-                                .sort("timestamp", -1)
+                                coll("agent_activity")
+                                .find(storage_filter("agent_activity", {"application_id": app_id}))
+                                .sort(_a("timestamp"), -1)
                                 .limit(1)
                             )
                         )
@@ -276,7 +292,7 @@ async def stream_activity(app_id: str):
                         continue
                     try:
                         stream = await asyncio.to_thread(
-                            lambda: db[NAMES.agent_activity].watch(
+                            lambda: coll("agent_activity").watch(
                                 pipeline,
                                 full_document="updateLookup",
                                 resume_after=last_resume_token,
@@ -313,7 +329,7 @@ async def stream_activity(app_id: str):
                 if change:
                     resume_retries = 0
                     last_resume_token = change.get("_id")
-                    doc = change.get("fullDocument", {})
+                    doc = from_storage("agent_activity", change.get("fullDocument")) or {}
                     event = {
                         "type": "activity",
                         # Borrower never sees backend agent identity/actions —
@@ -378,15 +394,16 @@ async def stream_status(app_id: str):
 
         # Snapshot-on-connect: send current status first
         app = await asyncio.to_thread(
-            db[NAMES.applications].find_one, {"application_id": app_id}
+            coll("applications").find_one, {_k("application_id"): app_id}
         )
+        app = _read_app(app)
         if app:
             yield f"data: {json.dumps({'type': 'status', 'status': app.get('status', 'unknown'), 'status_detail': app.get('status_detail', '')})}\n\n"
 
         pipeline = [
             {
                 "$match": {
-                    "fullDocument.application_id": app_id,
+                    f"fullDocument.{_k('application_id')}": app_id,
                     "operationType": {"$in": ["update", "replace"]},
                 }
             }
@@ -402,7 +419,7 @@ async def stream_status(app_id: str):
 
         try:
             stream = await asyncio.to_thread(
-                lambda: db[NAMES.applications].watch(pipeline, full_document="updateLookup")
+                lambda: coll("applications").watch(pipeline, full_document="updateLookup")
             )
         except Exception:
             use_polling = True
@@ -410,9 +427,9 @@ async def stream_status(app_id: str):
         try:
             while True:
                 if use_polling:
-                    current = await asyncio.to_thread(
-                        db[NAMES.applications].find_one, {"application_id": app_id}
-                    )
+                    current = _read_app(await asyncio.to_thread(
+                        coll("applications").find_one, {_k("application_id"): app_id}
+                    ))
                     if current:
                         cur_status = current.get("status")
                         cur_updated = current.get("updated_at")
@@ -444,7 +461,7 @@ async def stream_status(app_id: str):
                         continue
                     try:
                         stream = await asyncio.to_thread(
-                            lambda: db[NAMES.applications].watch(
+                            lambda: coll("applications").watch(
                                 pipeline,
                                 full_document="updateLookup",
                                 resume_after=last_resume_token,
@@ -481,13 +498,21 @@ async def stream_status(app_id: str):
                 if change:
                     resume_retries = 0
                     last_resume_token = change.get("_id")
-                    doc = change.get("fullDocument", {})
+                    # A change stream hands back a raw STORAGE document, so it
+                    # has to cross the boundary like any other read. Without
+                    # _read_app: `status` is the BIAN projection (four in-flight
+                    # states collapse onto UNDER_REVIEW, so the UI sticks on
+                    # "in review"), and `status_detail` / `updated_at` are
+                    # stored as `assessment.statusDetail` / `updatedAt` and so
+                    # always read empty.
+                    doc = _read_app(change.get("fullDocument")) or {}
+                    updated_at = doc.get("updated_at", "")
                     event = {
                         "type": "status",
                         "status": doc.get("status", ""),
                         "status_detail": doc.get("status_detail", ""),
-                        "updated_at": doc.get("updated_at", "").isoformat()
-                        if hasattr(doc.get("updated_at", ""), "isoformat")
+                        "updated_at": updated_at.isoformat()
+                        if hasattr(updated_at, "isoformat")
                         else "",
                     }
                     yield f"data: {json.dumps(event)}\n\n"
@@ -535,20 +560,23 @@ async def get_timeline_context(app_id: str):
     # Borrower-safe intervention data
     interventions = await asyncio.to_thread(
         lambda: list(
-            db[NAMES.interventions]
+            coll("interventions")
             .find(
-                {"application_id": app_id},
-                {"_id": 0, "type": 1, "status": 1, "borrower_context": 1, "created_at": 1, "resolved_at": 1},
+                storage_filter("interventions", {"application_id": app_id}),
+                {"_id": 0, "type": 1, "status": 1,
+                 storage_key("interventions", "borrower_context"): 1,
+                 storage_key("interventions", "created_at"): 1,
+                 storage_key("interventions", "resolved_at"): 1},
             )
-            .sort("created_at", 1)
+            .sort(storage_key("interventions", "created_at"), 1)
         )
     )
 
     # Activity summary counts
     activity_counts = await asyncio.to_thread(
         lambda: list(
-            db[NAMES.agent_activity].aggregate([
-                {"$match": {"application_id": app_id}},
+            coll("agent_activity").aggregate([
+                {"$match": storage_filter("agent_activity", {"application_id": app_id})},
                 {"$group": {
                     "_id": None,
                     "total": {"$sum": 1},
@@ -739,7 +767,7 @@ async def applications_ws(websocket: WebSocket):
             # Initial open; degrade to polling if change streams are unavailable
             try:
                 stream = await asyncio.to_thread(
-                    lambda: db[NAMES.applications].watch(pipeline, full_document="updateLookup")
+                    lambda: coll("applications").watch(pipeline, full_document="updateLookup")
                 )
             except Exception:
                 stream = None
@@ -757,7 +785,7 @@ async def applications_ws(websocket: WebSocket):
                         break
                     try:
                         stream = await asyncio.to_thread(
-                            lambda: db[NAMES.applications].watch(
+                            lambda: coll("applications").watch(
                                 pipeline,
                                 full_document="updateLookup",
                                 resume_after=last_resume_token,
@@ -794,7 +822,7 @@ async def applications_ws(websocket: WebSocket):
                 if change:
                     resume_retries = 0
                     last_resume_token = change.get("_id")
-                    doc = change.get("fullDocument")
+                    doc = _read_app(change.get("fullDocument"))
                     if doc and not doc.get("seed_complete"):
                         serialized = application_service.serialize_doc(doc)
                         await enqueue({

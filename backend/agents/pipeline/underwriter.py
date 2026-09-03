@@ -17,6 +17,8 @@ from agents.llm import get_llm
 from agents.helpers.interventions import create_intervention
 from db.mdb import get_db as _get_db
 from db.collections_config import NAMES
+from db.mdb import coll
+from db.storage_mapping import storage_key, to_storage
 
 logger = logging.getLogger(__name__)
 
@@ -425,9 +427,9 @@ Risk Tier: {risk_tier}
         _persist["recommendation_reason"] = structured_analysis.get("recommendation_reason")
         _persist["recommendation_confidence"] = structured_analysis.get("confidence")
         _persist["recommended_conditions"] = structured_analysis.get("recommended_conditions", [])
-    _get_db()[NAMES.applications].update_one(
-        {"application_id": app_id},
-        {"$set": _persist},
+    coll("applications").update_one(
+        {storage_key("applications", "application_id"): app_id},
+        {"$set": to_storage("applications", _persist)},
     )
 
     if decision == "escalate":

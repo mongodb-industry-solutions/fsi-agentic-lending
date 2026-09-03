@@ -10,8 +10,8 @@ can be added later without changing callers.
 """
 import logging
 
-from db.mdb import get_db as _get_db
-from db.collections_config import NAMES
+from db.mdb import coll
+from db.storage_mapping import from_storage, storage_filter, storage_key, to_storage
 from services.application_service import serialize_doc
 
 logger = logging.getLogger(__name__)
@@ -31,12 +31,11 @@ DEFAULT_OFFICER = {
 }
 
 
-def seed_officer(db=None) -> None:
+def seed_officer() -> None:
     """Idempotently upsert the singleton loan officer."""
-    db = db or _get_db()
-    db[NAMES.officers].update_one(
-        {"officer_id": OFFICER_ID},
-        {"$set": DEFAULT_OFFICER},
+    coll("officers").update_one(
+        storage_filter("officers", {"officer_id": OFFICER_ID}),
+        {"$set": to_storage("officers", DEFAULT_OFFICER)},
         upsert=True,
     )
 
@@ -44,10 +43,11 @@ def seed_officer(db=None) -> None:
 def get_current_officer() -> dict:
     """Return the current reviewing officer (serialized), seeded or fallback."""
     try:
-        db = _get_db()
-        doc = db[NAMES.officers].find_one({"officer_id": OFFICER_ID}, {"_id": 0})
+        doc = coll("officers").find_one(
+            storage_filter("officers", {"officer_id": OFFICER_ID}), {"_id": 0}
+        )
         if doc:
-            return serialize_doc(doc)
+            return serialize_doc(from_storage("officers", doc))
     except Exception as e:  # pragma: no cover - defensive; fall back to constant
         logger.warning(f"Officer lookup failed, using default: {e}")
     return {k: v for k, v in DEFAULT_OFFICER.items() if k != "seed_complete"}
@@ -61,8 +61,11 @@ def get_officer_display(officer_id: str) -> str:
     if not officer_id:
         return "an officer"
     try:
-        db = _get_db()
-        doc = db[NAMES.officers].find_one({"officer_id": officer_id}, {"_id": 0, "full_name": 1, "title": 1})
+        stored = coll("officers").find_one(
+            storage_filter("officers", {"officer_id": officer_id}),
+            {"_id": 0, storage_key("officers", "full_name"): 1, "title": 1},
+        )
+        doc = from_storage("officers", stored) if stored else None
         if doc and doc.get("full_name"):
             title = doc.get("title")
             return f"{doc['full_name']} ({title})" if title else doc["full_name"]

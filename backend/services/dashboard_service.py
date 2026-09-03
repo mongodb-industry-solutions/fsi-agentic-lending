@@ -4,20 +4,29 @@ These are read-only MongoDB aggregation pipelines that power the officer
 dashboard — portfolio stats, payment trends, early warning signals, and
 recent event feeds. They have no dependency on the agent layer.
 """
-from db.mdb import get_db as _get_db
-from db.collections_config import NAMES
+from db.mdb import coll
+from db.storage_mapping import from_storage, storage_key
+
+
+def _p(runtime_path: str) -> str:
+    """Runtime field path -> storage path on `loanRepayments`."""
+    return storage_key("payments", runtime_path)
+
+
+def _a(runtime_path: str) -> str:
+    """Runtime field path -> storage path on `lendingAgentActivity`."""
+    return storage_key("agent_activity", runtime_path)
 
 
 def get_portfolio_stats() -> dict:
     """Aggregation pipeline that groups payments to get active loan count, total outstanding, delinquency rate."""
-    db = _get_db()
     pipeline = [
-        {"$sort": {"timestamp": -1}},
+        {"$sort": {_p("timestamp"): -1}},
         {"$group": {
-            "_id": "$loan_id",
-            "latest_balance": {"$first": "$outstanding_balance"},
+            "_id": "$" + _p("loan_id"),
+            "latest_balance": {"$first": "$" + _p("outstanding_balance")},
             "total_payments": {"$sum": 1},
-            "late_payments": {"$sum": {"$cond": [{"$gt": ["$days_late", 0]}, 1, 0]}},
+            "late_payments": {"$sum": {"$cond": [{"$gt": ["$" + _p("days_late"), 0]}, 1, 0]}},
         }},
         {"$group": {
             "_id": None,
@@ -33,7 +42,7 @@ def get_portfolio_stats() -> dict:
             ]},
         }},
     ]
-    result = list(db[NAMES.payments].aggregate(pipeline))
+    result = list(coll("payments").aggregate(pipeline))
     if not result:
         return {"active_loan_count": 0, "total_outstanding": 0, "delinquency_rate": 0}
     r = result[0]
@@ -43,23 +52,26 @@ def get_portfolio_stats() -> dict:
 
 def get_payment_trends(loan_id: str = None) -> list:
     """Uses $setWindowFields with a rolling 90-day window for average days_late and payment count."""
-    db = _get_db()
-
-    match_stage = {}
-    if loan_id:
-        match_stage = {"$match": {"loan_id": loan_id}}
-
     pipeline = []
-    if match_stage:
-        pipeline.append(match_stage)
+    if loan_id:
+        pipeline.append({"$match": {_p("loan_id"): loan_id}})
+
+    projected = ("loan_id", "payment_number", "amount", "principal", "interest",
+                 "outstanding_balance", "days_late", "status", "timestamp")
+    projection = {runtime: "$" + _p(runtime) for runtime in projected}
+    projection.update({
+        "_id": 0,
+        "rolling_avg_days_late": 1,
+        "rolling_payment_count": 1,
+    })
 
     pipeline.extend([
         {"$setWindowFields": {
-            "partitionBy": "$loan_id",
-            "sortBy": {"timestamp": 1},
+            "partitionBy": "$" + _p("loan_id"),
+            "sortBy": {_p("timestamp"): 1},
             "output": {
                 "rolling_avg_days_late": {
-                    "$avg": "$days_late",
+                    "$avg": "$" + _p("days_late"),
                     "window": {"range": [-90, 0], "unit": "day"},
                 },
                 "rolling_payment_count": {
@@ -68,35 +80,25 @@ def get_payment_trends(loan_id: str = None) -> list:
                 },
             },
         }},
-        {"$sort": {"timestamp": -1}},
+        {"$sort": {_p("timestamp"): -1}},
         {"$limit": 12},
-        {"$project": {
-            "_id": 0,
-            "loan_id": 1,
-            "payment_number": 1,
-            "amount": 1,
-            "principal": 1,
-            "interest": 1,
-            "outstanding_balance": 1,
-            "days_late": 1,
-            "status": 1,
-            "timestamp": 1,
-            "rolling_avg_days_late": 1,
-            "rolling_payment_count": 1,
-        }},
+        {"$project": projection},
     ])
 
-    return list(db[NAMES.payments].aggregate(pipeline))
+    # Keys are already projected back to runtime names; from_storage is applied
+    # for the status value translation (ON_TIME -> on_time).
+    return [from_storage("payments", d) for d in coll("payments").aggregate(pipeline)]
 
 
 def get_ews_signals(loan_id: str) -> list:
     """Analyze payment patterns to generate Early Warning System signals."""
-    db = _get_db()
-
-    recent = list(db[NAMES.payments].find(
-        {"loan_id": loan_id},
-        {"_id": 0, "days_late": 1, "amount": 1, "outstanding_balance": 1, "timestamp": 1}
-    ).sort("timestamp", -1).limit(12))
+    projection = {_p(f): 1 for f in ("days_late", "amount", "outstanding_balance", "timestamp")}
+    projection["_id"] = 0
+    recent = [
+        from_storage("payments", d)
+        for d in coll("payments").find({_p("loan_id"): loan_id}, projection)
+        .sort(_p("timestamp"), -1).limit(12)
+    ]
 
     if not recent:
         return []
@@ -163,12 +165,15 @@ def get_ews_signals(loan_id: str) -> list:
 
 def get_recent_events(limit: int = 20) -> list:
     """Get recent loan events from agent_activity and payments."""
-    db = _get_db()
     events = []
 
-    activities = list(db[NAMES.agent_activity].find(
-        {}, {"_id": 0, "agent": 1, "action": 1, "detail": 1, "timestamp": 1}
-    ).sort("timestamp", -1).limit(limit // 2))
+    activity_projection = {_a(f): 1 for f in ("agent", "action", "detail", "timestamp")}
+    activity_projection["_id"] = 0
+    activities = [
+        from_storage("agent_activity", d)
+        for d in coll("agent_activity").find({}, activity_projection)
+        .sort(_a("timestamp"), -1).limit(limit // 2)
+    ]
 
     for a in activities:
         ts = a.get("timestamp")
@@ -180,9 +185,13 @@ def get_recent_events(limit: int = 20) -> list:
             "color": "var(--agent-cyan)",
         })
 
-    payments = list(db[NAMES.payments].find(
-        {}, {"_id": 0, "loan_id": 1, "amount": 1, "status": 1, "days_late": 1, "timestamp": 1}
-    ).sort("timestamp", -1).limit(limit // 2))
+    payment_projection = {_p(f): 1 for f in ("loan_id", "amount", "status", "days_late", "timestamp")}
+    payment_projection["_id"] = 0
+    payments = [
+        from_storage("payments", d)
+        for d in coll("payments").find({}, payment_projection)
+        .sort(_p("timestamp"), -1).limit(limit // 2)
+    ]
 
     for p in payments:
         ts = p.get("timestamp")

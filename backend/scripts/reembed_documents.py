@@ -15,7 +15,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from dotenv import load_dotenv
 load_dotenv()
 
-from db.mdb import MongoDBConnector
+from db.mdb import MongoDBConnector, coll
+from db.storage_mapping import from_storage, storage_key, to_storage
 from services.embedding_service import embed_document
 
 def _resolve_project_root() -> Path:
@@ -54,7 +55,13 @@ def main():
     db_connector = MongoDBConnector()
     db = db_connector.client[os.getenv("DATABASE_NAME", "lendflow")]
 
-    docs = list(db["documents"].find({}, {"_id": 1, "filename": 1, "doc_type": 1}))
+    docs = [
+        from_storage("documents", d)
+        for d in coll("documents").find(
+            {}, {"_id": 1, storage_key("documents", "filename"): 1,
+                 storage_key("documents", "doc_type"): 1}
+        )
+    ]
     print(f"Found {len(docs)} documents in the database")
     print(f"PDF search directories: {[str(d) for d in PDF_DIRS]}\n")
 
@@ -76,13 +83,13 @@ def main():
 
         try:
             embedding, pages = embed_document(pdf_path)
-            db["documents"].update_one(
+            coll("documents").update_one(
                 {"_id": doc_id},
-                {"$set": {
+                {"$set": to_storage("documents", {
                     "embedding": embedding,
                     "embedding_type": "multimodal",
                     "embedding_pages": pages,
-                }},
+                })},
             )
             print(f"  OK    {label} — {pages} pages embedded")
             updated += 1
