@@ -52,6 +52,7 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
     tier: app.risk_tier ?? app.tier ?? null,
     submitted: app.created_at ? new Date(app.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
     createdAt: app.created_at ? new Date(app.created_at).getTime() : 0,
+    demoSeed: !!app.demoSeed,
   })), [applications]);
 
   const reviewCount = useMemo(() => formatted.filter((a) => isReviewStatus(a.status)).length, [formatted]);
@@ -174,13 +175,17 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
           </div>
         )}
         {filteredSorted.map((app) => {
-          const isSelected = app.id === selectedId;
+          // Decorative seed apps are read-only: they populate the queue for demo
+          // purposes but have no backend record, so selecting them is disabled.
+          const isSeed = app.demoSeed;
+          const isSelected = !isSeed && app.id === selectedId;
           const needsReview = isReviewStatus(app.status);
           return (
             <button
               key={app.id}
               type="button"
-              onClick={() => onSelect(app.id)}
+              onClick={isSeed ? undefined : () => onSelect(app.id)}
+              aria-disabled={isSeed || undefined}
               style={{
                 all: 'unset',
                 display: 'block',
@@ -189,7 +194,7 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
                 borderBottom: '1px solid var(--border-dim)',
                 borderLeft: needsReview ? '3px solid var(--hitl-amber)' : '3px solid transparent',
                 background: isSelected ? 'var(--mongo-dim)' : needsReview ? 'rgba(255, 180, 0, 0.04)' : 'transparent',
-                cursor: 'pointer',
+                cursor: isSeed ? 'default' : 'pointer',
                 boxSizing: 'border-box',
                 transition: 'background 0.15s',
               }}

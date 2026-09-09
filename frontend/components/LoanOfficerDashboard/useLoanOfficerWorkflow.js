@@ -6,6 +6,36 @@ import { agentToStageIdx, WORKFLOW_STAGES } from './constants';
 
 const MAX_ACTIVITY_EVENTS = 200;
 
+// Frontend-only demo applications so the officer queue looks already-populated.
+// These are decorative (non-selectable in ApplicationQueue) and never hit the
+// backend — the `APP-DEMO-` prefix guarantees no collision with real IDs, and
+// `demoSeed: true` is the flag consumers use to render them read-only.
+// Timestamps are computed once at module load so they stay plausibly recent.
+const _now = Date.now();
+const SEED_DEMO_APPS = [
+  {
+    application_id: 'APP-DEMO-0001', demoSeed: true,
+    borrower_names: ['Emily Carter'],
+    loan_amount: 512000, product: '5yr Fixed (25yr Amort)', status: 'processing',
+    created_at: new Date(_now - 2 * 60 * 60 * 1000).toISOString(),
+    risk_score: 41, risk_tier: 'A', decision_ms: 7200,
+  },
+  {
+    application_id: 'APP-DEMO-0002', demoSeed: true,
+    borrower_names: ['David Nguyen', 'Lena Nguyen'],
+    loan_amount: 689000, product: 'Variable (5yr)', status: 'review',
+    created_at: new Date(_now - 4 * 60 * 60 * 1000).toISOString(),
+    risk_score: 63, risk_tier: 'B+', decision_ms: 9600,
+  },
+  {
+    application_id: 'APP-DEMO-0003', demoSeed: true,
+    borrower_names: ['Priya Sharma'],
+    loan_amount: 358000, product: '5yr Fixed (25yr Amort)', status: 'funded',
+    created_at: new Date(_now - 26 * 60 * 60 * 1000).toISOString(),
+    risk_score: 26, risk_tier: 'A', decision_ms: 6100,
+  },
+];
+
 /**
  * Pure helper: derive workflow UI state from the live queue status.
  * Used both when the selected app changes and when the queue WS pushes
@@ -261,12 +291,29 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     });
   }, [selectedApp]);
 
+  // Merge the decorative seed apps ahead of the real queue for display + stats.
+  // Kept separate from `liveApplications` so internal selection/WS-matching logic
+  // (which only ever deals with real backend IDs) is untouched.
+  const applicationsForDisplay = useMemo(
+    () => [...SEED_DEMO_APPS, ...liveApplications],
+    [liveApplications]
+  );
+
   const dashboardStats = useMemo(() => {
-    const pendingCount = liveApplications.filter(
+    const pendingCount = applicationsForDisplay.filter(
       (a) => ['review', 'pending_review'].includes(a.status)
     ).length;
-    const approvedCount = liveApplications.filter((a) => a.status === 'approved').length;
-    const processingCount = liveApplications.filter((a) => a.status === 'processing' || a.status === 'underwriting').length;
+    const approvedCount = applicationsForDisplay.filter((a) => a.status === 'approved').length;
+    const processingCount = applicationsForDisplay.filter((a) => a.status === 'processing' || a.status === 'underwriting').length;
+
+    // Average agentic decision time across apps that report one (seed apps carry
+    // `decision_ms`; real apps expose it via `decision_ms` when the pipeline persists it).
+    const decisionTimes = applicationsForDisplay
+      .map((a) => a.decision_ms)
+      .filter((ms) => typeof ms === 'number' && ms > 0);
+    const avgDecisionMs = decisionTimes.length
+      ? decisionTimes.reduce((sum, ms) => sum + ms, 0) / decisionTimes.length
+      : null;
 
     const prev = prevStatsRef.current;
     const trend = (key, current) => {
@@ -278,11 +325,19 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     };
 
     const stats = [
-      { label: 'Applications', value: String(liveApplications.length), color: 'var(--mongo)', trend: trend('total', liveApplications.length) },
+      { label: 'Applications', value: String(applicationsForDisplay.length), color: 'var(--mongo)', trend: trend('total', applicationsForDisplay.length) },
       { label: 'Processing', value: String(processingCount), color: 'var(--agent-cyan)', trend: trend('processing', processingCount) },
       { label: 'Approved', value: String(approvedCount), color: 'var(--success)', trend: trend('approved', approvedCount) },
       { label: 'Pending Reviews', value: String(pendingCount), color: 'var(--hitl-amber)', trend: trend('pending', pendingCount) },
     ];
+
+    if (avgDecisionMs != null) {
+      stats.push({
+        label: 'Avg Decision Time',
+        value: `${(avgDecisionMs / 1000).toFixed(1)}s`,
+        color: 'var(--tool-blue)',
+      });
+    }
 
     if (portfolioStats) {
       if (portfolioStats.total_portfolio_value) {
@@ -294,14 +349,14 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     }
 
     return stats;
-  }, [liveApplications, portfolioStats]);
+  }, [applicationsForDisplay, portfolioStats]);
 
   useEffect(() => {
-    const processingCount = liveApplications.filter((a) => a.status === 'processing' || a.status === 'underwriting').length;
-    const approvedCount = liveApplications.filter((a) => a.status === 'approved').length;
-    const pendingCount = liveApplications.filter((a) => ['review', 'pending_review'].includes(a.status)).length;
-    prevStatsRef.current = { total: liveApplications.length, processing: processingCount, approved: approvedCount, pending: pendingCount };
-  }, [liveApplications]);
+    const processingCount = applicationsForDisplay.filter((a) => a.status === 'processing' || a.status === 'underwriting').length;
+    const approvedCount = applicationsForDisplay.filter((a) => a.status === 'approved').length;
+    const pendingCount = applicationsForDisplay.filter((a) => ['review', 'pending_review'].includes(a.status)).length;
+    prevStatsRef.current = { total: applicationsForDisplay.length, processing: processingCount, approved: approvedCount, pending: pendingCount };
+  }, [applicationsForDisplay]);
 
   // Cleanup on unmount. activitySSERef is managed by its per-app effect
   // (closed + nulled in that effect's teardown) — only runStreamSSERef
@@ -640,7 +695,9 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     approvalDetails,
     liveAgentOutput,
     elapsedSeconds,
-    liveApplications,
+    // Exposed with the decorative seed apps merged in, so the queue + counts look
+    // populated. Internal selection/WS logic uses the raw `liveApplications` state.
+    liveApplications: applicationsForDisplay,
     selectedAppDetail,
     portfolioStats,
     dashboardStats,
