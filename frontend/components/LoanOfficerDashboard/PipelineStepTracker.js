@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { WORKFLOW_STAGES } from './constants';
+import { formatDuration } from './utils';
 
 /**
  * Consolidated, expandable pipeline step tracker for the officer view.
@@ -37,7 +38,7 @@ function formatElapsed(stageTimestamps, i) {
   if (!start || !end) return null;
   const ms = end - start;
   if (ms <= 0) return null;
-  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
+  return formatDuration(ms);
 }
 
 function StatePill({ state }) {

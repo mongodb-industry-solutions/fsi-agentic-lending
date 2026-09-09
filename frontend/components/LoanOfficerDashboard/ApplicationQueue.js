@@ -175,17 +175,16 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
           </div>
         )}
         {filteredSorted.map((app) => {
-          // Decorative seed apps are read-only: they populate the queue for demo
-          // purposes but have no backend record, so selecting them is disabled.
-          const isSeed = app.demoSeed;
-          const isSelected = !isSeed && app.id === selectedId;
+          // Seed apps ARE selectable — they render a hardcoded detail view in
+          // the center column. Selection is handled normally; the hook gates the
+          // real network calls off when the selected id is a seed.
+          const isSelected = app.id === selectedId;
           const needsReview = isReviewStatus(app.status);
           return (
             <button
               key={app.id}
               type="button"
-              onClick={isSeed ? undefined : () => onSelect(app.id)}
-              aria-disabled={isSeed || undefined}
+              onClick={() => onSelect(app.id)}
               style={{
                 all: 'unset',
                 display: 'block',
@@ -194,7 +193,7 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
                 borderBottom: '1px solid var(--border-dim)',
                 borderLeft: needsReview ? '3px solid var(--hitl-amber)' : '3px solid transparent',
                 background: isSelected ? 'var(--mongo-dim)' : needsReview ? 'rgba(255, 180, 0, 0.04)' : 'transparent',
-                cursor: isSeed ? 'default' : 'pointer',
+                cursor: 'pointer',
                 boxSizing: 'border-box',
                 transition: 'background 0.15s',
               }}
