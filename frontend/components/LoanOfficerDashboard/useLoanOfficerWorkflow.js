@@ -3,38 +3,9 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { apiPost, apiGet, apiSSE, apiWebSocket } from '../../lib/api';
 import { agentToStageIdx, WORKFLOW_STAGES } from './constants';
+import { SEED_DEMO_APPS, getDemoSeedDetail, isDemoSeed } from '../../lib/data/seedDemoApps';
 
 const MAX_ACTIVITY_EVENTS = 200;
-
-// Frontend-only demo applications so the officer queue looks already-populated.
-// These are decorative (non-selectable in ApplicationQueue) and never hit the
-// backend — the `APP-DEMO-` prefix guarantees no collision with real IDs, and
-// `demoSeed: true` is the flag consumers use to render them read-only.
-// Timestamps are computed once at module load so they stay plausibly recent.
-const _now = Date.now();
-const SEED_DEMO_APPS = [
-  {
-    application_id: 'APP-DEMO-0001', demoSeed: true,
-    borrower_names: ['Emily Carter'],
-    loan_amount: 512000, product: '5yr Fixed (25yr Amort)', status: 'processing',
-    created_at: new Date(_now - 2 * 60 * 60 * 1000).toISOString(),
-    risk_score: 41, risk_tier: 'A', decision_ms: 7200,
-  },
-  {
-    application_id: 'APP-DEMO-0002', demoSeed: true,
-    borrower_names: ['David Nguyen', 'Lena Nguyen'],
-    loan_amount: 689000, product: 'Variable (5yr)', status: 'review',
-    created_at: new Date(_now - 4 * 60 * 60 * 1000).toISOString(),
-    risk_score: 63, risk_tier: 'B+', decision_ms: 9600,
-  },
-  {
-    application_id: 'APP-DEMO-0003', demoSeed: true,
-    borrower_names: ['Priya Sharma'],
-    loan_amount: 358000, product: '5yr Fixed (25yr Amort)', status: 'funded',
-    created_at: new Date(_now - 26 * 60 * 60 * 1000).toISOString(),
-    risk_score: 26, risk_tier: 'A', decision_ms: 6100,
-  },
-];
 
 /**
  * Pure helper: derive workflow UI state from the live queue status.
@@ -172,6 +143,12 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
   // Keep currentStageRef aligned with the committed state.
   currentStageRef.current = workflowStage;
 
+  // Decorative APP-DEMO-* selection? These have no backend record, so the
+  // per-app detail fetch + activity SSE must never fire for them. Module lookup
+  // is used instead of a find on `applicationsForDisplay`, which is declared
+  // later in the hook (TDZ).
+  const isSeedSelection = isDemoSeed(selectedApp);
+
   // Advance the stage pointer and record its entry timestamp. All side
   // effects happen outside setState updaters to stay StrictMode-safe.
   const advanceStage = useCallback((stageIdx, markNext = false) => {
@@ -286,10 +263,16 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       setSelectedAppDetail(null);
       return;
     }
+    // Seed selections resolve their detail from the hardcoded module instead
+    // of a backend fetch (which would 404 — the records don't exist).
+    if (isSeedSelection) {
+      setSelectedAppDetail(getDemoSeedDetail(selectedApp));
+      return;
+    }
     apiGet(`/applications/${selectedApp}`).then((data) => {
       setSelectedAppDetail(data);
     });
-  }, [selectedApp]);
+  }, [selectedApp, isSeedSelection]);
 
   // Merge the decorative seed apps ahead of the real queue for display + stats.
   // Kept separate from `liveApplications` so internal selection/WS-matching logic
@@ -374,7 +357,9 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     setStreamConnected(false);
     setStreamError(false);
 
-    if (!selectedApp) return;
+    // Seeds have no backend agent stream — skip (the close + resets above still
+    // clear any state from a previously-selected real app).
+    if (!selectedApp || isSeedSelection) return;
 
     const handle = apiSSE(
       `/agent/${selectedApp}/stream`,
@@ -417,7 +402,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       if (handle) handle.close();
       activitySSERef.current = null;
     };
-  }, [selectedApp, appendActivityEvents, advanceStage]);
+  }, [selectedApp, isSeedSelection, appendActivityEvents, advanceStage]);
 
   // ── Reset everything when selected app changes ─────────────────────────
   useEffect(() => {
@@ -438,7 +423,12 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       return;
     }
 
-    const queueApp = liveApplicationsRef.current.find((a) => a.application_id === selectedApp);
+    // Seeds live in the hardcoded module, not in `liveApplications` (raw state),
+    // so resolve their status from the module. Keeps hitlReached/approved phase
+    // consistent for the Agent Rail when a seed is selected.
+    const queueApp = isSeedSelection
+      ? getDemoSeedDetail(selectedApp)
+      : liveApplicationsRef.current.find((a) => a.application_id === selectedApp);
     const status = queueApp?.status || 'submitted';
     const derived = deriveWorkflowStateFromStatus(status);
 
@@ -461,7 +451,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       setHitlResolutionTime(Date.now());
       setApprovalDetails({ mode: derived.approvalMode });
     }
-  }, [selectedApp]);
+  }, [selectedApp, isSeedSelection]);
 
   // ── Phase follows live queue status transitions ────────────────────────
   // When the WS pushes a status change for the already-selected app (e.g.
@@ -492,7 +482,8 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
 
   // Elapsed processing timer
   useEffect(() => {
-    if (workflowPhase !== 'executing' || approved) {
+    // Seeds show no live pipeline, so never start a wall-clock timer for them.
+    if (workflowPhase !== 'executing' || approved || isSeedSelection) {
       setElapsedSeconds(0);
       executingStartRef.current = null;
       return;
@@ -504,7 +495,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [workflowPhase, approved, selectedApp]);
+  }, [workflowPhase, approved, selectedApp, isSeedSelection]);
 
   // SSE-driven workflow run via run-stream endpoint ("Proceed" action)
   const startWorkflowSSE = useCallback((appId) => {

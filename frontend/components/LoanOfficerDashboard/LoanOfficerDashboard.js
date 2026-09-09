@@ -22,6 +22,9 @@ import { PortfolioIntelligence } from './PortfolioIntelligence';
 import { PipelineStepTracker } from './PipelineStepTracker';
 import { useLoanOfficerWorkflow } from './useLoanOfficerWorkflow';
 import TechRail from './TechRail';
+import ApplicationTimingCard from './ApplicationTimingCard';
+import SeedApplicationDetail from './SeedApplicationDetail';
+import { getDemoSeedDetail } from '../../lib/data/seedDemoApps';
 
 const OFFICER_AVATAR_COLORS = ['#00684A', '#00ED64', '#0498EC', '#016BF8', '#B45AF2'];
 
@@ -187,9 +190,23 @@ export default function LoanOfficerDashboard({ active = true }) {
   const appName = getAppDisplayName(selectedAppDetail, selectedAppData);
   const currentWorkflow = WORKFLOW_STAGES[workflowStage] || WORKFLOW_STAGES[WORKFLOW_STAGES.length - 1];
   const selectedAppStatus = selectedAppData?.status;
+  // Decorative APP-DEMO-* selection: renders the hardcoded seed detail and skips
+  // the timing card (no backend record). `selectedAppData` resolves seeds because
+  // the hook exposes `applicationsForDisplay` (seeds merged) as `liveApplications`.
+  const isSeedSelection = !!selectedAppData?.demoSeed;
 
   const statusBadge = () => {
     if (!selectedApp) return null;
+    // Seeds badge by their own queue status so e.g. the funded seed reads
+    // "Funded" rather than the derived "Approved".
+    if (isSeedSelection) {
+      const seedBadges = {
+        processing: { label: 'Processing', bg: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' },
+        review: { label: 'Awaiting Review', bg: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)' },
+        funded: { label: 'Funded', bg: 'var(--success-dim)', color: 'var(--success)' },
+      };
+      return seedBadges[selectedAppStatus] || null;
+    }
     if (approved && approvalDetails?.mode === 'declined') return { label: 'Declined', bg: 'var(--danger-dim)', color: 'var(--danger)' };
     if (approved) return { label: 'Approved', bg: 'var(--success-dim)', color: 'var(--success)' };
     if (hitlReached) return { label: 'Awaiting Review', bg: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)' };
@@ -260,14 +277,6 @@ export default function LoanOfficerDashboard({ active = true }) {
               <ModifiedParamsBadge settings={planSettings} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {workflowPhase === 'executing' && !approved && elapsedSeconds > 0 && (
-                <span style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
-                  color: 'var(--agent-cyan)',
-                }}>
-                  {Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, '0')}
-                </span>
-              )}
               {badge && (
                 <span style={{
                   fontSize: 10, fontWeight: 600, padding: '4px 10px', borderRadius: 12,
@@ -286,8 +295,26 @@ export default function LoanOfficerDashboard({ active = true }) {
             </div>
           )}
 
+          {/* Persistent total-time card — pinned above the scroll region so it
+              survives decision and approval (unlike the old header timer) */}
+          {selectedApp && !isSeedSelection && (
+            <ApplicationTimingCard
+              applicationId={selectedApp}
+              detail={selectedAppDetail}
+              status={selectedAppStatus}
+              approved={approved}
+            />
+          )}
+
           {/* Main scrollable content region */}
-          {selectedApp && workflowPhase === 'preview' ? (
+          {selectedApp && isSeedSelection ? (
+            <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg-base)' }}>
+              <SeedApplicationDetail
+                app={getDemoSeedDetail(selectedApp)}
+                officerName={officer?.full_name || 'Loan Officer'}
+              />
+            </div>
+          ) : selectedApp && workflowPhase === 'preview' ? (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto', background: 'var(--bg-base)' }}>
               {selectedAppDetail && (
                 <ApplicationDetail appDetail={selectedAppDetail} />
