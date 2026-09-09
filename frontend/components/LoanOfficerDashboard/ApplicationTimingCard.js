@@ -17,6 +17,12 @@ import { formatDuration } from './utils';
 
 const TERMINAL_STATUSES = ['approved', 'declined'];
 
+// Statuses where the agent pipeline is blocked on an external party (the
+// borrower) and is NOT processing. The elapsed clock pauses during these, so a
+// parked demo app doesn't accumulate hours of idle "processing" time — the
+// stage renders as "waiting" and stops growing.
+const WAIT_STATUSES = ['action_required'];
+
 function parseTs(value) {
   if (value == null) return null;
   const t = new Date(value).getTime();
@@ -67,12 +73,13 @@ function buildTimingData(doc, now) {
   if (entries.length === 0) {
     if (t0 == null) return null;
     return {
-      stages: [{ status: 'submitted', start: t0, end: now, elapsed: Math.max(0, now - t0), live: true }],
+      stages: [{ status: 'submitted', start: t0, end: now, elapsed: Math.max(0, now - t0), live: true, idle: false }],
       total: Math.max(0, now - t0),
       isDecided: false,
       decisionTs: null,
       terminalStatus: null,
       t0,
+      ticking: true,
     };
   }
 
@@ -95,13 +102,15 @@ function buildTimingData(doc, now) {
   const endTs = isDecided ? decisionTs : now;
 
   const stages = effective.map((e, i) => {
+    const idle = WAIT_STATUSES.includes(e.status);
     const end = i < effective.length - 1 ? effective[i + 1].ts : endTs;
     return {
       status: e.status,
       start: e.ts,
       end,
       elapsed: Math.max(0, end - e.ts),
-      live: !isDecided && i === effective.length - 1,
+      live: !isDecided && !idle && i === effective.length - 1,
+      idle,
     };
   });
 
@@ -110,13 +119,22 @@ function buildTimingData(doc, now) {
   // surfaced via the accent color + badge rather than a stage row.
   const blocks = isDecided && stages.length > 1 ? stages.slice(0, -1) : stages;
 
+  // "Total Time" = active pipeline time only: sum of non-wait stage durations.
+  // While the current stage is a wait state the clock is paused, so the total
+  // freezes at the last active boundary instead of growing during a borrower wait.
+  const total = blocks.reduce((sum, s) => (s.idle ? sum : sum + s.elapsed), 0);
+
+  // Tick only while the pipeline is genuinely processing (undecided + not idle).
+  const ticking = !isDecided && blocks.length > 0 && !blocks[blocks.length - 1].idle;
+
   return {
     stages: blocks,
-    total: Math.max(0, endTs - startTs),
+    total,
     isDecided,
     decisionTs,
     terminalStatus: isDecided ? effective[effective.length - 1].status : null,
     t0: startTs,
+    ticking,
   };
 }
 
@@ -154,22 +172,24 @@ export function ApplicationTimingCard({ applicationId = null, detail = null, sta
   }, [applicationId, approved, status]);
 
   const timing = useMemo(() => buildTimingData(doc, now), [doc, now]);
-  const running = !!(doc && timing && !timing.isDecided);
 
-  // 1s live tick, mounted only while undecided; cleared on decision/unmount.
+  // Live tick, mounted only while the pipeline is genuinely processing (undecided
+  // and not paused on a borrower wait). Cleared on decision / idle pause.
+  const tickingOn = !!(doc && timing && timing.ticking);
+  const waitingOnBorrower = !!(doc && timing && !timing.isDecided && !timing.ticking);
   useEffect(() => {
-    if (!running) return;
+    if (!tickingOn) return;
     setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [running]);
+  }, [tickingOn]);
 
   if (!timing) return null;
 
   const pendingReview = doc?.status === 'review' || doc?.status === 'pending_review';
   const accent = timing.isDecided
     ? timing.terminalStatus === 'declined' ? 'var(--danger)' : 'var(--success)'
-    : pendingReview ? 'var(--hitl-amber)' : 'var(--agent-cyan)';
+    : waitingOnBorrower ? 'var(--tool-blue)' : pendingReview ? 'var(--hitl-amber)' : 'var(--agent-cyan)';
   const totalColor = timing.isDecided
     ? timing.terminalStatus === 'declined' ? 'var(--danger)' : 'var(--success)'
     : 'var(--text-primary)';
@@ -207,35 +227,56 @@ export function ApplicationTimingCard({ applicationId = null, detail = null, sta
           </span>
         ) : (
           <span style={{ fontSize: 8, fontWeight: 600, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-            in progress
+            {waitingOnBorrower ? 'awaiting borrower' : 'in progress'}
           </span>
         )}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-        {timing.stages.map((stage) => (
-          <span
-            key={`${stage.status}-${stage.start}`}
-            title={`${titleCase(stage.status)}: ${isoRange(stage)}`}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              fontSize: 9, fontFamily: 'var(--font-mono)',
-              color: stage.live ? 'var(--agent-cyan)' : 'var(--text-dim)',
-              fontWeight: stage.live ? 700 : 400,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {titleCase(stage.status)}
-            <span style={{ color: 'var(--text-secondary)' }}>{formatDuration(stage.elapsed)}</span>
-            {stage.live && (
+        {timing.stages.map((stage) => {
+          if (stage.idle) {
+            // Pipeline is blocked on the borrower — show a "waiting" chip instead
+            // of a duration that would keep growing. The clock is paused here.
+            return (
               <span
-                aria-hidden
-                style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--agent-cyan)', animation: 'pulse 1.5s infinite' }}
-              />
-            )}
-            <span style={{ color: 'var(--border-base)', marginLeft: 2 }}>{'›'}</span>
-          </span>
-        ))}
+                key={`${stage.status}-${stage.start}`}
+                title={`${titleCase(stage.status)}: awaiting borrower input — clock paused`}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  fontSize: 9, fontFamily: 'var(--font-mono)',
+                  color: 'var(--text-dim)', fontWeight: 400, whiteSpace: 'nowrap',
+                }}
+              >
+                {titleCase(stage.status)}
+                <span style={{ color: 'var(--tool-blue)', fontStyle: 'italic' }}>waiting</span>
+                <span style={{ color: 'var(--border-base)', marginLeft: 2 }}>{'›'}</span>
+              </span>
+            );
+          }
+          return (
+            <span
+              key={`${stage.status}-${stage.start}`}
+              title={`${titleCase(stage.status)}: ${isoRange(stage)}`}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                fontSize: 9, fontFamily: 'var(--font-mono)',
+                color: stage.live ? 'var(--agent-cyan)' : 'var(--text-dim)',
+                fontWeight: stage.live ? 700 : 400,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {titleCase(stage.status)}
+              <span style={{ color: 'var(--text-secondary)' }}>{formatDuration(stage.elapsed)}</span>
+              {stage.live && (
+                <span
+                  aria-hidden
+                  style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--agent-cyan)', animation: 'pulse 1.5s infinite' }}
+                />
+              )}
+              <span style={{ color: 'var(--border-base)', marginLeft: 2 }}>{'›'}</span>
+            </span>
+          );
+        })}
       </div>
     </div>
   );
