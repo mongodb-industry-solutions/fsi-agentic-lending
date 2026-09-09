@@ -103,14 +103,12 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
   const [hitlStartTime, setHitlStartTime] = useState(null);
   const [hitlResolutionTime, setHitlResolutionTime] = useState(null);
   const [approved, setApproved] = useState(false);
-  const [planSettings, setPlanSettings] = useState(null);
   const [approvalDetails, setApprovalDetails] = useState(null);
   const [liveAgentOutput, setLiveAgentOutput] = useState({});
   const [activityEvents, setActivityEvents] = useState([]);
   const [streamConnected, setStreamConnected] = useState(false);
   const [streamError, setStreamError] = useState(false);
   const activitySSERef = useRef(null);
-  const runStreamSSERef = useRef(null);
   const stageTimestampsRef = useRef({});
   const [stageTimestamps, setStageTimestamps] = useState({});
   // Mirror of workflowStage for synchronous reads inside event handlers so
@@ -341,15 +339,6 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     prevStatsRef.current = { total: applicationsForDisplay.length, processing: processingCount, approved: approvedCount, pending: pendingCount };
   }, [applicationsForDisplay]);
 
-  // Cleanup on unmount. activitySSERef is managed by its per-app effect
-  // (closed + nulled in that effect's teardown) — only runStreamSSERef
-  // needs an unmount-scoped close here.
-  useEffect(() => {
-    return () => {
-      if (runStreamSSERef.current) { runStreamSSERef.current.close(); runStreamSSERef.current = null; }
-    };
-  }, []);
-
   // ── Single persistent activity SSE per selected app ────────────────────
   useEffect(() => {
     // Close any prior stream first
@@ -411,7 +400,6 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     currentStageRef.current = 0;
     setHitlReached(false); setHitlStartTime(null); setHitlResolutionTime(null);
     setApproved(false);
-    setPlanSettings(null);
     setApprovalDetails(null);
     setLiveAgentOutput({});
     setActivityEvents([]);
@@ -467,7 +455,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       return;
     }
 
-    setWorkflowPhase((prev) => (prev === 'manual' ? 'manual' : derived.phase));
+    setWorkflowPhase(derived.phase);
     advanceStage(derived.stage);
     if (derived.hitl) {
       setHitlReached(true);
@@ -496,84 +484,6 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     }, 1000);
     return () => clearInterval(interval);
   }, [workflowPhase, approved, selectedApp, isSeedSelection]);
-
-  // SSE-driven workflow run via run-stream endpoint ("Proceed" action)
-  const startWorkflowSSE = useCallback((appId) => {
-    if (runStreamSSERef.current) runStreamSSERef.current.close();
-
-    setWorkflowStage(0);
-    currentStageRef.current = 0;
-    setHitlReached(false); setHitlStartTime(null); setHitlResolutionTime(null);
-    setApproved(false);
-    setWorkflowPhase('executing');
-    setLiveAgentOutput({});
-    stageTimestampsRef.current = { 0: Date.now() };
-    setStageTimestamps({ ...stageTimestampsRef.current });
-
-    const handle = apiSSE(
-      `/agent/${appId}/run-stream?autonomy_level=bounded`,
-      (event) => {
-        // Synthesize an activity log entry from each pipeline event so the
-        // Activity Log shows graph transitions even before any agent_activity
-        // document is written.
-        const entry = activityFromSseEvent(event, 'run');
-        if (entry) appendActivityEvents([entry]);
-
-        if (event.type === 'node_start') {
-          const agentName = event.agent || event.name || '';
-          const stageIdx = agentToStageIdx(agentName);
-          if (stageIdx != null) advanceStage(stageIdx);
-        }
-
-        if (event.type === 'node_complete') {
-          const agentName = event.agent || '';
-          const stageIdx = agentToStageIdx(agentName);
-          if (stageIdx != null) advanceStage(stageIdx, /* markNext */ true);
-
-          if (event.output && typeof event.output === 'object') {
-            setLiveAgentOutput((prev) => ({ ...prev, ...event.output }));
-          }
-
-          if (agentName === 'hitl_gate') {
-            setHitlReached(true); setHitlStartTime((prev) => prev || Date.now());
-            addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
-          }
-        }
-
-        if (event.type === 'hitl_waiting') {
-          setHitlReached(true); setHitlStartTime((prev) => prev || Date.now());
-          advanceStage(2);
-          addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
-        }
-
-        if (event.type === 'complete') {
-          setApproved(true);
-          advanceStage(WORKFLOW_STAGES.length - 1);
-          setHitlResolutionTime(Date.now());
-          setApprovalDetails((prev) => prev || { mode: 'auto' });
-          addToast({ type: 'success', title: 'Pipeline Complete', message: `Agent pipeline completed for ${appId}.` });
-        }
-      },
-      {
-        autoCloseOn: ['complete', 'error', 'hitl_waiting'],
-        onError: () => {},
-      },
-    );
-
-    runStreamSSERef.current = handle;
-  }, [addToast, appendActivityEvents, advanceStage]);
-
-  const handleProceed = useCallback((settings) => {
-    if (!selectedApp) return;
-    setPlanSettings(settings || null);
-    startWorkflowSSE(selectedApp);
-    addToast({ type: 'info', title: 'Workflow Started', message: `Processing ${selectedApp} with bounded autonomy.` });
-  }, [selectedApp, addToast, startWorkflowSSE]);
-
-  const handleManual = useCallback(() => {
-    setWorkflowPhase('manual');
-    addToast({ type: 'info', title: 'Manual Mode', message: 'Agent bypassed. You are handling this application directly.' });
-  }, [addToast]);
 
   const selectedAppData = liveApplications.find((a) => a.application_id === selectedApp);
 
@@ -681,8 +591,6 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     hitlStartTime,
     hitlResolutionTime,
     approved,
-    planSettings,
-    setPlanSettings,
     approvalDetails,
     liveAgentOutput,
     elapsedSeconds,
@@ -698,8 +606,6 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     streamConnected,
     streamError,
 
-    handleProceed,
-    handleManual,
     handleApprove,
     handleDecline,
     handleAgentEvent,

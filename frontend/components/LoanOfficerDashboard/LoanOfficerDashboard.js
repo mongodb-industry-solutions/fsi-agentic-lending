@@ -6,16 +6,13 @@ import Avatar from 'boring-avatars';
 import Modal from '@leafygreen-ui/modal';
 import ApplicationQueue from './ApplicationQueue';
 import AgentActivityLog from './AgentActivityLog';
-import IntentPreview from './IntentPreview';
 import ApplicationDetail from './ApplicationDetail';
 import DecisionSummary from './DecisionSummary';
 import WorkflowCanvas from '../DemoFlow/WorkflowCanvas';
 import NotificationToast, { useToasts } from '../NotificationToast/NotificationToast';
 import { WORKFLOW_STAGES } from './constants';
 import { getAppDisplayName } from './utils';
-import { ModifiedParamsBadge } from './ModifiedParamsBadge';
 import { PolicyBoundsIndicator } from './PolicyBoundsIndicator';
-import { ManualWorkspace } from './ManualWorkspace';
 import { HITLReviewCard } from './HITLReviewCard';
 import { PolicyExplorer } from './PolicyExplorer';
 import { PortfolioIntelligence } from './PortfolioIntelligence';
@@ -167,7 +164,6 @@ export default function LoanOfficerDashboard({ active = true }) {
     selectedApp, setSelectedApp,
     workflowPhase, workflowStage,
     hitlReached, hitlStartTime, hitlResolutionTime, approved,
-    planSettings,
     approvalDetails,
     liveAgentOutput,
     elapsedSeconds,
@@ -176,8 +172,6 @@ export default function LoanOfficerDashboard({ active = true }) {
     dashboardStats,
     officer,
     stageTimestamps,
-    handleProceed,
-    handleManual,
     handleApprove,
     handleDecline,
     handleAgentEvent,
@@ -212,7 +206,6 @@ export default function LoanOfficerDashboard({ active = true }) {
     if (hitlReached) return { label: 'Awaiting Review', bg: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)' };
     if (selectedAppStatus === 'error') return { label: 'Error', bg: 'var(--danger-dim)', color: 'var(--danger)' };
     if (workflowPhase === 'preview') return { label: 'Plan Ready', bg: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' };
-    if (workflowPhase === 'manual') return { label: 'Manual Mode', bg: 'var(--bg-raised)', color: 'var(--text-secondary)' };
     if (workflowPhase === 'executing') return { label: `Processing: ${currentWorkflow.label}`, bg: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' };
     return null;
   };
@@ -274,7 +267,6 @@ export default function LoanOfficerDashboard({ active = true }) {
                   {selectedApp}
                 </span>
               )}
-              <ModifiedParamsBadge settings={planSettings} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {badge && (
@@ -319,9 +311,6 @@ export default function LoanOfficerDashboard({ active = true }) {
               {selectedAppDetail && (
                 <ApplicationDetail appDetail={selectedAppDetail} />
               )}
-              <div style={{ padding: spacing[3] }}>
-                <IntentPreview applicationId={selectedApp} onProceed={handleProceed} onManual={handleManual} />
-              </div>
             </div>
           ) : selectedApp && workflowPhase === 'executing' ? (() => {
             // Action-first: once a decision is pending (HITL) or made (approved),
@@ -391,11 +380,7 @@ export default function LoanOfficerDashboard({ active = true }) {
               ) : tracker}
             </div>
             );
-          })() : selectedApp && workflowPhase === 'manual' ? (
-            <div style={{ flex: 1, overflow: 'hidden' }}>
-              <ManualWorkspace appDetail={selectedAppDetail} queueData={selectedAppData} onApprove={handleApprove} onDecline={handleDecline} addToast={addToast} />
-            </div>
-          ) : !selectedApp ? (
+          })() : !selectedApp ? (
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: spacing[4], flex: 1, minHeight: 0, overflowY: 'auto' }}>
               <div style={{
                 padding: spacing[4], maxWidth: 720, width: '100%',
