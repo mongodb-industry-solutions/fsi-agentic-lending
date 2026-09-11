@@ -1,15 +1,17 @@
 """
 MongoDB collection definitions for Agentic Lending Platform.
-6 core collections for the lending lifecycle.
+
+Keys are LOGICAL collection names (see `db.collections_config`); index keys are
+RUNTIME field names. `scripts.create_indexes` resolves both through the same
+indirection the application uses, so renaming a collection or a field cannot
+leave a stale index definition behind.
+
+`customers` is deliberately absent. It is the shared party directory in
+`leafy_bank_bian`, owned by the accounts service — this demo reads and upserts
+into it but does not own its indexes.
 """
 
 COLLECTIONS = {
-    "borrowers": {
-        "description": "Applicant identity and demographics",
-        "indexes": [
-            {"keys": [("application_id", 1), ("full_name", 1)]},
-        ],
-    },
     "applications": {
         "description": "Loan application state machine",
         "indexes": [
@@ -24,8 +26,9 @@ COLLECTIONS = {
         ],
     },
     "credit_reports": {
-        "description": "Structured credit bureau data",
+        "description": "Structured credit bureau data (BIAN creditReports)",
         "indexes": [
+            {"keys": [("id", 1)], "unique": True},
             {"keys": [("borrower_id", 1)]},
         ],
     },
@@ -42,8 +45,9 @@ COLLECTIONS = {
         ],
     },
     "payments": {
-        "description": "Loan payment history",
+        "description": "Loan repayment installments (BIAN loanRepayments)",
         "indexes": [
+            {"keys": [("id", 1)], "unique": True},
             {"keys": [("loan_id", 1), ("timestamp", -1)]},
         ],
     },

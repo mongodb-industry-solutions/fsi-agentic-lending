@@ -19,7 +19,8 @@ from services.extraction_service import extract_from_pdf, EXTRACTION_PROMPTS
 from services.application_service import serialize_doc
 from services.embedding_service import embed_document as _embed_document
 from db.mdb import get_db
-from db.collections_config import NAMES
+from db.mdb import coll
+from db.storage_mapping import from_storage, storage_filter, storage_key, to_storage
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +190,9 @@ async def upload_document(
     _validate_app_id(app_id)
     # Verify application exists
     db = get_db()
-    app = db[NAMES.applications].find_one({"application_id": app_id})
+    app = coll("applications").find_one(
+        {storage_key("applications", "application_id"): app_id}
+    )
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
 
@@ -209,12 +212,12 @@ async def upload_document(
 
     # Check for existing document with same type to avoid duplicate extraction
     content_hash = hashlib.sha256(content).hexdigest()
-    existing = db[NAMES.documents].find_one({
+    existing = coll("documents").find_one(storage_filter("documents", {
         "application_id": app_id,
         "doc_type": doc_type,
         "content_hash": content_hash,
         "status": {"$ne": "error"},
-    })
+    }))
     if existing:
         return serialize_doc(existing)
 
@@ -255,7 +258,7 @@ async def upload_document(
         "created_at": datetime.now(timezone.utc),
     }
 
-    result = db[NAMES.documents].insert_one(doc_record)
+    result = coll("documents").insert_one(to_storage("documents", doc_record))
     doc_record["_id"] = result.inserted_id
 
     return serialize_doc(doc_record)
@@ -284,7 +287,11 @@ async def demo_upload_document(app_id: str, doc_type: str):
     """
     _validate_app_id(app_id)
     db = get_db()
-    app = db[NAMES.applications].find_one({"application_id": app_id}, {"profile_id": 1})
+    app = coll("applications").find_one(
+        {storage_key("applications", "application_id"): app_id},
+        {storage_key("applications", "profile_id"): 1},
+    )
+    app = from_storage("applications", app) if app else None
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
 
@@ -303,12 +310,12 @@ async def demo_upload_document(app_id: str, doc_type: str):
     # Check for dedup
     content = pdf_path.read_bytes()
     content_hash = hashlib.sha256(content).hexdigest()
-    existing = db[NAMES.documents].find_one({
+    existing = coll("documents").find_one(storage_filter("documents", {
         "application_id": app_id,
         "doc_type": doc_type,
         "content_hash": content_hash,
         "status": {"$ne": "error"},
-    })
+    }))
     if existing:
         return serialize_doc(existing)
 
@@ -342,7 +349,7 @@ async def demo_upload_document(app_id: str, doc_type: str):
         "created_at": datetime.now(timezone.utc),
     }
 
-    result = db[NAMES.documents].insert_one(doc_record)
+    result = coll("documents").insert_one(to_storage("documents", doc_record))
     doc_record["_id"] = result.inserted_id
     logger.info(f"Demo upload: {doc_type} for {app_id} (profile: {profile_id})")
 

@@ -1,18 +1,23 @@
 """Collection-name indirection.
 
 Single source of truth for physical MongoDB collection names. Every runtime
-call site resolves collection names through ``NAMES`` (attribute access, e.g.
-``db[NAMES.applications]``) instead of hardcoded string literals.
+call site resolves collections through ``coll()`` in ``db.mdb`` (which consults
+this module) instead of hardcoded string literals.
 
 Each logical name resolves to an env var override, defaulting to today's exact
-physical name — so with no env set, behaviour is byte-for-byte unchanged. Later
-migration steps rename a collection by setting ``COLL_<LOGICAL>`` (e.g.
+physical name — so with no env set, behaviour is byte-for-byte unchanged. A
+migration step renames a collection by setting ``COLL_<LOGICAL>`` (e.g.
 ``COLL_PAYMENTS=loanRepayments``) with no code edits.
 
-Scope note: this layer resolves collection *names* only. The eventual
-two-database split (leafy_bank_bian vs fsi-agentic-lending) is a follow-up that
-will extend these entries with a target-database and teach ``get_db()`` to hand
-out a second handle. Not in scope here.
+One database
+------------
+Every collection — BIAN banking records *and* this demo's agentic
+infrastructure — lives in the single consolidated database named by
+``DATABASE_NAME`` (``leafy_bank_bian``). This follows the standing umbrella
+decision (`.claude/memory/decisions.md`) and the document-intelligence
+precedent, where all 15 collections moved into ``leafy_bank_bian`` under a
+name prefix. The agentic collections carry a ``lending`` prefix for exactly
+that reason: generic names collide in a shared database.
 
 LangGraph-managed collections (``checkpoints`` / ``checkpoint_writes``) are
 deliberately absent — they are owned by the MongoDBSaver, not this app.
@@ -36,7 +41,11 @@ _DEFAULTS = {
     "hitl_audit": "hitl_audit",
     "officers": "officers",
     "pipeline_locks": "pipeline_locks",
+    "customers": "customers",
 }
+
+# `borrowers` is retired by the BIAN migration (folded into `customers`) and
+# kept above only so legacy seed scripts resolve while they are being reworked.
 
 
 def resolve(logical: str) -> str:

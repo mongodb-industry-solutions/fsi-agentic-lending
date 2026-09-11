@@ -5,7 +5,6 @@ from langgraph.types import interrupt
 from agents.state import LendFlowState
 from agents.pipeline.tools import log_agent_activity, update_application_status
 from services.officer_service import get_officer_display
-from db.collections_config import NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -67,11 +66,11 @@ def hitl_gate(state: LendFlowState, **kwargs) -> dict:
             log_agent_activity(app_id, "hitl_gate", "invalid_override", f"Invalid risk_tier override: {overrides['risk_tier']}")
     if overrides.get("loan_amount") is not None and isinstance(overrides["loan_amount"], (int, float)) and overrides["loan_amount"] > 0:
         state_updates["decision_reasoning"] = f"Re-underwriting: officer adjusted loan to ${overrides['loan_amount']:,.0f}"
-        from db.mdb import get_db as _get_db
-        db = _get_db()
-        db[NAMES.applications].update_one(
-            {"application_id": app_id},
-            {"$set": {"loan_amount": overrides["loan_amount"]}}
+        from db.mdb import coll
+        from db.storage_mapping import storage_key
+        coll("applications").update_one(
+            {storage_key("applications", "application_id"): app_id},
+            {"$set": {storage_key("applications", "loan_amount"): overrides["loan_amount"]}},
         )
 
     officer_id = decision.get("officer_id", "unknown")

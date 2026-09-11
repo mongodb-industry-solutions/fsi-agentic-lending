@@ -438,7 +438,7 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | Variable                   | Required | Description                                      |
 | -------------------------- | -------- | ------------------------------------------------ |
 | `MONGODB_URI`              | Yes      | MongoDB Atlas connection string                  |
-| `DATABASE_NAME`            | Yes      | Database name (default: `lendflow`)              |
+| `DATABASE_NAME`            | Yes      | Database name — `leafy_bank_bian` (shared)       |
 | `CHATCOMPLETIONS_MODEL_ID` | Yes      | Bedrock inference profile ARN or model ID        |
 | `VOYAGE_API_KEY`           | Yes      | Voyage AI API key for multimodal embeddings      |
 | `AWS_REGION`               | No       | AWS region (default: `us-east-1`)                |

@@ -1,0 +1,339 @@
+{
+  "customerIds": {
+    "Sofia Renata Delgado": "CUST-0D3F9BB599",
+    "John Smith": "CUST-33DCC32591",
+    "Bob Johnson": "CUST-4DB63F163E",
+    "Jane Doe": "CUST-BC225AC5F0",
+    "Alice Johnson": "CUST-BDDC80E2A4",
+    "Marcus Alejandro Delgado": "CUST-D024F09585",
+    "John Doe": "CUST-FA0688A33F",
+    "Sarah Williams": "CUST-FDA7761943"
+  },
+  "customerIdSourceNames": {
+    "Sofia Renata Delgado": "CUST-0D3F9BB599",
+    "Sofia Delgado": "CUST-0D3F9BB599",
+    "John Smith": "CUST-33DCC32591",
+    "Bob Johnson": "CUST-4DB63F163E",
+    "Jane Doe": "CUST-BC225AC5F0",
+    "Alice Johnson": "CUST-BDDC80E2A4",
+    "Marcus Alejandro Delgado": "CUST-D024F09585",
+    "Marcus Delgado": "CUST-D024F09585",
+    "John Doe": "CUST-FA0688A33F",
+    "Sarah Williams": "CUST-FDA7761943"
+  },
+  "loan": {
+    "loansId": "APP-733F7A69",
+    "borrowerIds": [
+      {
+        "customerId": "CUST-BC225AC5F0",
+        "role": "PRIMARY"
+      },
+      {
+        "customerId": "CUST-FA0688A33F",
+        "role": "CO_APPLICANT"
+      }
+    ],
+    "borrowerNames": [
+      "Jane Doe",
+      "John Doe"
+    ],
+    "loanAmount": 340000.0,
+    "purchasePrice": 425000.0,
+    "downPayment": 85000.0,
+    "product": "5yr Fixed (25yr Amort)",
+    "status": "APPROVED",
+    "property": {
+      "address": "1438 Garden Terrace, Burnaby, BC V5A 3G2",
+      "type": "Townhouse",
+      "purchasePrice": 425000.0,
+      "annualTax": 3950.0
+    },
+    "incomeSummary": {
+      "combinedGross": 165000.0,
+      "primary": 95000.0,
+      "coApplicant": 70000.0
+    },
+    "existingMonthlyDebt": 650.0,
+    "maintenance": {
+      "statusHistory": [
+        {
+          "status": "SUBMITTED",
+          "statusSource": "submitted",
+          "timestamp": "2026-07-29T07:45:09.044Z",
+          "detail": "Application received"
+        },
+        {
+          "status": "UNDER_REVIEW",
+          "statusSource": "processing",
+          "timestamp": "2026-07-29T07:45:10.917Z",
+          "detail": "Agent pipeline started"
+        },
+        {
+          "status": "UNDER_REVIEW",
+          "statusSource": "underwriting",
+          "timestamp": "2026-07-29T07:45:23.903Z",
+          "detail": "Documents verified \u2014 proceeding to underwriting"
+        },
+        {
+          "status": "APPROVED",
+          "statusSource": "approved",
+          "timestamp": "2026-07-29T07:45:33.133Z",
+          "detail": "Auto-approved: GDS 21.5%, TDS 26.2%, Risk 25.0/100 (A)."
+        }
+      ],
+      "updatedAt": "2026-07-29T07:45:33.133Z"
+    },
+    "createdAt": "2026-07-29T07:45:09.044Z",
+    "updatedAt": "2026-07-29T07:45:33.133Z",
+    "assessment": {
+      "grossDebtServiceRatio": 0.1851,
+      "totalDebtServiceRatio": 0.2324,
+      "stressGrossDebtService": 0.2151,
+      "stressTotalDebtService": 0.2624,
+      "loanToValue": 80.0,
+      "riskScore": 25.0,
+      "riskTier": "A",
+      "primaryCreditScore": 798,
+      "decisionReasoning": "Auto-approved: GDS 21.5%, TDS 26.2%, Risk 25.0/100 (A).",
+      "statusDetail": "Agent pipeline started"
+    }
+  },
+  "creditReportObjectDerog": {
+    "id": "CR-69e090f9406738e478a18338",
+    "borrowerId": "CUST-D024F09585",
+    "bureau": "EQUIFAX",
+    "score": 784,
+    "totalOutstanding": 251844.0,
+    "paymentHistory": "100% on-time payments (last 7 years)",
+    "externalReporting": {
+      "score": 784,
+      "bureau": "EQUIFAX",
+      "totalOutstanding": 251844.0,
+      "paymentHistory": "100% on-time payments (last 7 years)",
+      "derogatoryItems": {
+        "derogatoryMarks": "None",
+        "collectionsJudgments": "None on file",
+        "bankruptcies": "None on file",
+        "items": []
+      }
+    },
+    "accounts": [
+      {
+        "creditor": "TD Visa Infinite Card",
+        "balance": 1842.0,
+        "monthlyPayment": null,
+        "status": "Open"
+      },
+      {
+        "creditor": "TD Line of Credit",
+        "balance": 0.0,
+        "monthlyPayment": null,
+        "status": "Open"
+      },
+      {
+        "creditor": "Scotiabank Car Loan",
+        "balance": 18240.0,
+        "monthlyPayment": null,
+        "status": "Open"
+      },
+      {
+        "creditor": "First National Mortgage (Condo)",
+        "balance": 231450.0,
+        "monthlyPayment": null,
+        "status": "Open"
+      },
+      {
+        "creditor": "Canadian Tire Mastercard",
+        "balance": 312.0,
+        "monthlyPayment": null,
+        "status": "Open"
+      },
+      {
+        "creditor": "TD RRSP Loan (paid)",
+        "balance": 0.0,
+        "monthlyPayment": null,
+        "status": "Closed"
+      }
+    ],
+    "inquiries": [
+      {
+        "creditor": "Royal LePage Benchmark (Mortgage Pre-Approval)",
+        "date": "2025-01-15",
+        "type": "Soft Inquiry"
+      },
+      {
+        "creditor": "Axiom Mortgage Solutions (Mortgage Application)",
+        "date": "2025-02-18",
+        "type": "Hard Inquiry"
+      }
+    ],
+    "derogatoryItems": {
+      "derogatoryMarks": "None",
+      "collectionsJudgments": "None on file",
+      "bankruptcies": "None on file",
+      "items": []
+    },
+    "createdAt": "2026-04-16T07:34:17.077Z",
+    "borrowerNameSource": "Marcus Alejandro Delgado"
+  },
+  "creditReportListDerog": {
+    "id": "CR-69debb480e702ecf5ed0ba3f",
+    "borrowerId": "CUST-4DB63F163E",
+    "bureau": "EQUIFAX",
+    "score": 648,
+    "totalOutstanding": 87000,
+    "paymentHistory": "36 months; 5 late payments 30+ days, 1 payment 60+ days (2025)",
+    "externalReporting": {
+      "score": 648,
+      "bureau": "EQUIFAX",
+      "totalOutstanding": 87000,
+      "paymentHistory": "36 months; 5 late payments 30+ days, 1 payment 60+ days (2025)",
+      "derogatoryItems": {
+        "derogatoryMarks": null,
+        "collectionsJudgments": null,
+        "bankruptcies": null,
+        "items": [
+          {
+            "type": "collection",
+            "amount": 2400,
+            "creditor": "Bell Canada",
+            "date": "2025-06-01"
+          }
+        ]
+      }
+    },
+    "accounts": [
+      {
+        "creditor": "TD Visa Infinite",
+        "balance": 18000,
+        "monthlyPayment": 540,
+        "status": "fair"
+      },
+      {
+        "creditor": "Ford Credit (F-150)",
+        "balance": 38000,
+        "monthlyPayment": 720,
+        "status": "fair"
+      },
+      {
+        "creditor": "CIBC Personal LOC",
+        "balance": 25000,
+        "monthlyPayment": 625,
+        "status": "fair"
+      },
+      {
+        "creditor": "Furniture Financing",
+        "balance": 6000,
+        "monthlyPayment": 200,
+        "status": "good"
+      }
+    ],
+    "inquiries": [
+      {
+        "creditor": "RBC Mortgage",
+        "date": "2025-11-01",
+        "type": "hard"
+      },
+      {
+        "creditor": "National Bank Mortgage",
+        "date": "2025-12-15",
+        "type": "hard"
+      },
+      {
+        "creditor": "First National Mortgage",
+        "date": "2026-01-20",
+        "type": "hard"
+      }
+    ],
+    "derogatoryItems": {
+      "derogatoryMarks": null,
+      "collectionsJudgments": null,
+      "bankruptcies": null,
+      "items": [
+        {
+          "type": "collection",
+          "amount": 2400,
+          "creditor": "Bell Canada",
+          "date": "2025-06-01"
+        }
+      ]
+    },
+    "createdAt": "2026-04-14T22:07:32.827Z",
+    "borrowerNameSource": "Bob Johnson"
+  },
+  "loanRepayment": {
+    "loanRepaymentsId": "LRP-L-00001-0001",
+    "loanId": "L-00001",
+    "paymentNumber": 1,
+    "amount": 4047.39,
+    "principal": 1194.89,
+    "interest": 2852.5,
+    "outstandingBalance": 698805.11,
+    "daysLate": 0,
+    "status": "ON_TIME",
+    "timestamp": "2023-07-01T00:00:00Z"
+  },
+  "customer": {
+    "customerId": "CUST-0D3F9BB599",
+    "status": "ACTIVE",
+    "type": "INDIVIDUAL",
+    "segment": "RETAIL",
+    "since": "2026-04-16",
+    "rmId": null,
+    "identification": {
+      "legalName": "Sofia Renata Delgado",
+      "firstName": "Sofia",
+      "lastName": "Delgado",
+      "middleName": "Renata",
+      "fullName": "Sofia Renata Delgado",
+      "dateOfBirth": "1989-03-22",
+      "nationalId": "AB-9145-3382-SRD",
+      "nationalIdType": "NATIONAL_ID",
+      "jobTitle": "Registered Nurse \u2014 Critical Care Unit"
+    },
+    "contact": {
+      "email": "sofia.delgado@example.com",
+      "phone": "+15555726197",
+      "preferredLanguage": "en",
+      "preferredChannel": "EMAIL",
+      "addresses": [
+        {
+          "type": "HOME",
+          "isPrimary": true,
+          "line1": "4821 Varsity Drive NW",
+          "line2": "Apt 305",
+          "city": "Edmonton",
+          "state": "AB",
+          "postcode": "T5K 2M4",
+          "country": "CA",
+          "validFrom": "2026-04-16"
+        }
+      ]
+    },
+    "kyc": {
+      "status": "PENDING",
+      "level": "BASIC",
+      "riskRating": "LOW",
+      "documents": []
+    },
+    "consents": [],
+    "createdAt": "2026-04-16T07:34:16.087Z",
+    "updatedAt": "2026-08-07T09:07:10.177Z",
+    "createdBy": "lending-migration",
+    "version": 1,
+    "sourceSystem": "fsi-agentic-lending",
+    "employment": {
+      "employer": {
+        "name": "Covenant Health \u2014 Grey Nuns Community Hospital",
+        "startDate": "2016-09-12"
+      },
+      "jobTitle": "Registered Nurse \u2014 Critical Care Unit",
+      "income": {
+        "amount": 94200.0,
+        "currency": "CAD",
+        "frequency": "Annual"
+      },
+      "employmentStatusSource": "Active \u2014 In Good Standing"
+    }
+  }
+}
