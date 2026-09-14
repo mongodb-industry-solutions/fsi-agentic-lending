@@ -118,6 +118,13 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
   const executingStartRef = useRef(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [liveApplications, setLiveApplications] = useState([]);
+  // Decorative seed apps carry module-load `Date.now()` timestamps, so rendering
+  // them into SSR HTML would mismatch the client (React hydration error #418).
+  // Merge them only after the component has mounted.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const [selectedAppDetail, setSelectedAppDetail] = useState(null);
   const [portfolioStats, setPortfolioStats] = useState(null);
   const [officer, setOfficer] = useState(null);
@@ -276,8 +283,8 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
   // Kept separate from `liveApplications` so internal selection/WS-matching logic
   // (which only ever deals with real backend IDs) is untouched.
   const applicationsForDisplay = useMemo(
-    () => [...SEED_DEMO_APPS, ...liveApplications],
-    [liveApplications]
+    () => (mounted ? [...SEED_DEMO_APPS, ...liveApplications] : liveApplications),
+    [liveApplications, mounted]
   );
 
   const dashboardStats = useMemo(() => {
