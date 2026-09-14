@@ -181,24 +181,34 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
 
       <div style={{ display: "flex", alignItems: "center", gap: spacing[3] }}>
         {!compact && (
-          <div
-            aria-hidden="true"
+          <a
+            href="https://leafy-bank-bian-model.industrysolutions.staging.corp.mongodb.com/bian-data-model?demo=lending"
+            aria-label="Open BIAN data model viewer"
             style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 2,
               padding: `${spacing[1]}px ${spacing[3]}px`,
-              borderRadius: "var(--radius-xl)",
+              borderRadius: "var(--radius-sm)",
               border: "1px solid rgba(255,255,255,0.12)",
               background: "rgba(255,255,255,0.06)",
+              color: "rgba(255,255,255,0.8)",
               fontFamily: "var(--font-display)",
               fontSize: 10,
-              fontWeight: 500,
-              color: "rgba(255,255,255,0.5)",
+              fontWeight: 600,
               letterSpacing: 0.2,
               whiteSpace: "nowrap",
-              userSelect: "none",
+              textDecoration: "none",
+              cursor: "pointer",
+              transition: "all 150ms ease",
             }}
           >
-            Built on <span style={{ color: palette.green.base, fontWeight: 600 }}>MongoDB Atlas</span>
-          </div>
+            <Icon glyph="Read" size={12} />
+            <span style={{ textDecoration: "underline", textUnderlineOffset: 2 }}>
+              Data Model
+            </span>
+          </a>
         )}
         {hasSession && (
           <button
