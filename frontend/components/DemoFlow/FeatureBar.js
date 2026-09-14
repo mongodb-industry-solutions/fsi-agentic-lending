@@ -35,11 +35,6 @@ export default function FeatureBar({ activeFeatures }) {
           />
         );
       })}
-      {activeFeatures.length >= 6 && (
-        <span style={{ marginLeft: spacing[2], fontSize: 11, color: 'var(--mongo)', fontWeight: 600 }}>
-          1 platform · 6 capabilities
-        </span>
-      )}
     </div>
   );
 }

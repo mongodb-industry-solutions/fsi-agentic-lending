@@ -144,8 +144,8 @@ After setting up your deployment type, you need to configure environment variabl
 
 The repository includes two environment configuration files:
 
-- `environment/staging.yaml` - Configuration for staging environment
-- `environment/production.yaml` - Configuration for production environment
+- `environment/staging-combined.yaml` - Configuration for staging environment
+- `environment/production-combined.yaml` - Configuration for production environment
 
 ### Types of Configuration
 
@@ -264,12 +264,12 @@ helm ksec set <secret-group> MONGODB_URI="your-mongodb-uri" DATABASE_NAME="your-
 
 #### 2. Update Environment Files
 
-1. **Update `environment/staging.yaml`:**
+1. **Update `environment/staging-combined.yaml`:**
    - Replace `<service-name>` with your actual service name
    - Update secret names from `<secret-group>` to your actual secret names :
    - Configure cloud provider settings (AWS/GCP)
 
-2. **Update `environment/production.yaml`:**
+2. **Update `environment/production-combined.yaml`:**
    - Same updates as staging, but for production values
    - Ensure production-specific configurations
 
@@ -301,7 +301,7 @@ After updating the configuration files:
 For a demo named `python-nextjs-demo`, your configuration might look like:
 
 ```yaml
-# staging.yaml
+# staging-combined.yaml
 env:
   NODE_ENV: staging
   AWS_REGION: us-east-1

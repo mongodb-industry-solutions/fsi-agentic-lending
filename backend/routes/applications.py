@@ -134,7 +134,7 @@ async def portfolio_stats():
 
 @router.get("/portfolio/ews")
 async def portfolio_ews(loan_id: str = None):
-    """Early Warning System signals from payment time-series analysis."""
+    """Early Warning System signals from rolling-window payment analysis."""
     from services.dashboard_service import get_ews_signals
     if not loan_id:
         sample = coll("payments").find_one({}, {storage_key("payments", "loan_id"): 1})

@@ -397,7 +397,7 @@ export default function BorrowerPortal() {
       setPhase('submitting');
       setSubmitStep(0);
 
-      const purchasePrice = parseFloat(formData.loanAmount) || 0;
+      const purchasePrice = parseFloat(formData.purchasePrice) || 0;
       const downPayment = parseFloat(formData.downPayment) || 0;
       const primaryIncome = parseFloat(formData.annualIncome) || 0;
       const coIncome = parseFloat(formData.coApplicantIncome) || 0;
