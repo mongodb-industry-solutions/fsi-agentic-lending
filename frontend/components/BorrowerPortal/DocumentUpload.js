@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
-import { apiGet } from '../../lib/api';
+import { getApplicationDocuments } from '../../lib/documents';
 import DocumentViewer from '../DocumentViewer';
 
 // Display metadata keyed by doc_type — used to enrich API-fetched documents
@@ -140,7 +140,7 @@ export default function DocumentUpload({ applicationId, borrowerProfile }) {
     setFetchError(false);
     setLoading(true);
 
-    apiGet(`/applications/${sourceAppId}/documents`).then((docs) => {
+    getApplicationDocuments(sourceAppId).then((docs) => {
       if (docs === null) { setFetchError(true); return; }
       if (Array.isArray(docs) && docs.length > 0) {
         setDocuments(buildDocList(docs));

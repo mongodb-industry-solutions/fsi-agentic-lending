@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import Code from '@leafygreen-ui/code';
-import { apiGet } from '../lib/api';
+import { getDocumentRecord, getDocumentPdfUrl } from '../lib/documents';
 
 const TABS = [
   { id: 'extracted', label: 'Extracted Data' },
@@ -232,8 +232,20 @@ function MongoDBDocumentPanel({ data }) {
 }
 
 function EmbeddingsPanel({ data }) {
-  const embedding = data.embedding;
-  const hasEmbedding = embedding && Array.isArray(embedding) && embedding.length > 0;
+  const fullEmbedding = data.embedding;
+  const preview = data.embedding_preview;
+  const embedding =
+    Array.isArray(fullEmbedding) && fullEmbedding.length > 0
+      ? fullEmbedding
+      : Array.isArray(preview) && preview.length > 0
+        ? preview
+        : null;
+  const hasEmbedding = !!embedding;
+  const isPreviewOnly = hasEmbedding && !(Array.isArray(fullEmbedding) && fullEmbedding.length > 0);
+  const dims =
+    Array.isArray(fullEmbedding) && fullEmbedding.length > 0
+      ? fullEmbedding.length
+      : data.embedding_dim || null;
   const isMultimodal = data.embedding_type === 'multimodal';
   const pageCount = data.embedding_pages || 0;
 
@@ -285,9 +297,9 @@ function EmbeddingsPanel({ data }) {
       }}>
         {[
           { label: 'Model', value: 'voyage-multimodal-3.5' },
-          { label: 'Dimensions', value: hasEmbedding ? String(embedding.length) : 'N/A' },
+          { label: 'Dimensions', value: dims ? String(dims) : 'N/A' },
           { label: 'Input Type', value: inputTypeValue },
-          { label: 'Status', value: hasEmbedding ? 'Generated' : 'Not available' },
+          { label: 'Status', value: hasEmbedding ? (isPreviewOnly ? 'Bundled preview' : 'Generated') : 'Not available' },
         ].map(({ label, value }) => (
           <div key={label} style={{
             padding: `${spacing[2]}px ${spacing[3]}px`,
@@ -317,7 +329,7 @@ function EmbeddingsPanel({ data }) {
       {/* Vector preview */}
       {vectorPreview && (
         <div>
-          <SectionLabel description={`${embedding.length}-dimensional float vector`}>
+          <SectionLabel description={`${dims || embedding.length}-dimensional float vector${isPreviewOnly ? ' · bundled preview' : ''}`}>
             Vector Preview
           </SectionLabel>
           <div style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border-dim)' }}>
@@ -325,6 +337,19 @@ function EmbeddingsPanel({ data }) {
               {vectorPreview}
             </Code>
           </div>
+        </div>
+      )}
+
+      {/* Bundled-preview note */}
+      {isPreviewOnly && (
+        <div style={{
+          fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.6,
+          padding: `${spacing[2]}px ${spacing[3]}px`,
+          background: 'var(--bg-raised)', borderRadius: 8,
+          border: '1px solid var(--border-dim)',
+        }}>
+          Bundled demo preview ({preview.length} of {dims} values) — the full embedding vector lives
+          in MongoDB Atlas and is returned once the database is seeded.
         </div>
       )}
 
@@ -452,7 +477,7 @@ export default function DocumentViewer({ docId, onClose }) {
   useEffect(() => {
     if (!docId) return;
     setLoading(true);
-    apiGet(`/documents/${docId}/json`)
+    getDocumentRecord(docId)
       .then((result) => setData(result))
       .catch(() => setData(null))
       .finally(() => setLoading(false));
@@ -478,7 +503,7 @@ export default function DocumentViewer({ docId, onClose }) {
 
   if (!docId) return null;
 
-  const pdfUrl = `/api/backend/documents/${docId}/pdf`;
+  const pdfUrl = getDocumentPdfUrl(docId);
 
   return (
     <>
@@ -584,26 +609,62 @@ export default function DocumentViewer({ docId, onClose }) {
               }}>
                 Original Document
               </span>
-              <a
-                href={pdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  fontSize: 10, color: 'var(--mongo)', fontWeight: 600,
-                  textDecoration: 'none', fontFamily: 'var(--font-display)',
-                }}
-              >
-                Open in new tab
-              </a>
+              {pdfUrl && (
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    fontSize: 10, color: 'var(--mongo)', fontWeight: 600,
+                    textDecoration: 'none', fontFamily: 'var(--font-display)',
+                  }}
+                >
+                  Open in new tab
+                </a>
+              )}
             </div>
-            <object
-              data={pdfUrl}
-              type="application/pdf"
-              style={{ flex: 1, width: '100%', border: 'none' }}
-            >
+            {pdfUrl ? (
+              <object
+                data={pdfUrl}
+                type="application/pdf"
+                style={{ flex: 1, width: '100%', border: 'none' }}
+              >
+                <div style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  justifyContent: 'center', height: '100%', padding: spacing[5],
+                  color: 'var(--text-dim)', textAlign: 'center',
+                }}>
+                  <div style={{
+                    width: 48, height: 48, borderRadius: 8, marginBottom: spacing[2],
+                    border: '2px solid var(--border-dim)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
+                    color: 'var(--text-dim)',
+                  }}>PDF</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: spacing[1] }}>
+                    PDF preview unavailable
+                  </div>
+                  <a
+                    href={pdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      padding: `${spacing[1]}px ${spacing[3]}px`,
+                      borderRadius: 6, border: 'none',
+                      background: 'var(--mongo)', color: 'var(--bg-base)',
+                      fontFamily: 'var(--font-display)',
+                      fontWeight: 600, fontSize: 12,
+                      textDecoration: 'none', cursor: 'pointer',
+                    }}
+                  >
+                    Download PDF
+                  </a>
+                </div>
+              </object>
+            ) : (
               <div style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'center', height: '100%', padding: spacing[5],
+                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', padding: spacing[5],
                 color: 'var(--text-dim)', textAlign: 'center',
               }}>
                 <div style={{
@@ -613,26 +674,15 @@ export default function DocumentViewer({ docId, onClose }) {
                   fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
                   color: 'var(--text-dim)',
                 }}>PDF</div>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: spacing[1] }}>
-                  PDF preview unavailable
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: spacing[1], color: 'var(--text-secondary)' }}>
+                  PDF preview requires the seeded database
                 </div>
-                <a
-                  href={pdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    padding: `${spacing[1]}px ${spacing[3]}px`,
-                    borderRadius: 6, border: 'none',
-                    background: 'var(--mongo)', color: 'var(--bg-base)',
-                    fontFamily: 'var(--font-display)',
-                    fontWeight: 600, fontSize: 12,
-                    textDecoration: 'none', cursor: 'pointer',
-                  }}
-                >
-                  Download PDF
-                </a>
+                <div style={{ fontSize: 10, lineHeight: 1.5, maxWidth: 320 }}>
+                  The document&apos;s extracted data is bundled with the demo. The original PDF is served
+                  from the backend document store once the database is seeded.
+                </div>
               </div>
-            </object>
+            )}
           </div>
 
           {/* Right: Tabbed detail pane */}
