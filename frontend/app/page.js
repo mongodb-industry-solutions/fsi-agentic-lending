@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "../components/Header/Header";
 import BorrowerPortal from "../components/BorrowerPortal/BorrowerPortal";
 import LoanOfficerDashboard from "../components/LoanOfficerDashboard/LoanOfficerDashboard";
@@ -10,11 +10,16 @@ import InfoWizardPanel from "../components/educational/InfoWizardPanel";
 import ErrorBoundary from '../components/ErrorBoundary';
 
 export default function Home() {
-  const [activeScreen, setActiveScreen] = useState(() => {
-    if (typeof window === 'undefined') return 'borrower';
+  const [activeScreen, setActiveScreen] = useState('borrower');
+
+  // Apply a deep-linked ?screen= after hydration only — reading window.location
+  // during the useState initializer would make client render diverge from the
+  // server HTML (React hydration error #418).
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get('screen') || 'borrower';
-  });
+    const screen = params.get('screen');
+    if (screen) setActiveScreen(screen);
+  }, []);
   const [infoWizardOpen, setInfoWizardOpen] = useState(false);
 
   const handleScreenChange = (screen) => {

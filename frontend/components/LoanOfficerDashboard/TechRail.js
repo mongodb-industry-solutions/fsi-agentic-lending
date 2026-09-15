@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import OfficerChangeStreamConsole from './OfficerChangeStreamConsole';
 import AggregationPipelineVisualizer from './AggregationPipelineVisualizer';
@@ -91,10 +91,14 @@ const TECHRAIL_PREF_KEY = 'lendflow_techrail_expanded';
 export default function TechRail({ applicationId, liveAgentOutput, lastCorrelatedEvent, activityEvents, streamConnected }) {
   // Collapsed by default (keeps the MongoDB detail out of the way); the officer's
   // choice persists so re-expanding sticks across app switches.
-  const [expanded, setExpanded] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return window.localStorage.getItem(TECHRAIL_PREF_KEY) === '1';
-  });
+  const [expanded, setExpanded] = useState(false);
+
+  // Restore the persisted preference after hydration — localStorage reads in a
+  // useState initializer would mismatch the server-rendered HTML (#418).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setExpanded(window.localStorage.getItem(TECHRAIL_PREF_KEY) === '1');
+  }, []);
   const [pipelineExpanded, setPipelineExpanded] = useState(false);
   const [docModelExpanded, setDocModelExpanded] = useState(false);
 

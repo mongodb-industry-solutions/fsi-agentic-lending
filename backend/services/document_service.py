@@ -11,10 +11,21 @@ logger = logging.getLogger(__name__)
 
 
 def list_documents(application_id: str) -> list[dict]:
-    """List all documents for an application."""
-    docs = coll("documents").find(
-        storage_filter("documents", {"application_id": application_id})
-    ).sort(storage_key("documents", "created_at"), 1)
+    """List all documents for an application.
+
+    Matches both the BIAN storage key (e.g. ``applicationId``) and the legacy
+    pre-BIAN snake_case key (``application_id``), so reads survive a database
+    that still holds pre-migration documents (the ``seed_complete`` guard skips
+    re-seeding those apps). Remove the legacy ``"$or"`` branch once all data is
+    stored in BIAN shape.
+    """
+    bian_key = storage_key("documents", "application_id")
+    id_query = (
+        {"$or": [{bian_key: application_id}, {"application_id": application_id}]}
+        if bian_key != "application_id"
+        else {"application_id": application_id}
+    )
+    docs = coll("documents").find(id_query).sort(storage_key("documents", "created_at"), 1)
     result = [serialize_doc(from_storage("documents", d)) for d in docs]
     logger.info(f"Listed {len(result)} documents for application {application_id}")
     return result
