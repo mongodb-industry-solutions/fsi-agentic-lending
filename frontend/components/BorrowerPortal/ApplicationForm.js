@@ -110,9 +110,9 @@ export default function ApplicationForm({ onSubmit, borrowerProfile }) {
 
   const validate = () => {
     const errs = {};
-    const purchasePrice = parseFloat(form.loanAmount);
+    const purchasePrice = parseFloat(form.purchasePrice);
     const downPayment = parseFloat(form.downPayment);
-    if (!purchasePrice || purchasePrice <= 0) errs.loanAmount = 'Purchase price is required';
+    if (!purchasePrice || purchasePrice <= 0) errs.purchasePrice = 'Purchase price is required';
     if (isNaN(downPayment) || downPayment < 0) errs.downPayment = 'Down payment is required';
     else if (purchasePrice && downPayment >= purchasePrice) errs.downPayment = 'Must be less than purchase price';
     return errs;
@@ -137,7 +137,7 @@ export default function ApplicationForm({ onSubmit, borrowerProfile }) {
   };
 
   const debtRatio = useMemo(() => {
-    const purchasePrice = parseFloat(form.loanAmount || 0);
+    const purchasePrice = parseFloat(form.purchasePrice || 0);
     const downPayment = parseFloat(form.downPayment || 0);
     const loanAmount = purchasePrice - downPayment;
     const rate = 0.0489;
@@ -159,7 +159,7 @@ export default function ApplicationForm({ onSubmit, borrowerProfile }) {
     const tds = ((monthlyPayment + monthlyTax + existingDebt) / monthlyIncome) * 100;
 
     return { ratio: tds, monthly: monthlyPayment, gds };
-  }, [form.loanAmount, form.downPayment, form.annualIncome, form.coApplicantIncome, form.existingDebt, form.annualPropertyTax]);
+  }, [form.purchasePrice, form.downPayment, form.annualIncome, form.coApplicantIncome, form.existingDebt, form.annualPropertyTax]);
 
   return (
     <form onSubmit={handleFormSubmit} style={{ flex: 1, overflowY: 'auto', padding: `${spacing[5]}px ${spacing[6]}px` }}>
@@ -214,7 +214,7 @@ export default function ApplicationForm({ onSubmit, borrowerProfile }) {
 
       {/* Editable: Loan Details */}
       <EditableSection title="Loan Parameters">
-        <Field label="Purchase Price ($)" value={form.loanAmount} onChange={update('loanAmount')} error={errors.loanAmount} />
+        <Field label="Purchase Price ($)" value={form.purchasePrice} onChange={update('purchasePrice')} error={errors.purchasePrice} />
         <Field label="Down Payment ($)" value={form.downPayment} onChange={update('downPayment')} error={errors.downPayment} />
         <Field label="Purpose" value={form.loanPurpose} onChange={update('loanPurpose')} />
         <Field label="Property Type" value={form.propertyType} onChange={update('propertyType')} />

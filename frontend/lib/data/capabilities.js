@@ -62,13 +62,13 @@ changeStream.on("change", (event) => {
   {
     id: "timeSeries",
     glyph: "TimeSeries",
-    label: "Time Series Collections",
+    label: "$setWindowFields",
     colorVar: "voyage",
     oneLiner:
-      "Columnar storage for payment histories and credit score trends.",
-    replaces: "Dedicated time series database",
+      "Rolling-window analytics on the payments data you already store.",
+    replaces: "A separate payments/analytics store",
     description:
-      "Columnar storage with automatic bucketing, purpose-built for payment histories and credit score trends. Combined with $setWindowFields for rolling delinquency rates.",
+      "An Aggregation Framework stage that computes rolling windows over the payments collection — 90-day delinquency rates, payment trend derivatives, moving averages — right next to the loans they belong to, no separate columnar or analytics store. Windowed metrics flow straight into Early Warning System signals.",
     code: `db.payments.insertOne({
   metadata: { loanId: "L-00001", borrowerId: "B-...", productType: "5yr_fixed" },
   amount: 4047,

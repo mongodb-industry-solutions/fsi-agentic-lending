@@ -118,7 +118,7 @@ export const mongoContent = {
       label: 'Aggregation Framework',
       oneLiner: 'Real-time risk scoring in a single pipeline execution.',
       description:
-        'Real-time risk scoring in a single pipeline execution. $lookup credit data, $addFields DTI calculation, $setWindowFields rolling 90-day payment average, $switch risk tiering, $group factor aggregation, $merge materialized view. $unionWith for cross-product analytics. MongoDB 8.0 block processing for time series.',
+        'Real-time risk scoring in a single pipeline execution. $lookup credit data, $addFields DTI calculation, $setWindowFields rolling 90-day payment average, $switch risk tiering, $group factor aggregation, $merge materialized view. $unionWith for cross-product analytics.',
     },
     changeStreams: {
       id: 'changeStreams',
@@ -129,10 +129,10 @@ export const mongoContent = {
     },
     timeSeries: {
       id: 'timeSeries',
-      label: 'Time Series Collections',
-      oneLiner: 'Columnar storage for payment histories and credit score trends.',
+      label: '$setWindowFields',
+      oneLiner: 'Rolling-window analytics over the payments collection.',
       description:
-        'Columnar storage with automatic bucketing, purpose-built for payment histories and credit score trends. Partition by loanMetadata (loanId, borrowerId, productType). Combined with $setWindowFields: rolling delinquency rates, payment trend derivatives, exponential moving averages. expireAfterSeconds for 7-year regulatory retention.',
+        'An Aggregation Framework stage that computes rolling windows — 90-day delinquency rates, payment trend derivatives, exponential moving averages — directly over the payments collection, right next to the loans they belong to. No separate columnar or analytics store: the flexible document model already holds payment history, and $setWindowFields brings windowed analytics straight to it, feeding Early Warning System signals.',
     },
     vectorSearch: {
       id: 'vectorSearch',
@@ -152,7 +152,7 @@ export const mongoContent = {
 export const architectureContent = {
   pageTitle: 'The AI Layer',
   pageIntro:
-    'LangGraph orchestrates 6 specialized agents through a supervisor pattern, backed by MongoDB for state persistence, vector search, and real-time streaming.',
+    'LangGraph orchestrates a 6-agent pipeline (supervisor, doc verifier, credit puller, loan app, underwriter, HITL gate) plus a separate borrower-facing Application Agent — all backed by MongoDB for state persistence, vector search, and real-time streaming.',
 
   agentDescriptions: {
     supervisor: {
@@ -160,7 +160,7 @@ export const architectureContent = {
       responsibilities:
         'Orchestrator-worker pattern for the lending pipeline. Routes agents via LangGraph StateGraph with 4 autonomy levels: observe (nodes paused for officer approval, approved nodes bypass), suggest (final decision paused), bounded (escalations paused — default), and auto (fully autonomous). Supervisor-level retry logic (3× attempts) with safe_node timeout wrappers. Dispatches parallel execution of Document Verifier + Credit Puller via LangGraph Send().',
       productionNote:
-        'Bounded autonomy is the default — agents act autonomously for standard checks while the HITL gate triggers on policy thresholds. Every agent interaction is logged to the agent_activity time-series collection for full auditability.',
+        'Bounded autonomy is the default — agents act autonomously for standard checks while the HITL gate triggers on policy thresholds. Every agent interaction is logged to the agent_activity collection for full auditability.',
     },
     docVerifier: {
       name: 'Document Verifier',
@@ -221,7 +221,7 @@ export const architectureContent = {
         { glyph: 'Charts', label: 'Aggregation Pipeline', colorVar: 'agent-cyan' },
         { glyph: 'MagnifyingGlass', label: 'Atlas Vector Search', colorVar: 'voyage' },
         { glyph: 'File', label: 'MongoDB Query', colorVar: 'mongo' },
-        { glyph: 'TimeSeries', label: 'Time Series', colorVar: 'voyage' },
+        { glyph: 'TimeSeries', label: '$setWindowFields', colorVar: 'voyage' },
       ],
       collections: 'applications, credit_reports, underwriting_policies, payments',
       capabilities: [
@@ -236,12 +236,12 @@ export const architectureContent = {
     applicationAgent: {
       name: 'Application Agent',
       responsibilities:
-        'Conversational AI assistant for borrowers, operating independently from the pipeline. Stage-aware prompting calibrates tone by application status. Provides 10 borrower-safe tools with explicit projection allowlists — raw risk scores and internal data are never exposed. Renders 7 interactive generative UI components inline in chat. Returns source citations with provenance badges.',
+        'Conversational AI assistant for borrowers, operating independently from the pipeline. Stage-aware prompting calibrates tone by application status. Provides 8 borrower-safe tools with explicit projection allowlists — raw risk scores and internal data are never exposed. Renders 2 generative UI components (document checklist, closing timeline) inline in chat. Returns source citations with provenance badges.',
       tools: [
         { glyph: 'MagnifyingGlass', label: 'Policy RAG (Vector Search)', colorVar: 'voyage' },
         { glyph: 'File', label: 'Status + Documents Query', colorVar: 'mongo' },
         { glyph: 'Warning', label: 'Intervention Check', colorVar: 'hitl-amber' },
-        { glyph: 'Charts', label: 'Affordability Calculator', colorVar: 'agent-cyan' },
+        { glyph: 'Charts', label: 'Document Checklist + Closing Timeline (generative UI)', colorVar: 'agent-cyan' },
       ],
       collections: 'applications, documents, interventions, underwriting_policies, conversations',
       capabilities: [

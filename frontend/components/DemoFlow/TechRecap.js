@@ -36,7 +36,7 @@ export default function TechRecap({ activeFeatures }) {
   ];
 
   const techStack = [
-    { category: 'Data Platform', items: 'MongoDB Atlas — Document Model, Aggregation Framework, Change Streams, Time Series, Vector Search' },
+    { category: 'Data Platform', items: 'MongoDB Atlas — Document Model, Aggregation Framework, Change Streams, $setWindowFields, Vector Search' },
     { category: 'Orchestration', items: 'LangGraph — Orchestrator-worker pattern, interrupt(), MongoDBSaver checkpoints, MongoDBStore memory' },
     { category: 'Integration', items: 'LangChain — MongoDBAtlasVectorSearch, tool bindings, structured output' },
     { category: 'AI Models', items: 'Claude 3.5 Sonnet (reasoning) + voyage-multimodal-3.5 (multimodal embeddings with Matryoshka dimensionality)' },

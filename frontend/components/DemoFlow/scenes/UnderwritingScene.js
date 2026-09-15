@@ -191,7 +191,7 @@ export default function UnderwritingScene({ sceneStep, currentStepData }) {
             <div style={{ padding: spacing[300], background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border-dim)', marginBottom: spacing[400], animation: 'slideDown 220ms cubic-bezier(0.33, 1, 0.68, 1)' }}>
               <div style={{ fontFamily: uiTokens.font, fontWeight: 700, fontSize: 12, marginBottom: spacing[150] }}>Payment History</div>
               <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                36-month analysis via Time Series Collection
+                36-month analysis via $setWindowFields
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: spacing[200], marginTop: spacing[200] }}>
                 <div style={{ textAlign: 'center', padding: spacing[200], background: 'var(--bg-raised)', borderRadius: 8 }}>

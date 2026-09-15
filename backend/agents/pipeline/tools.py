@@ -78,7 +78,7 @@ _logger = logging.getLogger(__name__)
 
 
 def log_agent_activity(application_id: str, agent: str, action: str, detail: str, checkpoint_id: str = None, run_id: str = None):
-    """Log an agent action to the agent_activity time-series collection."""
+    """Log an agent action to the agent_activity collection."""
     try:
         entry = {
             "application_id": application_id,

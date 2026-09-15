@@ -88,7 +88,7 @@ function EWSPanel({ highlightAlert, signals }) {
         <div style={{ fontFamily: uiTokens.font, fontWeight: 700, fontSize: 12 }}>Early Warning System</div>
         <div style={{ display: 'flex', gap: spacing[100], alignItems: 'center' }}>
           <span style={{ fontSize: 8, fontWeight: 600, padding: `${spacing[50]}px ${spacing[150]}px`, borderRadius: 8, background: 'var(--voyage-dim)', color: 'var(--voyage)' }}>
-            Time Series &middot; $setWindowFields
+            Aggregation &middot; $setWindowFields
           </span>
           <span style={{ fontSize: 8, fontWeight: 600, padding: `${spacing[50]}px ${spacing[150]}px`, borderRadius: 8, background: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' }}>
             Change Streams
@@ -155,7 +155,7 @@ function ServicingInterventionCard({ sceneStep }) {
 
       <div style={{ marginTop: spacing[200], fontSize: 11, color: 'var(--text-dim)', display: 'flex', gap: spacing[150] }}>
         <span style={{ padding: `${spacing[50]}px ${spacing[150]}px`, background: 'var(--voyage-dim)', color: 'var(--voyage)', borderRadius: 8 }}>Vector Search</span>
-        <span style={{ padding: `${spacing[50]}px ${spacing[150]}px`, background: 'var(--bg-raised)', color: 'var(--agent-cyan)', borderRadius: 8 }}>Time Series</span>
+        <span style={{ padding: `${spacing[50]}px ${spacing[150]}px`, background: 'var(--bg-raised)', color: 'var(--agent-cyan)', borderRadius: 8 }}>$setWindowFields</span>
         <span style={{ padding: `${spacing[50]}px ${spacing[150]}px`, background: 'var(--bg-raised)', color: 'var(--success)', borderRadius: 8 }}>Change Streams</span>
       </div>
     </div>

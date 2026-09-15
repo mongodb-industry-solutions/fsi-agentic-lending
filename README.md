@@ -1,4 +1,4 @@
-# LendFlow AI — Agentic Lending Platform
+# Agentic Lending Platform (formerly "LendFlow AI")
 
 End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangGraph**, and **Voyage AI** work together to automate the full mortgage lifecycle — from application intake through loan servicing.
 
@@ -17,7 +17,7 @@ End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangG
 │   │ • Selection  │  │ • Queue (WebSocket)│  │ • Origination            │  │
 │   │ • Form+Valid │  │ • Activity (SSE)   │  │ • Underwriting           │  │
 │   │ • Status(SSE)│  │ • HITL Review      │  │ • Approval               │  │
-│   │ • Your docs  │  │ • Intent Preview   │  │ • Closing                │  │
+│   │ • Your docs  │  │ • Total-Time Card  │  │ • Closing                │  │
 │   │ • Assistant  │  │ • Decision Summary │  │ • Funding                │  │
 │   │   chat +     │  │ • Tech Rail        │  │ • Servicing              │  │
 │   │   Gen UI     │  │                    │  │                           │  │
@@ -93,7 +93,7 @@ End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangG
 │   │ Bedrock    │  │ LangSmith  │  │ Voyage AI    │                       │
 │   │ Claude     │  │ @traceable │  │ Multimodal   │                       │
 │   │ Haiku 4    │  │ traces     │  │ Embeddings   │                       │
-│   │ + tool_use │  │            │  │ (voyage-3.5) │                       │
+│   │ + tool_use │  │            │  │ (multimodal) │                       │
 │   └────────────┘  └────────────┘  └──────────────┘                       │
 └────────────────────────────────────┬────────────────────────────────────────┘
                                      │
@@ -113,12 +113,12 @@ End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangG
 │   └─────────────┘                                                          │
 │                                                                             │
 │   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│   │ Time Series  │  │ MongoDBSaver │  │ Pipeline     │  │ HITL Audit   │ │
+│   │ Standard     │  │ MongoDBSaver │  │ Pipeline     │  │ HITL Audit   │ │
 │   │ Collections  │  │ Checkpoints  │  │ Locks        │  │ Log          │ │
-│   │              │  │              │  │              │  │              │ │
-│   │ payments     │  │ checkpoints  │  │ TTL-based    │  │ Immutable    │ │
-│   │ agent_activity│ │ chkpt_writes │  │ distributed  │  │ officer      │ │
-│   │ + $setWindow │  │ chkpt_meta   │  │ concurrency  │  │ decisions    │ │
+│   │ $setWindow-  │  │              │  │              │  │              │ │
+│   │ Fields       │  │ checkpoints  │  │ TTL-based    │  │ Immutable    │ │
+│   │ payments     │  │ chkpt_writes │  │ distributed  │  │ officer      │ │
+│   │ agent_activity│ │ chkpt_meta   │  │ concurrency  │  │ decisions    │ │
 │   └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘ │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -202,10 +202,27 @@ End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangG
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----- |
 | **Document Model**        | Loan applications, interventions, and conversations grow through lifecycle stages — one document per entity, no schema migrations | A     |
 | **Atlas Vector Search**   | Policy RAG via Voyage AI multimodal embeddings (voyage-multimodal-3.5) — `queryVector` with pre-computed embeddings               | A     |
-| **Aggregation Framework** | 7-stage risk scoring pipeline ($match→$lookup×2→$addFields×3→$project)                                                            | A     |
+| **Aggregation Framework** | 7-stage risk scoring pipeline ($match→$lookup×2→$addFields×3→$project); $setWindowFields rolling-window payment/EWS analytics     | A     |
 | **Change Streams**        | Real-time WebSocket queue + SSE status/activity feeds, labeled in UI                                                              | A     |
-| **Time Series**           | Payment history with $setWindowFields (rolling 90-day analysis), EWS signals                                                      | A-    |
 | **MongoDBSaver**          | LangGraph checkpoint persistence for HITL interrupt/resume across restarts                                                        | A     |
+
+## BIAN Data Model Alignment
+
+The staging build aligns this demo with the **BIAN banking data model** (BIAN spec `v4_34`). Everything above the persistence layer — services, agents, routes, the HTTP API, and the frontend — keeps this demo's native snake_case shape; only what crosses the storage boundary is translated into BIAN camelCase.
+
+- **One consolidated database.** `DATABASE_NAME` selects the single `leafy_bank_bian` database that holds both the umbrella BIAN banking records and this demo's agentic infrastructure. The LangGraph-managed `checkpoints` collections are handled separately by MongoDBSaver.
+- **Collection-name indirection.** `db/collections_config.py` is the single source of truth for physical collection names. Every logical collection resolves through `coll()` / `NAMES` and is overridable at runtime via `COLL_<LOGICAL>` env vars (e.g. `COLL_PAYMENTS=loanRepayments`) — so a migration step renames a collection with **zero code edits**, defaulting to today's exact names when no env override is set.
+- **Translate at the storage boundary (Playbook Option A).** `db/storage_mapping.py` and `db/bian_field_maps.py` translate whole documents and query keys between the runtime snake_case shape and the BIAN storage shape on every read/write. The translation is a round-trip guarantee: `from_storage(c, to_storage(c, doc)) == doc`, pinned by `tests/test_bian_mapping.py` against fixtures cut from the migration output (`tests/fixtures/migrated_bian_samples.json`).
+- **Representative mappings:**
+
+| Logical (snake_case, runtime)                     | BIAN storage (camelCase)                                                        |
+| ------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `applications.application_id`                     | `applications.loansId`                                                          |
+| `gds_ratio`, `tds_ratio`, `stress_gds`, `stress_tds`, `ltv`, `risk_score`, `risk_tier`, `primary_credit_score`, `decision_reasoning`, `status_detail` | nested `assessment.*` record (e.g. `assessment.grossDebtServiceRatio`, `assessment.riskScore`) |
+| `status_history`                                  | `maintenance.statusHistory`                                                     |
+| `borrower_ids` (flat customer refs)               | `[{ "customerId": "CUST-…", "role": "PRIMARY" \| "CO_APPLICANT" }]`              |
+
+- **Shared party directory.** `customers` is the shared BIAN party directory in `leafy_bank_bian`, owned by the umbrella accounts service — this demo reads and upserts into it but deliberately does not own its indexes. The legacy `borrowers` collection is retired by the migration.
 
 ## Tech Stack
 
@@ -213,7 +230,7 @@ End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangG
 | ------------- | -------------------------------------------------------------------------------------------------------------------- |
 | Frontend      | Next.js 15 (App Router), React 19, LeafyGreen UI, custom server.mjs (WebSocket proxy for K8s)                        |
 | Backend       | FastAPI, LangGraph 0.4+, Python 3.13 (managed by uv)                                                                |
-| Database      | MongoDB Atlas (12 collections + 3 LangGraph infra)                                                                   |
+| Database      | MongoDB Atlas — shared `leafy_bank_bian` database (13 standard collections + shared `customers` + 3 LangGraph infra) |
 | AI/ML         | AWS Bedrock Claude Haiku 4 (tool_use for structured output), Voyage AI multimodal embeddings (voyage-multimodal-3.5) |
 | Observability | LangSmith (@traceable on all LLM calls + agent nodes)                                                                |
 | Deployment    | Docker Compose (local), K8s (staging/prod)                                                                    |
@@ -327,7 +344,8 @@ Phase-based flow: **profile selection → application form → real-time trackin
 Full-featured officer workspace with real-time data flows and human-in-the-loop decisioning, recently redesigned to be **action-first and simplified**: the decision the officer needs to make leads, and the technical depth is available on demand rather than always-on. Dual-rail architecture on the right side. Unlike the borrower, the officer sees **full underwriting detail and the multi-agent pipeline** — all the transparency the borrower view deliberately hides.
 
 - **Officer Identity** — a single seeded loan officer (**Curtis Dean**, "Loan Officer", NMLS #) lives in the `officers` collection, served by `GET /officers/current`. Shown as an `OfficerIdentityCard` (avatar + name + title + NMLS) atop the Agent Rail, and their `officer_id` is sent on every HITL decision.
-- **Application Queue** — real-time via WebSocket + Change Stream, filterable and sortable, amber accent on review-needed apps.
+- **Application Queue** — real-time via WebSocket + Change Stream, filterable and sortable, amber accent on review-needed apps. Pre-populated with the 5 seeded applications plus decorative seed sample apps (`APP-DEMO-*`), so the queue reads as live on load.
+- **Total-Time Card** — a persistent processing-time card pinned to the center column. It breaks the end-to-end turnaround time into status stages and **pauses the clock while the case waits on the borrower** (`action_required` — "awaiting borrower · clock paused"), so the elapsed number is the honest regulatory turnaround time, not wall-clock.
 - **Application Detail** — borrower info, risk assessment, credit reports, documents. Includes **Pipeline Explorer** (7-stage aggregation viz) and **Document Search** (Atlas Vector Search).
 - **Action-First Center Column** — the executing phase leads with the decision the officer must make: while the pipeline is still running the **Pipeline Step Tracker** stays primary; once a decision is pending (HITL) or made (approved/declined), the **HITL Review** or **Decision Summary** becomes the top hero and the pipeline tracker collapses beneath it behind a **"Pipeline progress"** toggle. Larger typography in the middle section for review-focused legibility.
 - **Pipeline Step Tracker** — one consolidated, expandable **3-stage tracker** (Origination / Underwriting / Decision Review). Each stage is a collapsible box — collapsed shows a state pill + elapsed time; expanded shows the real sub-steps + live metrics (risk score, GDS/TDS, credit score) — with the active stage auto-expanded. The full **Workflow Canvas** (Canvas 2D engine, parallel `doc_verifier`/`credit_puller` nodes, comet trails, HITL barrier drama) is demoted behind a **"View diagram"** button that opens it in a LeafyGreen Modal. (Replaces the earlier always-on inline canvas, `StageProgressBar`, and `LiveUnderwritingResults` overlay.)
@@ -335,7 +353,6 @@ Full-featured officer workspace with real-time data flows and human-in-the-loop 
 - **Agent Activity Log** — SSE feed with color-coded left-borders by action type, noise-action filter, deferred status-gated REST fallback, multi-line markdown-aware reasoning, metric summary strip, HITL gate entry, agent transition dividers, pause/resume.
 - **Policy Explorer** — Atlas Vector Search with relevance bars, search provenance, term highlighting, HITL auto-search.
 - **Portfolio Intelligence** — Payment trends (SVG trend line), severity-tiered EWS cards, events timeline.
-- **Intent Preview** — agent's planned execution steps with dependency connectors and data readiness badges, aligned to the real pipeline (doc verify, credit pull, synthesis, risk score, policy RAG, decision gate).
 - **HITL Review** — leads with an **AI Recommendation hero** (LLM-generated recommended action badge + one-line reason + confidence + suggested conditions, persisted by the underwriter and surfaced via `/hitl/{id}/context`); "Approve as recommended" carries those suggested conditions. The dense underwriting detail (reasoning, the explicit **Threshold Analysis** panel — price / effective GDS / effective TDS / risk tier vs. policy limits — risk table, activity) collapses behind a toggle. Approve/decline/modify with officer overrides and re-underwriting. GDS/TDS limits centralized in `LoanOfficerDashboard/utils.js` (`GDS_LIMIT`, `TDS_LIMIT`).
 - **Decision Summary** — provenance chain, audit trail, before/after comparison for modified decisions. Non-auto decisions are attributed ("Reviewed by Curtis Dean").
 - **Agent Rail** (320px) — `OfficerIdentityCard` (officer persona) above the branded "AI Agent Layer" header with live pulse and stats, cyan-to-amber border on HITL. Agent events highlight corresponding canvas nodes.
@@ -354,7 +371,7 @@ Full-featured officer workspace with real-time data flows and human-in-the-loop 
 - **Approval** — HITL review card with Badge-based tier indicator, Approve/Modify/Decline controls, collapsible Repayment Schedule and Regulatory Disclosures.
 - **Closing** — closing timeline with workflow canvas: approval detection, closing package (TILA, RESPA), compliance checks, e-sign completion.
 - **Funding** — disbursement timeline with 4-step document evolution, double-entry accounting table.
-- **Servicing** — portfolio stats grid, top-3 Early Warning System signals, live event feed, 4-step renewal intervention card. Real-time data from `/portfolio/stats`. Focus nodes: `timeSeries`, `changeStream`, `vectorSearch`, `mongoAtlas` (servicingAgent node retired from canvas).
+- **Servicing** — portfolio stats grid, top-3 Early Warning System signals, live event feed, 4-step renewal intervention card. Real-time data from `/portfolio/stats`. Focus nodes: `$setWindowFields`, `changeStream`, `vectorSearch`, `mongoAtlas` (servicingAgent node retired from canvas).
 - **Completion Screen** — full WorkflowCanvas with all nodes completed (green edges, checkmarks), `TechRecap` card with 5 collapsible sections (Performance Stats, Tech Stack, Cross-Lifecycle Intelligence, By the Numbers).
 
 ### 4. Renewal Dashboard
@@ -428,7 +445,7 @@ make clean    # Stop and remove containers
 
 ```bash
 cd backend
-uv run pytest    # 15 tests (health, applications, documents, agent state)
+uv run pytest    # 132 tests (underwriting math, BIAN storage mapping, interventions, officers, chatbot, circuit breaker, …)
 ```
 
 ## Environment Variables
@@ -438,7 +455,7 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | Variable                   | Required | Description                                      |
 | -------------------------- | -------- | ------------------------------------------------ |
 | `MONGODB_URI`              | Yes      | MongoDB Atlas connection string                  |
-| `DATABASE_NAME`            | Yes      | Database name — `leafy_bank_bian` (shared)       |
+| `DATABASE_NAME`            | Yes      | Database name — `leafy_bank_bian` (shared with the umbrella BIAN banking data) |
 | `CHATCOMPLETIONS_MODEL_ID` | Yes      | Bedrock inference profile ARN or model ID        |
 | `VOYAGE_API_KEY`           | Yes      | Voyage AI API key for multimodal embeddings      |
 | `AWS_REGION`               | No       | AWS region (default: `us-east-1`)                |
@@ -458,7 +475,7 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 
 ## API Endpoints
 
-### REST (31 endpoints)
+### REST (33 endpoints)
 
 | Method | Path                                         | Description                                                                             |
 | ------ | -------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -471,7 +488,9 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | GET    | `/api/documents/{id}`                        | Get single document                                                                     |
 | GET    | `/api/documents/{id}/pdf`                    | Serve original PDF                                                                      |
 | GET    | `/api/documents/{id}/json`                   | Full MongoDB document JSON                                                              |
+| GET    | `/api/documents/debug/pdf-paths`             | Debug: resolved PDF paths per seed profile (demo diagnostics)                          |
 | POST   | `/api/applications/{id}/documents/upload`    | Upload + extract document via Bedrock (50MB limit, SHA-256 dedup)                       |
+| POST   | `/api/applications/{id}/documents/demo-upload/{doc_type}` | Upload a pre-seeded demo PDF for a doc type (extract + embed)        |
 | POST   | `/api/documents/search`                      | Atlas Vector Search across documents (supports `application_id` filter)                 |
 | POST   | `/api/policies/search`                       | Atlas Vector Search across policies                                                     |
 | POST   | `/api/agent/{id}/run`                        | Trigger agent pipeline (with pipeline lock)                                             |
@@ -487,7 +506,7 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | POST   | `/api/chat/general/message`                  | General chat (pre-application, no app context)                                          |
 | GET    | `/api/portfolio/stats`                       | Portfolio-level aggregation (active loans, delinquency)                                 |
 | GET    | `/api/portfolio/payments`                    | Payment trends with $setWindowFields                                                    |
-| GET    | `/api/portfolio/ews`                         | Early Warning System signals from time-series (auto-samples a loan_id if none provided) |
+| GET    | `/api/portfolio/ews`                         | Early Warning System signals from rolling-window payment analytics (auto-samples a loan_id if none provided) |
 | GET    | `/api/portfolio/events`                      | Recent events (payments + agent actions)                                                |
 | POST   | `/api/demo/reset`                            | Reset demo state (requires `X-Demo-Reset: confirm` header)                              |
 | GET    | `/api/renewals`                              | Renewal Agent scan — loans maturing within 3 months (restores renewed seed loans)      |
@@ -510,11 +529,12 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | ------------------------- | -------------------------------------------------------------------------------------- |
 | WS `/api/applications/ws` | Real-time application queue (Change Stream, 15s heartbeat, 60s dead-client detection)  |
 
-## MongoDB Collections (13 + 3 infra)
+## MongoDB Collections (13 demo + shared `customers` + 3 LangGraph infra)
 
 | Collection              | Type            | Purpose                           | Key Feature                                                                    |
 | ----------------------- | --------------- | --------------------------------- | ------------------------------------------------------------------------------ |
-| `borrowers`             | Standard        | Applicant profiles                | Polymorphic income sources                                                     |
+| `borrowers`             | Retired (BIAN)  | Applicant profiles                | Folded into the shared `customers` party directory by the BIAN migration        |
+| `customers`             | Shared (BIAN)   | BIAN party directory              | Owned by the umbrella accounts service in `leafy_bank_bian`; read/upserted by this demo |
 | `applications`          | Standard        | Loan state machine                | Status history with audit trail                                                |
 | `documents`             | Standard        | Extracted PDF data                | Voyage AI embeddings for vector search                                         |
 | `credit_reports`        | Standard        | Credit bureau data                | Per-borrower scoring, sorted by borrower order                                 |
@@ -525,8 +545,8 @@ uv run pytest    # 15 tests (health, applications, documents, agent state)
 | `officers`              | Standard        | Loan officer identity             | Seeded singleton (Curtis Dean) — the reviewing officer, served by `/officers/current` |
 | `pipeline_locks`        | Standard        | Distributed concurrency locks     | TTL-based (600s expiry) to prevent concurrent pipeline execution               |
 | `renewals`              | Standard        | Loans nearing maturity            | Powers the standalone Renewal Agent (scan → offer → e-sign → auto-renew)        |
-| `payments`              | **Time Series** | Payment history                   | $setWindowFields rolling 90-day analysis                                       |
-| `agent_activity`        | **Time Series** | Agent action log                  | Real-time SSE streaming via Change Stream                                      |
+| `payments`              | Standard        | Payment history                   | $setWindowFields rolling 90-day analysis + EWS signals                          |
+| `agent_activity`        | Standard        | Agent action log                  | Real-time SSE streaming via Change Stream                                       |
 | `checkpoints`           | LangGraph       | Graph state snapshots             | MongoDBSaver interrupt/resume                                                  |
 | `checkpoint_writes`     | LangGraph       | Write-ahead log                   | Checkpoint durability                                                          |
 | `checkpoints_metadata`  | LangGraph       | Checkpoint metadata               | Graph state metadata                                                           |

@@ -24,7 +24,7 @@ function ContextStrip({ applicationId, applicationStatus, borrowerProfile, loadi
     ? `${borrowerProfile.firstName} ${borrowerProfile.lastName || ''}`
     : null;
   const loanAmount = borrowerProfile?.loanAmount
-    ? formatCurrency(parseFloat(borrowerProfile.loanAmount) - parseFloat(borrowerProfile.downPayment || 0))
+    ? formatCurrency(parseFloat(borrowerProfile.loanAmount))
     : null;
 
   const statusColors = {
