@@ -464,6 +464,12 @@ def upsert_demo_application(profile_id: str, demo_session_id: str, data: dict) -
 
     If an application already exists for (profile_id, demo_session_id), reset it.
     Otherwise create a new one and clone documents from the seeded profile.
+
+    Returns the clone counts so the caller can fail loudly when documents could
+    not be attached — a submit that ships an app with zero documents is broken
+    (the borrower just saw those docs on the apply page), and a silent empty
+    clone is how a wrong DATABASE_NAME / COLL_* mapping shows up as
+    "No documents found" in the tracking pane.
     """
     existing = coll("applications").find_one(storage_filter("applications", {
         "profile_id": profile_id,
@@ -477,22 +483,38 @@ def upsert_demo_application(profile_id: str, demo_session_id: str, data: dict) -
         _reset_application_state(app_id)
         # Re-clone seed data after reset
         seed_app_id = SEED_APPLICATION_IDS.get(profile) or SEED_APPLICATION_IDS.get("marcus-delgado")
+        docs_attached = 0
+        credit_reports_attached = 0
         if seed_app_id:
-            clone_demo_documents(seed_app_id, app_id)
-            clone_demo_credit_reports(seed_app_id, app_id)
+            docs_attached = clone_demo_documents(seed_app_id, app_id)
+            credit_reports_attached = clone_demo_credit_reports(seed_app_id, app_id)
         logger.info(f"Reset existing demo application {app_id} for session {demo_session_id[:8]}")
-        return {"application_id": app_id, "status": "submitted", "reset": True}
+        return {
+            "application_id": app_id,
+            "status": "submitted",
+            "reset": True,
+            "documents_attached": docs_attached,
+            "credit_reports_attached": credit_reports_attached,
+        }
 
     app = create_application(data, profile_id=profile_id, demo_session_id=demo_session_id)
     app_id = app["application_id"]
 
     # Clone seed data — fall back to default seed if profile not explicitly mapped
     seed_app_id = SEED_APPLICATION_IDS.get(profile_id) or SEED_APPLICATION_IDS.get("marcus-delgado")
+    docs_attached = 0
+    credit_reports_attached = 0
     if seed_app_id:
-        clone_demo_documents(seed_app_id, app_id)
-        clone_demo_credit_reports(seed_app_id, app_id)
+        docs_attached = clone_demo_documents(seed_app_id, app_id)
+        credit_reports_attached = clone_demo_credit_reports(seed_app_id, app_id)
 
-    return {"application_id": app_id, "status": "submitted", "reset": False}
+    return {
+        "application_id": app_id,
+        "status": "submitted",
+        "reset": False,
+        "documents_attached": docs_attached,
+        "credit_reports_attached": credit_reports_attached,
+    }
 
 
 def reset_all_demo_data() -> dict:
