@@ -66,11 +66,8 @@ there), and confirm `DATABASE_NAME=leafy_bank_bian`:
 ```yaml
 - name: DATABASE_NAME
   value: leafy_bank_bian          # from the fsi-agentic-lending-secrets secret — confirm
-- name: COLL_APPLICATIONS
-  value: 'loans'
 - name: COLL_BORROWERS
-  value: 'borrowers'              # retired; kept so legacy seed scripts resolve
-- name: COLL_DOCUMENTS
+  value: 'customers'              # retired; folded into `customers` in leafy_bank_bian
   value: 'lendingDocuments'
 - name: COLL_CREDIT_REPORTS
   value: 'creditReports'
