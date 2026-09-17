@@ -770,11 +770,15 @@ def main():
     print("\n" + "=" * 60)
     print("INGESTION COMPLETE")
     print("=" * 60)
-    print(f"  Borrowers: {db['borrowers'].count_documents({})}")
-    print(f"  Applications: {db['applications'].count_documents({})}")
-    print(f"  Documents: {db['documents'].count_documents({})}")
-    print(f"  Credit Reports: {db['credit_reports'].count_documents({})}")
-    print(f"  Policies: {db['underwriting_policies'].count_documents({})}")
+    # Resolve through the same COLL_* mapping the app uses (the physical names
+    # may be prefixed, e.g. loans / lendingDocuments in leafy_bank_bian). The
+    # retired `borrowers` collection no longer exists — borrowers now live in
+    # the shared `customers` directory tagged sourceSystem=fsi-agentic-lending.
+    print(f"  Customers (lending): {coll('customers').count_documents({'sourceSystem': 'fsi-agentic-lending'})}")
+    print(f"  Applications: {coll('applications').count_documents({})}")
+    print(f"  Documents: {coll('documents').count_documents({})}")
+    print(f"  Credit Reports: {coll('credit_reports').count_documents({})}")
+    print(f"  Policies: {coll('underwriting_policies').count_documents({})}")
     print(f"  Payments: {db['payments'].count_documents({})}")
 
 

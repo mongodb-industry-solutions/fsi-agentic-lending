@@ -191,7 +191,56 @@ def get_application(application_id: str) -> dict | None:
             serialize_doc(from_storage("credit_reports", r)) for r in reports
         ]
 
+    # The retired `borrowers` collection no longer exists in leafy_bank_bian;
+    # borrower employment detail now lives on the shared `customers` directory
+    # entries (tagged `sourceSystem: fsi-agentic-lending`). Enrich the loan's
+    # income summary from those entries — additive and guarded, so a missing or
+    # unresolvable customer never fails the endpoint (positional: PRIMARY at
+    # [0], CO_APPLICANT at [1], same convention the storage boundary uses).
+    try:
+        borrower_ids = app.get("borrower_ids") or []
+        if borrower_ids:
+            fetched = customer_service.get_customers(borrower_ids)
+            by_id = {c.get("customer_id"): c for c in fetched}
+            _attach_borrower_employment(app, by_id)
+    except Exception:
+        logger.exception("Failed to enrich borrower employment from customers for %s", application_id)
+
     return app
+
+
+def _attach_borrower_employment(app: dict, borrowers_by_id: dict) -> None:
+    """Fill ``income_summary.primary_employment`` / ``co_applicant_*`` from the
+    shared ``customers`` directory.
+
+    ``borrowers_by_id`` maps customerId -> customer (runtime shape). The loan's
+    ``borrower_ids`` ORDER is the source of truth (PRIMARY at index 0,
+    CO_APPLICANT at index 1) — a ``$in`` lookup returns DB order, not input
+    order, so indices must be taken from the loan's own array, never from the
+    fetch order. Additive; never mutates anything but ``income_summary``.
+    """
+    if not borrowers_by_id:
+        return
+    borrower_ids = app.get("borrower_ids") or []
+    ordered = [borrowers_by_id[bid] for bid in borrower_ids if borrowers_by_id.get(bid)]
+    if not ordered:
+        return
+
+    income = app.setdefault("income_summary", {})
+    primary_emp = ordered[0].get("employment") or {}
+    primary_job = primary_emp.get("job_title")
+    if primary_job:
+        employer = (primary_emp.get("employer") or {}).get("name")
+        income["primary_employment"] = f"{primary_job} · {employer}" if employer else primary_job
+
+    if len(ordered) > 1:
+        co_emp = ordered[1].get("employment") or {}
+        co_job = co_emp.get("job_title")
+        if co_job:
+            income["co_applicant_employment"] = co_job
+        co_income = (co_emp.get("income") or {}).get("amount")
+        if co_income is not None:
+            income["co_applicant_gross"] = co_income
 
 
 def list_applications(skip: int = 0, limit: int = 50) -> list[dict]:
