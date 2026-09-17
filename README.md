@@ -416,6 +416,9 @@ Sarah Williams demonstrates the **full intervention resolution loop**: pipeline 
 cd backend
 cp .env.example .env
 # Edit .env with your MongoDB URI, Bedrock model ID, etc.
+# If DATABASE_NAME=leafy_bank_bian, also set the COLL_* overrides (see
+# "Collection overrides (COLL_*, optional)" under Environment Variables) —
+# otherwise reads resolve to plain collection names that don't exist there.
 
 make uv_init && make uv_sync
 
@@ -464,7 +467,30 @@ uv run pytest    # 132 tests (underwriting math, BIAN storage mapping, intervent
 | `DECLINE_RISK_SCORE`       | No       | Auto-decline threshold (default: `80`)           |
 | `ESCALATE_PURCHASE_PRICE`  | No       | HITL escalation threshold (default: `500000`)    |
 | `ESCALATE_GDS`             | No       | GDS ratio escalation threshold (default: `0.36`) |
-| `ESCALATE_TDS`             | No       | TDS ratio escalation threshold (default: `0.41`) |                        |
+| `ESCALATE_TDS`             | No       | TDS ratio escalation threshold (default: `0.41`) |
+
+### Collection overrides (`COLL_*`, optional)
+
+`leafy_bank_bian` stores this demo's collections under a `lending` prefix and uses BIAN names for shared records. When `DATABASE_NAME` points at `leafy_bank_bian`, set these overrides — without them every read resolves to a plain name that does not exist there and returns empty (e.g. "No documents found").
+
+| Variable | Value | Logical collection |
+| --- | --- | --- |
+| `COLL_APPLICATIONS` | `loans` | applications |
+| `COLL_DOCUMENTS` | `lendingDocuments` | documents |
+| `COLL_CREDIT_REPORTS` | `creditReports` | credit_reports |
+| `COLL_PAYMENTS` | `loanRepayments` | payments |
+| `COLL_UNDERWRITING_POLICIES` | `lendingUnderwritingPolicies` | underwriting_policies |
+| `COLL_INTERVENTIONS` | `lendingInterventions` | interventions |
+| `COLL_CONVERSATIONS` | `lendingConversations` | conversations |
+| `COLL_AGENT_ACTIVITY` | `lendingAgentActivity` | agent_activity |
+| `COLL_OFFICERS` | `lendingOfficers` | officers |
+| `COLL_HITL_AUDIT` | `lendingHitlAudit` | hitl_audit |
+| `COLL_PIPELINE_LOCKS` | `lendingPipelineLocks` | pipeline_locks |
+| `COLL_RENEWALS` | `lendingRenewals` | renewals |
+| `COLL_BORROWERS` | `customers` | borrowers (retired — folded into customers) |
+| `COLL_CUSTOMERS` | `customers` | customers (shared directory) |
+
+Resolver: `backend/db/collections_config.py`. Detailed root-cause + verification steps: [`docs/deployment-and-seeding-guide.md`](docs/deployment-and-seeding-guide.md).
 
 ### Frontend (`frontend/.env`)
 
