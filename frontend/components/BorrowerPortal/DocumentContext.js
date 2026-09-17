@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
-import { apiGet } from '../../lib/api';
+import { getApplicationDocuments } from '../../lib/documents';
 import DocumentViewer from '../DocumentViewer';
 
 const DOC_TYPE_LABELS = {
@@ -147,7 +147,7 @@ export default function DocumentContext({ applicationId, refreshTrigger = 0 }) {
 
   const fetchDocs = useCallback(() => {
     if (!applicationId) return;
-    apiGet(`/applications/${applicationId}/documents`)
+    getApplicationDocuments(applicationId)
       .then((docs) => {
         if (docs && Array.isArray(docs)) {
           const newChanged = new Set();

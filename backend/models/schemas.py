@@ -90,6 +90,9 @@ class ApplicationResponse(BaseModel):
     product: str
     status: str
     property: dict
+    # income_summary keys: combined_gross, primary, co_applicant (stored on the
+    # loan) plus primary_employment, co_applicant_gross, co_applicant_employment
+    # (enriched from the shared `customers` directory in get_application()).
     income_summary: dict
     created_at: datetime
     documents: list[dict] = []
