@@ -68,6 +68,8 @@ sidecarContainers:
       # applications -> loans, payments -> loanRepayments, ...). Without these
       # COLL_* overrides the app resolves to plain names that do not exist there
       # and every collection reads empty. DATABASE_NAME must be leafy_bank_bian.
+      - name: COLL_APPLICATIONS
+        value: 'loans'
       - name: COLL_BORROWERS
         value: 'customers'
       - name: COLL_DOCUMENTS
