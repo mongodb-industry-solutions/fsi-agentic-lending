@@ -63,6 +63,37 @@ sidecarContainers:
           secretKeyRef:
             name: fsi-agentic-lending-secrets
             key: CHATCOMPLETIONS_MODEL_ID
+      # Collection-name indirection: the shared leafy_bank_bian database stores
+      # the demo's collections under a `lending` prefix (documents -> lendingDocuments,
+      # applications -> loans, payments -> loanRepayments, ...). Without these
+      # COLL_* overrides the app resolves to plain names that do not exist there
+      # and every collection reads empty. DATABASE_NAME must be leafy_bank_bian.
+      - name: COLL_APPLICATIONS
+        value: 'loans'
+      - name: COLL_BORROWERS
+        value: 'borrowers'
+      - name: COLL_DOCUMENTS
+        value: 'lendingDocuments'
+      - name: COLL_CREDIT_REPORTS
+        value: 'creditReports'
+      - name: COLL_PAYMENTS
+        value: 'loanRepayments'
+      - name: COLL_UNDERWRITING_POLICIES
+        value: 'lendingUnderwritingPolicies'
+      - name: COLL_AGENT_ACTIVITY
+        value: 'lendingAgentActivity'
+      - name: COLL_CONVERSATIONS
+        value: 'lendingConversations'
+      - name: COLL_INTERVENTIONS
+        value: 'lendingInterventions'
+      - name: COLL_HITL_AUDIT
+        value: 'lendingHitlAudit'
+      - name: COLL_OFFICERS
+        value: 'lendingOfficers'
+      - name: COLL_PIPELINE_LOCKS
+        value: 'lendingPipelineLocks'
+      - name: COLL_RENEWALS
+        value: 'lendingRenewals'
 
 # Service mesh
 mesh:
