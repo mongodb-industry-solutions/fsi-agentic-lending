@@ -99,6 +99,22 @@ async def create_application(req: ApplicationCreateRequest):
             demo_session_id=req.demo_session_id,
             data=req.model_dump(),
         )
+        # The borrower just saw these documents on the apply page — a submit that
+        # cannot attach them is broken, not successful. Fail loudly instead of
+        # shipping an empty application the tracking pane cannot display. A silent
+        # zero-clone is how a wrong DATABASE_NAME / COLL_* mapping or an
+        # unreachable Mongo manifests as "No documents found" with no error.
+        if result.get("documents_attached", 0) == 0:
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Application was created but 0 documents could be attached from "
+                    f"seed profile '{req.profile_id}'. Verify DATABASE_NAME and the "
+                    "COLL_* collection mapping (README: 'Collection overrides'), that "
+                    "the seed application has documents, and that the backend can reach "
+                    "MongoDB."
+                ),
+            )
         return result
 
     app = application_service.create_application(req.model_dump())

@@ -66,6 +66,57 @@ def coll(logical: str):
     return get_db()[resolve(logical)]
 
 
+def verify_db_config(logger=None):
+    """Best-effort startup check of the collection boundary.
+
+    Resolves every logical collection against the running env and reports which
+    physical collections are missing or empty in the connected database. Both of
+    those are the standard "reads return empty / No documents found" failure
+    mode — usually a wrong ``DATABASE_NAME`` (e.g. ``leafy_bank_bian`` vs the
+    legacy db) or missing ``COLL_*`` overrides. Log-only by design: it never
+    raises, so a flaky Mongo at boot does not take the pod down. Returns a
+    summary dict for diagnostics/tests.
+    """
+    from db.collections_config import _DEFAULTS
+    log = logger or logging.getLogger(__name__)
+    try:
+        db = get_db()
+        present = set(db.list_collection_names())
+    except Exception as e:
+        log.error("verify_db_config: cannot list collections (%s)", e)
+        return {}
+    summary = {}
+    for logical, default in _DEFAULTS.items():
+        physical = os.getenv(f"COLL_{logical.upper()}", default)
+        exists = physical in present
+        count = None
+        if exists:
+            try:
+                count = db[physical].estimated_document_count()
+            except Exception:
+                count = None
+        summary[logical] = {
+            "physical": physical,
+            "exists": exists,
+            "count": count,
+            "mapped": physical != default,
+            "default": default,
+        }
+        if logical in ("applications", "documents") and not exists:
+            log.error(
+                "Collection mapping problem: logical '%s' resolves to '%s', which does not "
+                "exist in database '%s'. Check DATABASE_NAME and COLL_* overrides.",
+                logical, physical, db.name,
+            )
+        elif logical in ("applications", "documents") and exists and count == 0:
+            log.warning(
+                "Collection '%s' (logical '%s') exists in '%s' but is EMPTY — seed it if "
+                "reads should return documents.",
+                physical, logical, db.name,
+            )
+    return summary
+
+
 def close_db():
     """Gracefully close the MongoDB connection pool."""
     global _instance

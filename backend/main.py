@@ -3,6 +3,7 @@ import asyncio
 import logging
 import os
 import sys
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -27,10 +28,33 @@ from db.mdb import get_db
 
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup: log the collection boundary early.
+
+    A wrong DATABASE_NAME or missing COLL_* mapping is the fastest way to get
+    silent empty reads ("No documents found", empty chat checklist, zero-doc
+    demo submits). Surface it at boot instead of at the first user click.
+    """
+    from db.mdb import verify_db_config
+    try:
+        verify_db_config()
+    except Exception as e:  # pragma: no cover — safety net for a flaky boot
+        logger.warning("Startup collection verification skipped: %s", e)
+    yield
+    # Shutdown
+    from agents.llm import shutdown_llm
+    from db.mdb import close_db
+    shutdown_llm()
+    close_db()
+
+
 app = FastAPI(
     title="Agentic Lending Platform",
     description="Agentic lending platform API powered by MongoDB Atlas and LangGraph",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # CORS
@@ -59,14 +83,6 @@ app.include_router(agent_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(officers_router, prefix="/api")
 app.include_router(renewals_router, prefix="/api")
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    from agents.llm import shutdown_llm
-    from db.mdb import close_db
-    shutdown_llm()
-    close_db()
 
 
 @app.get("/")
