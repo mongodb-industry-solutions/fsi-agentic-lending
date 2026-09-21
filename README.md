@@ -90,10 +90,10 @@ End-to-end agentic lending platform demonstrating how **MongoDB Atlas**, **LangG
 │   └────────────┘  └──────────────┘  └──────────────┘  └──────────────┘   │
 │                                                                             │
 │   ┌────────────┐  ┌────────────┐  ┌──────────────┐                       │
-│   │ Bedrock    │  │ LangSmith  │  │ Voyage AI    │                       │
-│   │ Claude     │  │ @traceable │  │ Multimodal   │                       │
-│   │ Haiku 4    │  │ traces     │  │ Embeddings   │                       │
-│   │ + tool_use │  │            │  │ (multimodal) │                       │
+│   │ Bedrock    │  │  │  │ Voyage AI     │        │
+│   │ Claude     │  │  │  │  Multimodal   │        │
+│   │ Haiku 4    │  │  │  │  Embeddings   │        │
+│   │ + tool_use │  │  │  │ (multimodal)  │        │
 │   └────────────┘  └────────────┘  └──────────────┘                       │
 └────────────────────────────────────┬────────────────────────────────────────┘
                                      │
@@ -231,8 +231,7 @@ The staging build aligns this demo with the **BIAN banking data model** (BIAN sp
 | Frontend      | Next.js 15 (App Router), React 19, LeafyGreen UI, custom server.mjs (WebSocket proxy for K8s)                        |
 | Backend       | FastAPI, LangGraph 0.4+, Python 3.13 (managed by uv)                                                                |
 | Database      | MongoDB Atlas — shared `leafy_bank_bian` database (13 standard collections + shared `customers` + 3 LangGraph infra) |
-| AI/ML         | AWS Bedrock Claude Haiku 4 (tool_use for structured output), Voyage AI multimodal embeddings (voyage-multimodal-3.5) |
-| Observability | LangSmith (@traceable on all LLM calls + agent nodes)                                                                |
+| AI/ML         | AWS Bedrock Claude Haiku 4 (tool_use for structured output), Voyage AI multimodal embeddings (voyage-multimodal-3.5) |                                                              |
 | Deployment    | Docker Compose (local), K8s (staging/prod)                                                                    |
 
 ## Agent Features
