@@ -89,12 +89,15 @@ def _restore_renewed_seeds(db, now: datetime) -> int:
 
     seed_by_id = {s["renewal_id"]: s for s in _RENEWAL_SEEDS}
     restored = 0
-    for r in coll("renewals").find({"status": "renewed", "seed": True}, {storage_key("renewals", "renewal_id"): 1}):
-        seed = seed_by_id.get(r["renewal_id"])
+    # `r` is a raw storage document, so its id field is the BIAN key (renewalId).
+    rid_key = storage_key("renewals", "renewal_id")
+    for r in coll("renewals").find({"status": "renewed", "seed": True}, {rid_key: 1}):
+        rid = r.get(rid_key)
+        seed = seed_by_id.get(rid)
         if not seed:
             continue
         coll("renewals").replace_one(
-            storage_filter("renewals", {"renewal_id": r["renewal_id"]}),
+            storage_filter("renewals", {"renewal_id": rid}),
             to_storage("renewals", _build_doc(seed, now)),
         )
         coll("agent_activity").delete_many(storage_filter("agent_activity",
@@ -138,8 +141,8 @@ def scan_due_renewals() -> dict:
 # ── Offer generation (the "agent") ───────────────────────────────────────────
 def _draft_rationale(renewal: dict, new_rate: float, new_payment: int) -> str:
     """Ask Bedrock for a short renewal rationale; fall back to deterministic text."""
-    current_rate = renewal.get("current_rate", 0)
-    current_payment = renewal.get("current_payment", 0)
+    current_rate = renewal.get("current_rate") or 0
+    current_payment = renewal.get("current_payment") or 0
     delta = new_payment - current_payment
     direction = "lower" if delta < 0 else ("higher" if delta > 0 else "unchanged")
 
@@ -161,10 +164,10 @@ def _draft_rationale(renewal: dict, new_rate: float, new_payment: int) -> str:
         )
         user = (
             f"Borrower: {renewal.get('borrower_name')}\n"
-            f"Outstanding balance: ${renewal.get('loan_amount'):,}\n"
+            f"Outstanding balance: ${renewal.get('loan_amount') or 0:,}\n"
             f"Current rate: {current_rate * 100:.2f}% | Current payment: ${current_payment:,}/mo\n"
             f"Offered rate: {new_rate * 100:.2f}% | New payment: ${new_payment:,}/mo\n"
-            f"Remaining amortization: {renewal.get('amortization_years')} years"
+            f"Remaining amortization: {renewal.get('amortization_years') or 25} years"
         )
         text = get_llm().predict_with_system(user, system_prompt)
         return (text or "").strip() or fallback
@@ -191,10 +194,14 @@ def generate_offer_events(renewal_id: str):
     fully serialized renewal (offer attached).
     """
     db = get_db()
-    renewal = coll("renewals").find_one(storage_filter("renewals", {"renewal_id": renewal_id}))
-    if not renewal:
+    raw = coll("renewals").find_one(storage_filter("renewals", {"renewal_id": renewal_id}))
+    if not raw:
         yield {"type": "error", "message": f"Renewal {renewal_id} not found"}
         return
+    # The stored document is BIAN camelCase; everything below (and _draft_rationale)
+    # reads runtime snake_case. Without this conversion loan_amount/current_rate etc.
+    # come back None/0 and the rationale format-string crashes.
+    renewal = from_storage("renewals", raw)
 
     now = datetime.now(timezone.utc)
     amort = renewal.get("amortization_years", 25)
@@ -278,7 +285,7 @@ def generate_offer_events(renewal_id: str):
                      "MongoDB · renewals + agent_activity", t)
 
     updated = coll("renewals").find_one(storage_filter("renewals", {"renewal_id": renewal_id}))
-    yield {"type": "done", "renewal": _serialize(updated)}
+    yield {"type": "done", "renewal": _serialize(from_storage("renewals", updated))}
 
 
 def generate_offer(renewal_id: str) -> dict | None:
@@ -296,9 +303,12 @@ def generate_offer(renewal_id: str) -> dict | None:
 def sign_and_renew(renewal_id: str, signer_name: str | None = None) -> dict | None:
     """Record the (simulated) e-signature and auto-renew the loan onto new terms."""
     db = get_db()
-    renewal = coll("renewals").find_one(storage_filter("renewals", {"renewal_id": renewal_id}))
-    if not renewal:
+    raw = coll("renewals").find_one(storage_filter("renewals", {"renewal_id": renewal_id}))
+    if not raw:
         return None
+    # Stored documents are BIAN camelCase; the offer/signature reads below use
+    # runtime snake_case.
+    renewal = from_storage("renewals", raw)
 
     offer = renewal.get("offer")
     if not offer:
@@ -332,4 +342,4 @@ def sign_and_renew(renewal_id: str, signer_name: str | None = None) -> dict | No
                        f"{offer['new_rate'] * 100:.2f}% through {new_maturity.date()}.")
 
     updated = coll("renewals").find_one(storage_filter("renewals", {"renewal_id": renewal_id}))
-    return _serialize(updated)
+    return _serialize(from_storage("renewals", updated))
