@@ -169,6 +169,18 @@ def create_application(data: dict, profile_id: str = None, demo_session_id: str 
     return serialize_doc(application)
 
 
+def get_application_stored(application_id: str) -> dict | None:
+    """Return the raw stored BIAN camelCase `loans` document, or None.
+
+    Unlike `get_application`, this does NOT translate to runtime snake_case
+    (`from_storage`) and does NOT attach documents/credit_reports. The BIAN
+    API surface speaks the storage shape directly (camelCase wire = Mongo
+    field names, per the payment-flow-full standard), so the Retrieve routes
+    read and return this raw doc with `_id` stripped.
+    """
+    return coll("applications").find_one({_k("application_id"): application_id})
+
+
 def get_application(application_id: str) -> dict | None:
     """Get full application with related documents and credit reports."""
     stored = coll("applications").find_one({_k("application_id"): application_id})
