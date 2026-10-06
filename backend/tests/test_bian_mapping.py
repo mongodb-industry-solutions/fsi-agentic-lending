@@ -335,3 +335,105 @@ def test_reseed_writes_repayment_timestamp_as_datetime():
             "a string breaks $setWindowFields in get_payment_trends"
         )
         assert r["timestamp"].tzinfo is not None, "timestamp must be tz-aware UTC"
+
+
+# ===========================================================================
+# 6. BIAN request adaptor — camelCase wire -> snake_case service data
+# ===========================================================================
+# Pure-function test (no Mongo, no FastAPI). `create_application` hits the DB,
+# so only the adaptor is exercised here. The response path needs no shaping —
+# handlers return the raw stored camelCase document with `_id` stripped.
+
+def test_adapt_initiate_maps_camelcase_body_to_service_data():
+    from api_models import ConsumerLoanInitiateRequest
+    from bian_api import adapt_initiate
+
+    body = ConsumerLoanInitiateRequest(
+        borrowerNames=["Ada Lovelace", "Charles Babbage"],
+        loanAmount=100000,
+        purchasePrice=120000,
+        downPayment=20000,
+        property={"address": "1 Main St", "purchasePrice": 120000},
+        incomeSummary={"combinedGross": 150000, "primary": 90000},
+    )
+    data = adapt_initiate(body)
+    assert data["primary_name"] == "Ada Lovelace"
+    assert data["co_applicant_name"] == "Charles Babbage"
+    assert data["loan_amount"] == 100000
+    assert data["purchase_price"] == 120000
+    assert data["property_address"] == "1 Main St"
+    assert data["property_type"] == "Detached Home"  # CollateralRecord default
+    assert data["annual_property_tax"] == 0  # CollateralRecord default
+    assert data["combined_income"] == 150000
+    assert data["primary_income"] == 90000
+    assert data["existing_monthly_debt"] == 0
+
+
+def test_adapt_initiate_single_borrower():
+    from api_models import ConsumerLoanInitiateRequest
+    from bian_api import adapt_initiate
+
+    body = ConsumerLoanInitiateRequest(
+        borrowerNames=["Ada Lovelace"],
+        loanAmount=100000, purchasePrice=120000, downPayment=20000,
+        property={"address": "1 Main St", "purchasePrice": 120000},
+        incomeSummary={"combinedGross": 150000, "primary": 150000},
+    )
+    data = adapt_initiate(body)
+    assert data["primary_name"] == "Ada Lovelace"
+    assert data["co_applicant_name"] is None
+
+
+# ===========================================================================
+# 7. enum drift — BIAN enums sourced from the canonical spec
+# ===========================================================================
+# Captured from `bian.py show loans` / `show creditReports` (ENUM/NOTE column).
+# If the spec adds or renames an enum value, update these sets and the field
+# that sources them; this test is the guardrail that forces the change.
+
+SPEC_ENUMS = {
+    "ConsumerLoanApexStatus": {"DRAFT", "SUBMITTED", "UNDER_REVIEW", "APPROVED",
+                               "REJECTED", "WITHDRAWN", "CLOSED"},
+    "ConsumerLoanBorrowerRoleType": {"PRIMARY", "CO_APPLICANT"},
+    "CustomerCreditBureauType": {"EQUIFAX", "EXPERIAN", "TRANSUNION", "OTHER"},
+}
+
+
+def test_bian_status_projection_stays_within_spec_enum():
+    from models.schemas import _BIAN_STATUS
+    projected = set(_BIAN_STATUS.values())
+    assert projected <= SPEC_ENUMS["ConsumerLoanApexStatus"], (
+        f"to_bian_status projects onto values outside the spec enum: "
+        f"{projected - SPEC_ENUMS['ConsumerLoanApexStatus']}"
+    )
+
+
+def test_api_models_literal_enums_match_spec():
+    """Every Literal field in api_models must be a known spec enum, byte-for-byte.
+
+    Field names are camelCase storage names (per the payment-flow-full standard),
+    so a Literal field must be registered in SPEC_ENUMS by its BIAN canonical
+    name. Currently the Initiate model has no Literal fields; this guard fires
+    the moment one is added without a matching SPEC_ENUMS entry.
+    """
+    import typing
+    import api_models
+    from pydantic import BaseModel
+
+    for name, model in vars(api_models).items():
+        if not (isinstance(model, type) and issubclass(model, BaseModel)):
+            continue
+        for field_name, fi in model.model_fields.items():
+            args = typing.get_args(fi.annotation)
+            values = {a for a in args if isinstance(a, str)}
+            if not values:
+                continue
+            assert field_name in SPEC_ENUMS, (
+                f"api_models.{name}.{field_name} is a Literal but is not in SPEC_ENUMS — "
+                f"add its spec values to SPEC_ENUMS in this test."
+            )
+            assert values == SPEC_ENUMS[field_name], (
+                f"api_models.{name}.{field_name} enum {values} != spec {SPEC_ENUMS[field_name]}"
+            )
+
+
