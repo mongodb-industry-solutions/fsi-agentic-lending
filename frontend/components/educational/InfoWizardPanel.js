@@ -14,6 +14,7 @@ import { uiTokens } from '../../lib/uiTokens';
 const screenTitles = {
   borrower: 'Borrower Portal — Technology Reference',
   officer: 'Loan Officer Dashboard — Technology Reference',
+  risk: 'Business Loan Risk Assessor — Technology Reference',
   demo: 'Agentic Lending — Technology Reference',
 };
 
