@@ -94,6 +94,13 @@ sidecarContainers:
         value: 'lendingPipelineLocks'
       - name: COLL_RENEWALS
         value: 'lendingRenewals'
+      # Atlas Vector Search index names as created on leafy_bank_bian. The code
+      # defaults (documents_vector_idx / policies_vector_idx) do not exist there,
+      # so vector search would silently return nothing.
+      - name: DOCUMENTS_VECTOR_INDEX
+        value: 'lendingDocumentsVectorIdx'
+      - name: POLICIES_VECTOR_INDEX
+        value: 'lendingPoliciesVectorIdx'
 
 # Service mesh
 mesh:
