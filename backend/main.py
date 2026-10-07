@@ -75,6 +75,7 @@ from routes.agent import router as agent_router
 from routes.chat import router as chat_router
 from routes.officers import router as officers_router
 from routes.renewals import router as renewals_router
+from routes.risk_assessment import router as risk_assessment_router
 # BIAN service-domain routes — mounted at the root (no /api prefix) so URLs are
 # exactly POST /ConsumerLoan/Initiate, GET /CustomerCreditRating/{id}/Retrieve, etc.
 from routes.bian_consumer_loan import router as bian_consumer_loan_router
@@ -87,6 +88,7 @@ app.include_router(agent_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(officers_router, prefix="/api")
 app.include_router(renewals_router, prefix="/api")
+app.include_router(risk_assessment_router, prefix="/api")
 app.include_router(bian_consumer_loan_router)
 app.include_router(bian_customer_credit_rating_router)
 
