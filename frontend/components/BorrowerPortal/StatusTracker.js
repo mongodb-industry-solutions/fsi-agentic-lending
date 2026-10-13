@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
-import { apiSSE, apiGet } from '../../lib/api';
+import { apiSSE, apiGet, apiPost } from '../../lib/api';
 import { STAGES, STATUS_TO_STAGE } from './statusTrackerConstants';
 import { SavingsSummary } from './SavingsSummary';
 import { TimelineStageCard } from './TimelineStageCard';
@@ -124,8 +124,81 @@ function DeclineCard({ stageContext, onOpenChat }) {
   );
 }
 
-function ActionNeededBanner({ actions, onOpenChat }) {
+// Button label for the "Provide Information" upload flow.
+function getProvideLabel(state) {
+  switch (state) {
+    case 'uploading': return 'Uploading...';
+    case 'extracting': return 'Extracting data...';
+    case 'processing': return 'Processing...';
+    case 'done': return '✓ Documents Uploaded — Resuming Review';
+    case 'error': return 'Upload Failed — Retry';
+    default: return 'Provide Information';
+  }
+}
+
+const DOC_TYPE_LABELS = {
+  government_id: 'Government ID',
+  employment_letter: 'Employment Letter',
+  paystubs: 'Pay Stubs',
+  income_tax: 'CRA Tax Notices',
+  bank_statements: 'Bank Statements',
+  purchase_agreement: 'Purchase Agreement',
+  investment_statements: 'Investment Statements',
+  other_property_docs: 'Property Docs',
+  mortgage_application: 'Mortgage Application',
+  utility_bills: 'Utility Bills',
+  credit_report: 'Credit Report',
+  car_loan_statement: 'Car Loan Statement',
+  property_tax: 'Property Tax',
+  property_inspection: 'Property Inspection',
+};
+
+// Timestamped log of each step the "Provide Information" flow actually carried
+// out — what was uploaded, when, and what happened after. Entries come only
+// from real API results, so the log reflects genuine backend activity.
+function ProvideLog({ entries }) {
+  if (!entries || entries.length === 0) return null;
+  return (
+    <div style={{
+      marginTop: spacing[2],
+      padding: spacing[2],
+      background: 'var(--bg-surface)',
+      border: '1px solid var(--border-dim)',
+      borderRadius: 'var(--radius-sm)',
+      display: 'flex', flexDirection: 'column', gap: 4,
+    }}>
+      <div style={{
+        fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
+        letterSpacing: '0.05em', color: 'var(--text-dim)',
+        fontFamily: 'var(--font-display)', marginBottom: 2,
+      }}>
+        Steps Carried Out
+      </div>
+      {entries.map((e, i) => (
+        <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 9,
+            color: 'var(--text-dim)', flexShrink: 0,
+          }}>
+            {e.time}
+          </span>
+          <span style={{
+            fontSize: 10, lineHeight: 1.5,
+            color: e.error ? 'var(--danger)' : 'var(--text-secondary)',
+          }}>
+            {e.error ? '✗ ' : '✓ '}{e.text}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ActionNeededBanner({ actions, onProvide, provideState, provideLog }) {
   if (!actions || actions.length === 0) return null;
+  const inProgress = provideState === 'uploading' || provideState === 'extracting' || provideState === 'processing';
+  const isDone = provideState === 'done';
+  const isError = provideState === 'error';
   return (
     <div style={{
       padding: spacing[3],
@@ -159,33 +232,55 @@ function ActionNeededBanner({ actions, onOpenChat }) {
           </div>
         ))}
       </div>
-      {onOpenChat && (
+      {onProvide && (
         <button
           type="button"
-          onClick={onOpenChat}
+          onClick={onProvide}
+          disabled={inProgress || isDone}
           style={{
             width: '100%', padding: '10px 16px',
-            background: 'var(--hitl-amber)', color: '#fff',
+            background: isDone ? 'var(--success)' : isError ? 'var(--danger)' : 'var(--hitl-amber)',
+            color: '#fff',
             border: 'none', borderRadius: 'var(--radius-md)',
             fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12,
-            cursor: 'pointer',
+            cursor: inProgress || isDone ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            opacity: inProgress ? 0.85 : 1,
           }}
         >
-          Provide Information
+          {inProgress && (
+            <span style={{
+              display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
+              border: '2px solid currentColor', borderTopColor: 'transparent',
+              animation: 'spin 0.8s linear infinite',
+              flexShrink: 0,
+            }} />
+          )}
+          {getProvideLabel(provideState)}
         </button>
       )}
+      <ProvideLog entries={provideLog} />
     </div>
   );
 }
 
-export default function StatusTracker({ onNotification, applicationId, applicationData, onOpenChat }) {
+export default function StatusTracker({ onNotification, applicationId, applicationData, onOpenChat, onDocumentUploaded }) {
   const [activeStage, setActiveStage] = useState(0);
   const [timestamps, setTimestamps] = useState([]);
   const [sseConnected, setSseConnected] = useState(false);
   const [isDeclined, setIsDeclined] = useState(false);
   const [timelineCtx, setTimelineCtx] = useState(null);
+  // idle | uploading | extracting | processing | done | error
+  const [provideState, setProvideState] = useState('idle');
+  const [provideLog, setProvideLog] = useState([]);
   const stageContextRef = useRef({});
   const stageIdxRef = useRef(0);
+  const provideTimersRef = useRef([]);
+  const mountedRef = useRef(true);
+  useEffect(() => () => {
+    mountedRef.current = false;
+    provideTimersRef.current.forEach(clearTimeout);
+  }, []);
 
   const sendNotification = useCallback((stage, time, extra) => {
     if (onNotification) onNotification({ stage, time, ...extra });
@@ -257,16 +352,30 @@ export default function StatusTracker({ onNotification, applicationId, applicati
   }, [applicationId, applyStatus]);
 
   // Fetch borrower-safe timeline context — debounced re-fetch as stages advance.
+  // Generation guard: a stale response from a previous applicationId must not
+  // overwrite the freshly-fetched context after a borrower switch.
+  const ctxGenRef = useRef(0);
+  const refreshTimelineCtx = useCallback(() => {
+    if (!applicationId) return;
+    const gen = ++ctxGenRef.current;
+    apiGet(`/applications/${applicationId}/timeline-context`).then(
+      (data) => { if (mountedRef.current && ctxGenRef.current === gen && data) setTimelineCtx(data); }
+    ).catch(() => {});
+  }, [applicationId]);
+
   useEffect(() => {
     if (!applicationId) return;
-    let ignore = false;
-    const timer = setTimeout(() => {
-      apiGet(`/applications/${applicationId}/timeline-context`).then(
-        (data) => { if (!ignore && data) setTimelineCtx(data); }
-      ).catch(() => {});
-    }, activeStage === 0 ? 0 : 250);
-    return () => { ignore = true; clearTimeout(timer); };
-  }, [applicationId, activeStage]);
+    const timer = setTimeout(refreshTimelineCtx, activeStage === 0 ? 0 : 250);
+    return () => clearTimeout(timer);
+  }, [applicationId, activeStage, refreshTimelineCtx]);
+
+  // Reset the provide-info flow when switching applications.
+  useEffect(() => {
+    setProvideState('idle');
+    setProvideLog([]);
+    provideTimersRef.current.forEach(clearTimeout);
+    provideTimersRef.current = [];
+  }, [applicationId]);
 
   // Build context for milestone template functions. Only borrower-safe fields.
   const stageContext = useMemo(() => {
@@ -298,6 +407,95 @@ export default function StatusTracker({ onNotification, applicationId, applicati
     };
   }, [timelineCtx, applicationId, isDeclined]);
   stageContextRef.current = stageContext;
+
+  // "Provide Information" — HUMAN-TRIGGERED ONLY (the banner button's onClick is
+  // the sole entry point; nothing in this component or the backend invokes it
+  // automatically). Upload the requested documents (demo-upload of the
+  // pre-seeded PDFs, same pipeline the chat InterventionCard uses), then
+  // resolve the intervention(s). The resolve endpoint auto-triggers the
+  // pipeline re-evaluate once no blocking interventions remain, so processing
+  // resumes. Each real step is appended to a timestamped log so the borrower
+  // can see exactly what was carried out, what, and when.
+  const addProvideLog = useCallback((text, error = false) => {
+    const time = new Date().toLocaleTimeString([], { hour12: false });
+    setProvideLog((prev) => [...prev, { time, text, error }]);
+  }, []);
+
+  const handleProvideInfo = useCallback(async () => {
+    if (!applicationId) return;
+    if (provideState !== 'idle' && provideState !== 'error') return;
+    const actionable = stageContextRef.current.pendingActions;
+    if (!actionable || actionable.length === 0) return;
+
+    setProvideState('uploading');
+    if (provideState === 'error') setProvideLog([]);
+    addProvideLog('You clicked "Provide Information" — starting document upload');
+    // Simulated staged progress, mirroring InterventionCard's UX.
+    const extractTimer = setTimeout(() => setProvideState((s) => (s === 'uploading' ? 'extracting' : s)), 1200);
+    const processTimer = setTimeout(() => setProvideState((s) => ((s === 'uploading' || s === 'extracting') ? 'processing' : s)), 3000);
+    provideTimersRef.current = [extractTimer, processTimer];
+
+    try {
+      for (const action of actionable) {
+        for (const docType of action.borrower_context?.document_types_accepted || []) {
+          const label = DOC_TYPE_LABELS[docType] || docType;
+          addProvideLog(`Uploading ${label}...`);
+          const result = await apiPost(`/applications/${applicationId}/documents/demo-upload/${docType}`, {});
+          if (!mountedRef.current) return;
+          if (!result || result.error) {
+            addProvideLog(`${label} upload failed${result?.error ? `: ${result.error}` : ''}`, true);
+            throw new Error('document upload failed');
+          }
+          addProvideLog(`${label} uploaded — data extracted and indexed`);
+        }
+      }
+
+      for (const action of actionable) {
+        if (action._id) {
+          const resolved = await apiPost(`/chat/${applicationId}/interventions/${action._id}/resolve`);
+          if (!mountedRef.current) return;
+          if (!resolved || resolved.error) {
+            addProvideLog('Marking the request as answered failed — please retry', true);
+            throw new Error('intervention resolve failed');
+          }
+          addProvideLog('Request marked as answered — notifying the lending team');
+        }
+      }
+
+      if (onDocumentUploaded) onDocumentUploaded();
+      addProvideLog('Review resumed — your application is being re-evaluated');
+      setProvideState('done');
+      // Re-fetch so the banner clears even if the status change hasn't
+      // advanced a timeline stage yet.
+      refreshTimelineCtx();
+    } catch (err) {
+      console.warn('[StatusTracker] provide information failed:', err);
+      if (mountedRef.current) setProvideState('error');
+    } finally {
+      provideTimersRef.current.forEach(clearTimeout);
+      provideTimersRef.current = [];
+    }
+  }, [applicationId, provideState, onDocumentUploaded, refreshTimelineCtx, addProvideLog]);
+
+  // Re-arm the Provide Information button when a NEW set of pending actions
+  // appears (e.g. the post-resolve re-evaluate surfaced another missing
+  // document). The initial pending set and the cleared (post-resolve) state
+  // don't reset — 'done' should persist while the banner is on its way out.
+  const pendingIdsRef = useRef(null);
+  useEffect(() => {
+    const ids = stageContext.pendingActions.map((a) => a._id).join(',');
+    if (pendingIdsRef.current === null) {
+      pendingIdsRef.current = ids;
+      return;
+    }
+    if (ids !== pendingIdsRef.current) {
+      pendingIdsRef.current = ids;
+      if (ids) {
+        setProvideState('idle');
+        setProvideLog([]);
+      }
+    }
+  }, [stageContext.pendingActions]);
 
   // "Approved" (positive/complete state) is reached at the Decision milestone,
   // not only at Funded — so the approval summary shows as soon as it's approved.
@@ -475,7 +673,12 @@ export default function StatusTracker({ onNotification, applicationId, applicati
 
       {/* Action needed — pending info the loan officer requested */}
       {!isApproved && !isDeclined && (
-        <ActionNeededBanner actions={stageContext.pendingActions} onOpenChat={onOpenChat} />
+        <ActionNeededBanner
+          actions={stageContext.pendingActions}
+          onProvide={handleProvideInfo}
+          provideState={provideState}
+          provideLog={provideLog}
+        />
       )}
 
       {/* Segmented progress rail */}

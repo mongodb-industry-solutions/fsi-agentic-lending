@@ -579,7 +579,10 @@ async def get_timeline_context(app_id: str):
             coll("interventions")
             .find(
                 storage_filter("interventions", {"application_id": app_id}),
-                {"_id": 0, "type": 1, "status": 1,
+                # _id is borrower-safe (the chat interventions endpoint already
+                # exposes it) and lets the borrower portal resolve an
+                # intervention after uploading the requested documents.
+                {"_id": 1, "type": 1, "status": 1,
                  storage_key("interventions", "borrower_context"): 1,
                  storage_key("interventions", "created_at"): 1,
                  storage_key("interventions", "resolved_at"): 1},
@@ -667,8 +670,9 @@ async def get_timeline_context(app_id: str):
             "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else ts,
         })
 
-    # Serialize intervention timestamps
+    # Serialize intervention ids + timestamps
     for intv in interventions:
+        intv["_id"] = str(intv["_id"])
         for key in ("created_at", "resolved_at"):
             if hasattr(intv.get(key), "isoformat"):
                 intv[key] = intv[key].isoformat()
