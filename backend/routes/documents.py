@@ -20,13 +20,14 @@ from services.application_service import serialize_doc
 from services.embedding_service import embed_document as _embed_document
 from db.mdb import get_db
 from db.mdb import coll
-from db.storage_mapping import from_storage, storage_filter, storage_key, to_storage
+from db.storage_mapping import storage_filter, storage_key, to_storage
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["documents"])
 
 APP_ID_PATTERN = re.compile(r'^APP-[A-Z0-9-]{4,20}$')
+_PROFILE_ID_PATTERN = re.compile(r'^[a-z0-9][a-z0-9-]{1,40}$')
 
 def _validate_app_id(app_id: str):
     if not APP_ID_PATTERN.match(app_id):
@@ -87,6 +88,14 @@ async def get_document(doc_id: str):
     return doc
 
 
+def _synthetic_dir() -> Path:
+    """Root of the per-profile seeded PDFs (docs/synthetic data/)."""
+    base_override = os.environ.get("PDF_BASE_DIR")
+    if base_override:
+        return Path(base_override).resolve() / "synthetic data"
+    return _PROJECT_ROOT / "docs" / "synthetic data"
+
+
 def _build_pdf_dirs():
     """Build the list of directories to search for PDF files.
 
@@ -97,12 +106,12 @@ def _build_pdf_dirs():
     base_override = os.environ.get("PDF_BASE_DIR")
     if base_override:
         base = Path(base_override).resolve()
-        synthetic = base / "synthetic data"
         dirs = [base / "uploads", base]  # base root for flat Docker layouts
     else:
         docs_root = _PROJECT_ROOT / "docs"
-        synthetic = docs_root / "synthetic data"
         dirs = [docs_root / "uploads"]
+
+    synthetic = _synthetic_dir()
 
     # Add all profile subdirectories (marcus-delgado/, jane-doe/, etc.)
     if synthetic.is_dir():
@@ -132,6 +141,62 @@ def _find_pdf(filename):
     return None
 
 
+def _doc_application_id(doc) -> str | None:
+    """Application id from a document record, in BIAN or legacy key shape."""
+    for key in (storage_key("documents", "application_id"), "application_id"):
+        if doc.get(key):
+            return doc[key]
+    return None
+
+
+def _application_profile_id(app_id: str) -> str | None:
+    """``profile_id`` for an application, in BIAN or legacy key shape."""
+    app_key = storage_key("applications", "application_id")
+    app = coll("applications").find_one(
+        {"$or": [{app_key: app_id}, {"application_id": app_id}]},
+        {storage_key("applications", "profile_id"): 1, "profile_id": 1},
+    )
+    if not app:
+        return None
+    # Read the raw keys rather than round-tripping through from_storage: a
+    # pre-migration document has no BIAN keys for from_storage to map.
+    return app.get(storage_key("applications", "profile_id")) or app.get("profile_id")
+
+
+def _resolve_pdf_path(doc) -> Path | None:
+    """Locate the PDF on disk for a document record.
+
+    Seeded profiles share filenames (each has its own 12_car_loan_statement.pdf),
+    so a filename-only lookup serves whichever profile directory sorts first —
+    every borrower would get bob-johnson's PDF. Resolve through the profile
+    directory of the document's own application instead.
+
+    The filename search remains the fallback for genuine uploads, which live in
+    docs/uploads/ and have unique names. A seeded document that reaches it is a
+    bug (a missing profile_id), so that case is logged as a warning.
+    """
+    safe = PurePosixPath(doc["filename"]).name
+    app_id = _doc_application_id(doc)
+    if app_id:
+        profile_id = _application_profile_id(app_id)
+        if profile_id and _PROFILE_ID_PATTERN.match(profile_id):
+            p = _synthetic_dir() / profile_id / safe
+            if p.is_file():
+                return p
+            logger.warning(
+                "PDF resolve: '%s' not under profile '%s' (app %s); "
+                "falling back to filename search, which may serve another borrower's PDF",
+                safe, profile_id, app_id,
+            )
+        elif not profile_id:
+            logger.warning(
+                "PDF resolve: application %s has no profile_id; falling back to "
+                "filename search. Run scripts.backfill_profile_ids to repair.",
+                app_id,
+            )
+    return _find_pdf(doc["filename"])
+
+
 @router.get("/documents/{doc_id}/pdf")
 async def serve_document_pdf(doc_id: str):
     """Serve the original PDF file for in-browser viewing."""
@@ -141,7 +206,7 @@ async def serve_document_pdf(doc_id: str):
         logger.warning("PDF serve: doc %s has no filename (doc=%s)", doc_id, bool(doc))
         raise HTTPException(status_code=404, detail="Document not found")
 
-    pdf_path = _find_pdf(doc["filename"])
+    pdf_path = _resolve_pdf_path(doc)
     if not pdf_path:
         logger.error(
             "PDF serve: file '%s' not on disk. Searched: %s",
@@ -274,9 +339,6 @@ _DOC_TYPE_TO_PREFIX = {
 }
 
 
-_PROFILE_ID_PATTERN = re.compile(r'^[a-z0-9][a-z0-9-]{1,40}$')
-
-
 @router.post("/applications/{app_id}/documents/demo-upload/{doc_type}")
 async def demo_upload_document(app_id: str, doc_type: str):
     """Upload a pre-seeded correction document for demo purposes.
@@ -287,15 +349,13 @@ async def demo_upload_document(app_id: str, doc_type: str):
     """
     _validate_app_id(app_id)
     db = get_db()
-    app = coll("applications").find_one(
-        {storage_key("applications", "application_id"): app_id},
-        {storage_key("applications", "profile_id"): 1},
-    )
-    app = from_storage("applications", app) if app else None
-    if not app:
+    app_key = storage_key("applications", "application_id")
+    if not coll("applications").find_one(
+        {"$or": [{app_key: app_id}, {"application_id": app_id}]}, {"_id": 1}
+    ):
         raise HTTPException(status_code=404, detail="Application not found")
 
-    profile_id = app.get("profile_id")
+    profile_id = _application_profile_id(app_id)
     if not profile_id or not _PROFILE_ID_PATTERN.match(profile_id):
         raise HTTPException(status_code=400, detail="Application has no valid profile_id")
 
@@ -303,7 +363,7 @@ async def demo_upload_document(app_id: str, doc_type: str):
         raise HTTPException(status_code=400, detail=f"Unknown doc_type: {doc_type}")
 
     prefix = _DOC_TYPE_TO_PREFIX[doc_type]
-    pdf_path = _PROJECT_ROOT / "docs" / "synthetic data" / profile_id / f"{prefix}_{doc_type}.pdf"
+    pdf_path = _synthetic_dir() / profile_id / f"{prefix}_{doc_type}.pdf"
     if not pdf_path.is_file():
         raise HTTPException(status_code=404, detail=f"No pre-seeded {doc_type} PDF found for profile {profile_id}")
 
