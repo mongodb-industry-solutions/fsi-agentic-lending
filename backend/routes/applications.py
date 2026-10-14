@@ -573,10 +573,14 @@ async def get_timeline_context(app_id: str):
 
     db = get_db()
 
-    # Borrower-safe intervention data
+    # Borrower-safe intervention data. The projection speaks the BIAN storage
+    # shape, so each document is translated back to the runtime snake_case the
+    # borrower portal reads (borrowerContext -> borrower_context, and the nested
+    # actionRequired / documentTypesAccepted with it).
     interventions = await asyncio.to_thread(
-        lambda: list(
-            coll("interventions")
+        lambda: [
+            from_storage("interventions", i)
+            for i in coll("interventions")
             .find(
                 storage_filter("interventions", {"application_id": app_id}),
                 # _id is borrower-safe (the chat interventions endpoint already
@@ -588,7 +592,7 @@ async def get_timeline_context(app_id: str):
                  storage_key("interventions", "resolved_at"): 1},
             )
             .sort(storage_key("interventions", "created_at"), 1)
-        )
+        ]
     )
 
     # Activity summary counts
