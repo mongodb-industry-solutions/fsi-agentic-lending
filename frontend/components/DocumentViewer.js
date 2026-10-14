@@ -222,7 +222,7 @@ function MongoDBDocumentPanel({ data }) {
           Raw Document
         </SectionLabel>
         <div style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border-dim)' }}>
-          <Code language="json" copyable={true}>
+          <Code language="json" copyButtonAppearance="hover">
             {jsonString}
           </Code>
         </div>
@@ -333,7 +333,7 @@ function EmbeddingsPanel({ data }) {
             Vector Preview
           </SectionLabel>
           <div style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border-dim)' }}>
-            <Code language="json" copyable={true}>
+            <Code language="json" copyButtonAppearance="hover">
               {vectorPreview}
             </Code>
           </div>
