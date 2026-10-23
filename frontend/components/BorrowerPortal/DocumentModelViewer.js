@@ -26,6 +26,29 @@ const TYPE_COLORS = {
   objectId: 'var(--text-secondary)',
 };
 
+// Underwriting internals that must never reach the borrower. When this viewer
+// is rendered borrower-side (borrowerSafe), these keys are stripped from the
+// document (values AND keys) at any depth before rendering. The officer-side
+// inspector renders the full document unchanged.
+const SENSITIVE_FIELDS = new Set([
+  'risk_score', 'risk_tier', 'gds_ratio', 'tds_ratio',
+  'stress_gds', 'stress_tds', 'primary_credit_score', 'ltv',
+  'decision_reasoning', 'credit_score', 'risk_factors',
+]);
+
+function sanitizeDoc(value) {
+  if (Array.isArray(value)) return value.map(sanitizeDoc);
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (SENSITIVE_FIELDS.has(k)) continue;
+      out[k] = sanitizeDoc(v);
+    }
+    return out;
+  }
+  return value;
+}
+
 function getValueType(val) {
   if (val === null || val === undefined) return 'null';
   if (typeof val === 'boolean') return 'boolean';
@@ -220,7 +243,7 @@ function RawJsonView({ doc }) {
   );
 }
 
-export default function DocumentModelViewer({ applicationId }) {
+export default function DocumentModelViewer({ applicationId, borrowerSafe = false }) {
   const [doc, setDoc] = useState(null);
   const [viewMode, setViewMode] = useState('json');
   const [changedPaths, setChangedPaths] = useState(new Set());
@@ -255,8 +278,9 @@ export default function DocumentModelViewer({ applicationId }) {
     let cancelled = false;
 
     const fetchDoc = () => {
-      apiGet(`/applications/${applicationId}`).then((data) => {
-        if (cancelled || !data) return;
+      apiGet(`/applications/${applicationId}`).then((raw) => {
+        if (cancelled || !raw) return;
+        const data = borrowerSafe ? sanitizeDoc(raw) : raw;
         const changes = detectChanges(prevDocRef.current, data);
         if (changes.size > 0) setChangedPaths(changes);
         prevDocRef.current = data;
@@ -268,7 +292,7 @@ export default function DocumentModelViewer({ applicationId }) {
     fetchDoc();
     const interval = setInterval(fetchDoc, 3000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [applicationId, detectChanges]);
+  }, [applicationId, detectChanges, borrowerSafe]);
 
   // Clear change highlights after 3 seconds
   useEffect(() => {

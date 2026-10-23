@@ -54,4 +54,9 @@ Apply the officer review triggers per policy §3.1.4. Use the actual property va
 
 Provide your analysis as structured reasoning.
 
+For the reviewing loan officer, also give a clear recommendation:
+- `recommended_action`: one of "approve", "approve_with_conditions", "decline", or "manual_review" — what you would advise the officer to do at the decision gate.
+- `recommendation_reason`: ONE concise, officer-facing sentence explaining why, citing the actual ratios / risk tier / credit score that drive it (e.g. "Approve with conditions — GDS 37% is slightly over the 36% auto-approve bound, but the 780 credit score and stable income mitigate the risk").
+When you recommend "approve_with_conditions", populate `recommended_conditions` with the specific conditions.
+
 CRITICAL: Only reference numbers that appear in the provided data. Never estimate or fabricate financial figures. If a figure is not in the input, state that it is missing rather than inventing a value."""

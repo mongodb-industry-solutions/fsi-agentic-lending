@@ -10,6 +10,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from db.mdb import get_db
+from db.collections_config import NAMES
+from db.mdb import coll
+from db.storage_mapping import from_storage, storage_filter, storage_key, to_storage
 from agents.chatbot.agent import chat as agent_chat, chat_stream as agent_chat_stream, safety_filter
 
 logger = logging.getLogger(__name__)
@@ -35,20 +38,20 @@ async def send_message(application_id: str, req: ChatMessageRequest):
     # Get or create conversation (atomic upsert to avoid TOCTOU race)
     from pymongo import ReturnDocument
     conversation = await asyncio.to_thread(
-        db["conversations"].find_one_and_update,
-        {"application_id": application_id},
-        {"$setOnInsert": {
+        coll("conversations").find_one_and_update,
+        storage_filter("conversations", {"application_id": application_id}),
+        {"$setOnInsert": to_storage("conversations", {
             "application_id": application_id,
             "messages": [],
             "phase": "active",
             "created_at": datetime.now(timezone.utc),
             "updated_at": datetime.now(timezone.utc),
-        }},
+        })},
         upsert=True,
         return_document=ReturnDocument.AFTER,
     )
 
-    history = conversation.get("messages", [])
+    history = from_storage("conversations", conversation).get("messages", [])
 
     # Call agent (run in thread to avoid blocking the event loop)
     response_text = await asyncio.to_thread(
@@ -62,11 +65,11 @@ async def send_message(application_id: str, req: ChatMessageRequest):
 
     # Append both messages to conversation
     await asyncio.to_thread(
-        db["conversations"].update_one,
-        {"application_id": application_id},
+        coll("conversations").update_one,
+        storage_filter("conversations", {"application_id": application_id}),
         {
             "$push": {
-                "messages": {
+                storage_key("conversations", "messages"): {
                     "$each": [
                         {
                             "role": "user",
@@ -81,7 +84,7 @@ async def send_message(application_id: str, req: ChatMessageRequest):
                     ]
                 }
             },
-            "$set": {"updated_at": now},
+            "$set": {storage_key("conversations", "updated_at"): now},
         },
     )
 
@@ -98,20 +101,20 @@ async def send_message_stream(application_id: str, req: ChatMessageRequest):
 
     from pymongo import ReturnDocument
     conversation = await asyncio.to_thread(
-        db["conversations"].find_one_and_update,
-        {"application_id": application_id},
-        {"$setOnInsert": {
+        coll("conversations").find_one_and_update,
+        storage_filter("conversations", {"application_id": application_id}),
+        {"$setOnInsert": to_storage("conversations", {
             "application_id": application_id,
             "messages": [],
             "phase": "active",
             "created_at": datetime.now(timezone.utc),
             "updated_at": datetime.now(timezone.utc),
-        }},
+        })},
         upsert=True,
         return_document=ReturnDocument.AFTER,
     )
 
-    history = conversation.get("messages", [])
+    history = from_storage("conversations", conversation).get("messages", [])
 
     async def event_generator():
         accumulated = []
@@ -168,18 +171,18 @@ async def send_message_stream(application_id: str, req: ChatMessageRequest):
         now = datetime.now(timezone.utc)
 
         await asyncio.to_thread(
-            db["conversations"].update_one,
-            {"application_id": application_id},
+            coll("conversations").update_one,
+            storage_filter("conversations", {"application_id": application_id}),
             {
                 "$push": {
-                    "messages": {
+                    storage_key("conversations", "messages"): {
                         "$each": [
                             {"role": "user", "content": req.message, "timestamp": now.isoformat()},
                             {"role": "assistant", "content": filtered, "timestamp": now.isoformat()},
                         ]
                     }
                 },
-                "$set": {"updated_at": now},
+                "$set": {storage_key("conversations", "updated_at"): now},
             },
         )
 
@@ -204,13 +207,13 @@ async def get_history(application_id: str):
     """Get conversation history for an application."""
     db = get_db()
     conversation = await asyncio.to_thread(
-        db["conversations"].find_one,
-        {"application_id": application_id},
-        {"messages": 1, "_id": 0},
+        coll("conversations").find_one,
+        storage_filter("conversations", {"application_id": application_id}),
+        {storage_key("conversations", "messages"): 1, "_id": 0},
     )
     if not conversation:
         return {"messages": []}
-    return {"messages": conversation.get("messages", [])}
+    return {"messages": from_storage("conversations", conversation).get("messages", [])}
 
 
 @router.get("/chat/{application_id}/interventions")
@@ -237,13 +240,15 @@ async def resolve_intervention(application_id: str, intervention_id: str):
         raise HTTPException(status_code=404, detail=result["error"])
 
     # Check if all blocking interventions are now resolved — auto-trigger re-evaluate
-    interventions_col = get_db()["interventions"]
+    interventions_col = coll("interventions")
     pending_blocking = await asyncio.to_thread(
-        lambda: interventions_col.count_documents({
-            "application_id": application_id,
-            "internal_context.severity": "blocking",
-            "status": {"$in": ["pending", "active"]},
-        })
+        lambda: interventions_col.count_documents(
+            storage_filter("interventions", {
+                "application_id": application_id,
+                "internal_context.severity": "blocking",
+                "status": {"$in": ["pending", "active"]},
+            })
+        )
     )
     result["pending_blocking"] = pending_blocking
     if pending_blocking == 0:

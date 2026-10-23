@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import Badge from '@leafygreen-ui/badge';
 import { apiGet } from '../../lib/api';
-import { formatCurrency, getRiskColor } from './utils';
+import { formatCurrency, getRiskColor, formatDuration } from './utils';
 
 const POST_APPROVAL_STAGES = [
   { label: 'Closing in progress', icon: '📑', statuses: ['closing'] },
@@ -96,7 +96,7 @@ function StageTimeline({ trail }) {
         const start = stage.startTime ? new Date(stage.startTime) : null;
         const end = stage.endTime ? new Date(stage.endTime) : null;
         const durationMs = start && end ? end - start : 0;
-        const durationLabel = durationMs < 1000 ? `${durationMs}ms` : `${(durationMs / 1000).toFixed(1)}s`;
+        const durationLabel = formatDuration(durationMs > 0 ? durationMs : null);
         const pct = Math.max(8, (durationMs / maxDuration) * 100);
         const colors = AGENT_TIMELINE_COLORS[stage.agent] || { color: 'var(--text-dim)', bg: 'var(--bg-raised)' };
 
@@ -237,7 +237,7 @@ function ProvenanceChain({ trail, approvalDetails, isDeclined }) {
   );
 }
 
-export default function DecisionSummary({ applicationId, appDetail, approvalDetails, appName, onClose }) {
+export default function DecisionSummary({ applicationId, appDetail, approvalDetails, appName, officer, onClose }) {
   const [trail, setTrail] = useState(null);
   const [showAudit, setShowAudit] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -263,7 +263,7 @@ export default function DecisionSummary({ applicationId, appDetail, approvalDeta
         const last = new Date(trail[trail.length - 1].timestamp);
         const ms = last - first;
         if (!Number.isFinite(ms) || ms < 0) return null;
-        return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
+        return formatDuration(ms);
       })()
     : null;
 
@@ -291,6 +291,7 @@ export default function DecisionSummary({ applicationId, appDetail, approvalDeta
             <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
               {appName} · {appDetail?.product || ''}
               {approvalDetails?.rate && ` @ ${approvalDetails.rate}`}
+              {!isAuto && officer?.full_name && ` · Reviewed by ${officer.full_name}`}
             </div>
           </div>
         </div>

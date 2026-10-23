@@ -18,6 +18,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from db.mdb import MongoDBConnector
+from db.mdb import coll
+from db.storage_mapping import from_storage, storage_filter, storage_key, to_storage
+from models.schemas import to_bian_status
+from services.application_service import history_entry
+from services import customer_service
 from services.extraction_service import extract_from_pdf, EXTRACTION_PROMPTS
 from services.embedding_service import embed_texts, embed_document
 
@@ -194,12 +199,48 @@ def create_borrowers(db, extraction_data: dict) -> list:
             "application_id": APPLICATION_ID,
             "created_at": now,
         }
-        result = db["borrowers"].insert_one(borrower)
-        borrower["_id"] = result.inserted_id
+        # Borrowers are customers in the shared party directory; the id is
+        # derived from the name, so re-seeding never duplicates a person.
+        borrower["_id"] = customer_service.upsert_customer(borrower["full_name"], now)
         borrowers.append(borrower)
         print(f"  Created borrower: {borrower['full_name']} (credit: {borrower.get('credit_score')})")
 
     return borrowers
+
+
+def _insert_loan(application: dict) -> None:
+    """Insert a seed application as a BIAN `loans` document.
+
+    Stamps both status fields: `statusSource` is the operational value the app
+    reads, `status` the BIAN projection.
+    """
+    stored = to_storage("applications", application)
+    stored["status"] = to_bian_status(application["status"])
+    stored["statusSource"] = application["status"]
+    history = application.get("status_history") or []
+    stored["maintenance"] = {
+        "statusHistory": [
+            history_entry(h["status"], h.get("timestamp"), h.get("detail", ""))
+            for h in history
+        ],
+        "updatedAt": application.get("updated_at"),
+    }
+    coll("applications").insert_one(stored)
+
+
+def _insert_repayments(records: list[dict]) -> None:
+    """Insert amortization rows as BIAN `loanRepayments` documents.
+
+    `loanRepaymentsId` is derived so a re-seed upserts rather than duplicating.
+    """
+    for record in records:
+        record = dict(record)
+        record["id"] = f"LRP-{record['loan_id']}-{int(record['payment_number']):04d}"
+        coll("payments").update_one(
+            storage_filter("payments", {"id": record["id"]}),
+            {"$set": to_storage("payments", record)},
+            upsert=True,
+        )
 
 
 def create_application(db, borrowers: list, extraction_data: dict):
@@ -236,7 +277,7 @@ def create_application(db, borrowers: list, extraction_data: dict):
         "updated_at": now,
     }
 
-    db["applications"].insert_one(application)
+    _insert_loan(application)
     print(f"  Created application: {APPLICATION_ID}")
 
 
@@ -259,7 +300,13 @@ def create_credit_reports(db, borrowers: list, extraction_data: dict):
             "derogatory_items": report.get("derogatory_items", []),
             "pulled_at": datetime.now(timezone.utc),
         }
-        db["credit_reports"].insert_one(credit_doc)
+        # creditReports.id is required and unique; the source has no identifier.
+        credit_doc["id"] = f"CR-{borrower['_id']}"
+        coll("credit_reports").update_one(
+            storage_filter("credit_reports", {"id": credit_doc["id"]}),
+            {"$set": to_storage("credit_reports", credit_doc)},
+            upsert=True,
+        )
         print(f"  Created credit report: {borrower['full_name']} (score: {credit_doc['score']})")
 
 
@@ -304,9 +351,9 @@ def create_policies(db):
             policy["embedding"] = None
 
     for policy in policies:
-        db["underwriting_policies"].update_one(
-            {"policy_id": policy["policy_id"]},
-            {"$setOnInsert": policy},
+        coll("underwriting_policies").update_one(
+            storage_filter("underwriting_policies", {"policy_id": policy["policy_id"]}),
+            {"$setOnInsert": to_storage("underwriting_policies", policy)},
             upsert=True,
         )
     print(f"  Upserted {len(policies)} underwriting policies")
@@ -356,14 +403,20 @@ def _generate_payment_records(loan_id: str, loan_amount: float, annual_rate: flo
 
 
 def create_payment_history(db):
-    """Insert 36 monthly payment records for loan L-00001."""
-    if db["payments"].count_documents({"loan_id": "L-00001"}) > 0:
-        print("  Payment history already exists for L-00001, skipping")
+    """Insert 36 monthly payment records for the primary application's loan.
+
+    `loan_id` is the application id, so `loanRepayments.loanId` references a
+    real `loans.loansId`. The pre-BIAN seeder used a separate "L-*" id space;
+    keep this aligned with `transform.py:LOAN_ID_MAP` or a re-seed reintroduces
+    orphan repayment rows.
+    """
+    if coll("payments").count_documents(storage_filter("payments", {"loan_id": APPLICATION_ID})) > 0:
+        print(f"  Payment history already exists for {APPLICATION_ID}, skipping")
         return
 
-    records = _generate_payment_records("L-00001", 700000, 0.0489, 36, [32])
-    db["payments"].insert_many(records)
-    print(f"  Inserted {len(records)} payment records for L-00001")
+    records = _generate_payment_records(APPLICATION_ID, 700000, 0.0489, 36, [32])
+    _insert_repayments(records)
+    print(f"  Inserted {len(records)} payment records for {APPLICATION_ID}")
 
 
 def _ingest_profile_pdfs(db, profile_id: str, app_id: str, skip_doc_types: list[str] | None = None) -> int:
@@ -403,7 +456,7 @@ def _ingest_profile_pdfs(db, profile_id: str, app_id: str, skip_doc_types: list[
             except Exception as e:
                 print(f"      Warning: embedding failed: {e}")
 
-            db["documents"].insert_one({
+            coll("documents").insert_one(to_storage("documents", {
                 "application_id": app_id,
                 "doc_type": doc_type,
                 "filename": pdf_path.name,
@@ -414,11 +467,11 @@ def _ingest_profile_pdfs(db, profile_id: str, app_id: str, skip_doc_types: list[
                 "embedding_pages": embedding_pages if embedding else 0,
                 "status": "parsed",
                 "created_at": datetime.now(timezone.utc),
-            })
+            }))
             count += 1
         except Exception as e:
             print(f"      ERROR extracting {pdf_path.name}: {e}")
-            db["documents"].insert_one({
+            coll("documents").insert_one(to_storage("documents", {
                 "application_id": app_id,
                 "doc_type": doc_type,
                 "filename": pdf_path.name,
@@ -426,7 +479,7 @@ def _ingest_profile_pdfs(db, profile_id: str, app_id: str, skip_doc_types: list[
                 "structured_data": {},
                 "status": "error",
                 "created_at": datetime.now(timezone.utc),
-            })
+            }))
             count += 1
 
     return count
@@ -445,22 +498,23 @@ def seed_additional_profiles(db):
         app_id = profile["app_id"]
 
         # Idempotency — only skip if fully seeded (seed_complete flag set at end)
-        if db["applications"].count_documents({"application_id": app_id, "seed_complete": True}) > 0:
+        if coll("applications").count_documents(storage_filter("applications", {"application_id": app_id, "seed_complete": True})) > 0:
             print(f"  {app_id} ({profile['profile_id']}) already fully seeded, skipping")
             continue
         # Clean up partial seed if app exists without seed_complete
-        if db["applications"].count_documents({"application_id": app_id}) > 0:
+        if coll("applications").count_documents(storage_filter("applications", {"application_id": app_id})) > 0:
             print(f"  {app_id} partially seeded — cleaning up and re-seeding")
-            old_app = db["applications"].find_one({"application_id": app_id}, {"borrower_ids": 1})
-            old_bids = old_app.get("borrower_ids", []) if old_app else []
-            db["applications"].delete_many({"application_id": app_id})
-            db["borrowers"].delete_many({"application_id": app_id})
-            db["documents"].delete_many({"application_id": app_id})
+            old_app = coll("applications").find_one(
+                storage_filter("applications", {"application_id": app_id}),
+                {storage_key("applications", "borrower_ids"): 1},
+            )
+            old_bids = from_storage("applications", old_app).get("borrower_ids", []) if old_app else []
+            coll("applications").delete_many(storage_filter("applications", {"application_id": app_id}))
+            coll("documents").delete_many(storage_filter("documents", {"application_id": app_id}))
             if old_bids:
-                db["credit_reports"].delete_many({"borrower_id": {"$in": old_bids}})
-            ph = profile.get("payment_history")
-            if ph:
-                db["payments"].delete_many({"loan_id": ph["loan_id"]})
+                coll("credit_reports").delete_many(storage_filter("credit_reports", {"borrower_id": {"$in": old_bids}}))
+            if profile.get("payment_history"):
+                coll("payments").delete_many(storage_filter("payments", {"loan_id": app_id}))
 
         now = datetime.now(timezone.utc)
 
@@ -479,8 +533,7 @@ def seed_additional_profiles(db):
                 "application_id": app_id,
                 "created_at": now,
             }
-            result = db["borrowers"].insert_one(borrower_doc)
-            borrower_ids.append(result.inserted_id)
+            borrower_ids.append(customer_service.upsert_customer(b["full_name"], now))
             borrower_names.append(b["full_name"])
             print(f"    Borrower: {b['full_name']} (credit: {b['credit_score']})")
 
@@ -503,7 +556,7 @@ def seed_additional_profiles(db):
             "created_at": now,
             "updated_at": now,
         }
-        db["applications"].insert_one(application)
+        _insert_loan(application)
         print(f"    Application: {app_id}")
 
         # --- Documents: use profile-specific PDFs if available, else clone Marcus's ---
@@ -532,25 +585,33 @@ def seed_additional_profiles(db):
                 "derogatory_items": cr.get("derogatory_items", []),
                 "pulled_at": now,
             }
-            db["credit_reports"].insert_one(credit_doc)
+            credit_doc["id"] = f"CR-{credit_doc['borrower_id']}"
+            coll("credit_reports").update_one(
+                storage_filter("credit_reports", {"id": credit_doc["id"]}),
+                {"$set": to_storage("credit_reports", credit_doc)},
+                upsert=True,
+            )
             print(f"    Credit report: {borrower_names[i]} (score: {cr['score']})")
 
         # --- Payment History ---
         ph = profile.get("payment_history")
         if ph:
-            loan_id = ph["loan_id"]
-            if db["payments"].count_documents({"loan_id": loan_id}) == 0:
+            # The application id IS the loan id — see create_payment_history.
+            # ph["loan_id"] is the retired "L-*" value, kept in the seed table
+            # only as provenance (transform.py:LOAN_ID_MAP pairs the two).
+            loan_id = app_id
+            if coll("payments").count_documents(storage_filter("payments", {"loan_id": loan_id})) == 0:
                 records = _generate_payment_records(
                     loan_id, ph["loan_amount"], ph["rate"],
                     ph["months"], ph.get("late_months", [])
                 )
-                db["payments"].insert_many(records)
+                _insert_repayments(records)
                 print(f"    Payments: {len(records)} records for {loan_id} ({len(ph.get('late_months', []))} late)")
 
         # Mark as fully seeded so re-runs skip this profile
-        db["applications"].update_one(
-            {"application_id": app_id},
-            {"$set": {"seed_complete": True}}
+        coll("applications").update_one(
+            storage_filter("applications", {"application_id": app_id}),
+            {"$set": {storage_key("applications", "seed_complete"): True}},
         )
         print(f"  Seeded profile: {profile['profile_id']} ({app_id})")
 
@@ -564,24 +625,27 @@ def main():
     # extraction. If the app exists but documents are gone (e.g. wiped by a prior
     # demo reset before the seed_complete fix), clean up and fall through to
     # full re-ingest.
-    existing = db["applications"].count_documents({"application_id": APPLICATION_ID})
+    existing = coll("applications").count_documents(storage_filter("applications", {"application_id": APPLICATION_ID}))
     if existing > 0:
         # Idempotent backfill: ensures profile_id and seed_complete are present
-        db["applications"].update_one(
-            {"application_id": APPLICATION_ID},
-            {"$set": {"profile_id": "marcus-delgado", "seed_complete": True}},
+        coll("applications").update_one(
+            storage_filter("applications", {"application_id": APPLICATION_ID}),
+            {"$set": storage_filter("applications",
+                                    {"profile_id": "marcus-delgado", "seed_complete": True})},
         )
 
-        doc_count = db["documents"].count_documents({"application_id": APPLICATION_ID})
+        doc_count = coll("documents").count_documents(storage_filter("documents", {"application_id": APPLICATION_ID}))
         if doc_count == 0:
             # App exists but documents are gone — clean up and fall through to re-ingest
             print(f"  {APPLICATION_ID} exists but has 0 documents — re-seeding from PDFs...")
-            app = db["applications"].find_one({"application_id": APPLICATION_ID}, {"borrower_ids": 1})
-            old_bids = app.get("borrower_ids", []) if app else []
-            db["applications"].delete_many({"application_id": APPLICATION_ID})
-            db["borrowers"].delete_many({"application_id": APPLICATION_ID})
+            app = coll("applications").find_one(
+                storage_filter("applications", {"application_id": APPLICATION_ID}),
+                {storage_key("applications", "borrower_ids"): 1},
+            )
+            old_bids = from_storage("applications", app).get("borrower_ids", []) if app else []
+            coll("applications").delete_many(storage_filter("applications", {"application_id": APPLICATION_ID}))
             if old_bids:
-                db["credit_reports"].delete_many({"borrower_id": {"$in": old_bids}})
+                coll("credit_reports").delete_many(storage_filter("credit_reports", {"borrower_id": {"$in": old_bids}}))
         else:
             print(f"Data already ingested for {APPLICATION_ID} ({doc_count} docs). Skipping PDF extraction.")
             print("Checking additional profiles, policies, and payments...\n")
@@ -643,13 +707,13 @@ def main():
                 "status": "parsed",
                 "created_at": datetime.now(timezone.utc),
             }
-            db["documents"].insert_one(doc_record)
+            coll("documents").insert_one(to_storage("documents", doc_record))
             print(f"  Stored document record with extracted data")
 
         except Exception as e:
             print(f"  ERROR: {e}")
             # Store with error status
-            db["documents"].insert_one({
+            coll("documents").insert_one(to_storage("documents", {
                 "application_id": APPLICATION_ID,
                 "doc_type": doc_type,
                 "filename": pdf_path.name,
@@ -657,7 +721,7 @@ def main():
                 "structured_data": {},
                 "status": "error",
                 "created_at": datetime.now(timezone.utc),
-            })
+            }))
 
     # Step 2: Create borrower records
     print("\n" + "=" * 60)
@@ -695,15 +759,26 @@ def main():
     print("=" * 60)
     seed_additional_profiles(db)
 
+    print("\n" + "=" * 60)
+    print("STEP 8: Seeding loan officer")
+    print("=" * 60)
+    from services.officer_service import seed_officer, DEFAULT_OFFICER
+    seed_officer(db)
+    print(f"  Seeded officer: {DEFAULT_OFFICER['full_name']} ({DEFAULT_OFFICER['title']})")
+
     # Summary
     print("\n" + "=" * 60)
     print("INGESTION COMPLETE")
     print("=" * 60)
-    print(f"  Borrowers: {db['borrowers'].count_documents({})}")
-    print(f"  Applications: {db['applications'].count_documents({})}")
-    print(f"  Documents: {db['documents'].count_documents({})}")
-    print(f"  Credit Reports: {db['credit_reports'].count_documents({})}")
-    print(f"  Policies: {db['underwriting_policies'].count_documents({})}")
+    # Resolve through the same COLL_* mapping the app uses (the physical names
+    # may be prefixed, e.g. loans / lendingDocuments in leafy_bank_bian). The
+    # retired `borrowers` collection no longer exists — borrowers now live in
+    # the shared `customers` directory tagged sourceSystem=fsi-agentic-lending.
+    print(f"  Customers (lending): {coll('customers').count_documents({'sourceSystem': 'fsi-agentic-lending'})}")
+    print(f"  Applications: {coll('applications').count_documents({})}")
+    print(f"  Documents: {coll('documents').count_documents({})}")
+    print(f"  Credit Reports: {coll('credit_reports').count_documents({})}")
+    print(f"  Policies: {coll('underwriting_policies').count_documents({})}")
     print(f"  Payments: {db['payments'].count_documents({})}")
 
 

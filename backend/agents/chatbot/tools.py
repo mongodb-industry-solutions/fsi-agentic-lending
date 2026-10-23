@@ -7,7 +7,8 @@ decision_reasoning are NEVER returned to the borrower-facing agent.
 import logging
 from datetime import datetime, timezone
 
-from db.mdb import get_db
+from db.mdb import coll, get_db
+from db.storage_mapping import from_storage, storage_filter, storage_key, to_storage
 from services.vector_search import search_policies, BORROWER_SAFE_PROJECTION
 
 logger = logging.getLogger(__name__)
@@ -86,10 +87,14 @@ def get_document_requirements(loan_type: str = "standard") -> list[dict]:
 def get_application_documents_summary(application_id: str) -> list[dict]:
     """Return lightweight document inventory for an application (no embeddings or full text)."""
     db = get_db()
-    return list(db["documents"].find(
-        {"application_id": application_id},
-        {"_id": 0, "doc_type": 1, "status": 1, "filename": 1},
-    ))
+    doc_k = lambda f: storage_key("documents", f)  # noqa: E731
+    return [
+        from_storage("documents", d)
+        for d in coll("documents").find(
+            storage_filter("documents", {"application_id": application_id}),
+            {"_id": 0, doc_k("doc_type"): 1, "status": 1, doc_k("filename"): 1},
+        )
+    ]
 
 
 def get_application_status_filtered(application_id: str) -> dict:
@@ -98,42 +103,42 @@ def get_application_status_filtered(application_id: str) -> dict:
     Uses a projection allowlist. NEVER projects: risk_score, officer_notes,
     internal_flags, decision_reasoning, risk_tier.
     """
-    db = get_db()
-    app = db["applications"].find_one(
-        {"application_id": application_id},
-        {
-            "_id": 0,
-            "application_id": 1,
-            "status": 1,
-            "status_history": 1,
-            "loan_amount": 1,
-            "purchase_price": 1,
-            "product": 1,
-            "borrower_names": 1,
-            "created_at": 1,
-            "updated_at": 1,
-        },
-    )
-    if not app:
+    # Allowlist projection. Since the BIAN migration every internal field the
+    # borrower must not see — risk_score, risk_tier, decision_reasoning — lives
+    # under the single `assessment` sub-record, so it is excluded by omission.
+    # NEVER add `assessment` here: one key would leak all ten at once.
+    k = lambda f: storage_key("applications", f)  # noqa: E731
+    projection = {
+        "_id": 0,
+        "statusSource": 1,
+        **{k(f): 1 for f in (
+            "application_id", "status_history", "loan_amount",
+            "purchase_price", "product", "borrower_names",
+            "created_at", "updated_at",
+        )},
+    }
+    stored = coll("applications").find_one({k("application_id"): application_id}, projection)
+    if not stored:
         return {"error": "Application not found"}
-    return app
+    from services.application_service import read_loan
+    return read_loan(stored)
 
 
 def get_pending_interventions(application_id: str) -> list[dict]:
     """Get pending interventions -- borrower_context only, never internal_context."""
     db = get_db()
     interventions = list(
-        db["interventions"].find(
-            {
+        coll("interventions").find(
+            storage_filter("interventions", {
                 "application_id": application_id,
                 "status": {"$in": ["pending", "active"]},
-            },
+            }),
             {
                 "_id": 1,
                 "type": 1,
                 "status": 1,
-                "borrower_context": 1,
-                "created_at": 1,
+                storage_key("interventions", "borrower_context"): 1,
+                storage_key("interventions", "created_at"): 1,
             },
         )
     )
@@ -145,32 +150,6 @@ def get_pending_interventions(application_id: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 # Generative UI data functions — structured payloads for inline components
 # ---------------------------------------------------------------------------
-
-
-def get_affordability_data(application_id: str) -> dict:
-    """Get loan parameters for the affordability calculator. Borrower-safe."""
-    db = get_db()
-    app = db["applications"].find_one(
-        {"application_id": application_id},
-        {
-            "_id": 0, "loan_amount": 1, "purchase_price": 1,
-            "down_payment": 1, "combined_income": 1,
-            "primary_income": 1, "co_applicant_income": 1,
-            "annual_property_tax": 1, "existing_monthly_debt": 1,
-            "product": 1,
-        },
-    )
-    if not app:
-        return {}
-    return {
-        "loan_amount": app.get("loan_amount", 0),
-        "purchase_price": app.get("purchase_price", 0),
-        "down_payment": app.get("down_payment", 0),
-        "combined_income": app.get("combined_income", 0),
-        "annual_property_tax": app.get("annual_property_tax", 0),
-        "existing_monthly_debt": app.get("existing_monthly_debt", 0),
-        "product": app.get("product", ""),
-    }
 
 
 def get_document_checklist_data(application_id: str) -> dict:
@@ -190,108 +169,6 @@ def get_document_checklist_data(application_id: str) -> dict:
         })
     complete = sum(1 for i in items if i["status"] in ("verified", "processed", "parsed"))
     return {"items": items, "complete": complete, "total": len(items)}
-
-
-def get_application_strength_data(application_id: str) -> dict:
-    """Get qualitative application strength assessment.
-
-    NEVER returns raw risk scores — only qualitative labels derived server-side.
-    """
-    db = get_db()
-    app = db["applications"].find_one(
-        {"application_id": application_id},
-        {
-            "_id": 0, "status": 1, "loan_amount": 1,
-            "purchase_price": 1, "down_payment": 1,
-            "combined_income": 1, "existing_monthly_debt": 1,
-        },
-    )
-    if not app:
-        return {}
-
-    purchase = max(app.get("purchase_price", 1), 1)
-    down = app.get("down_payment", 0)
-    down_pct = (down / purchase) * 100
-    monthly_income = max(app.get("combined_income", 1), 1) / 12
-    dti = app.get("existing_monthly_debt", 0) / monthly_income
-
-    factors = [
-        {
-            "label": "Down Payment",
-            "rating": "Excellent" if down_pct >= 20 else "Good" if down_pct >= 10 else "Fair",
-            "value": round(min(down_pct / 25 * 100, 100)),
-            "detail": f"{down_pct:.0f}% of purchase price",
-        },
-        {
-            "label": "Debt Ratios",
-            "rating": "Excellent" if dti < 0.30 else "Good" if dti < 0.40 else "Fair",
-            "value": round(max(0, min((1 - dti) * 100, 100))),
-            "detail": "Based on current debt obligations",
-        },
-        {
-            "label": "Employment",
-            "rating": "Good",
-            "value": 75,
-            "detail": "Verified employment",
-        },
-        {
-            "label": "Credit History",
-            "rating": "Good",
-            "value": 80,
-            "detail": "Based on credit report",
-        },
-    ]
-
-    fair_count = sum(1 for f in factors if f["rating"] == "Fair")
-    overall = "Strong" if fair_count == 0 else "Good" if fair_count <= 1 else "Fair"
-
-    return {
-        "overall": overall,
-        "factors": factors,
-        "status": app.get("status", "unknown"),
-    }
-
-
-def get_rate_comparison_data(application_id: str = None) -> dict:
-    """Get rate comparison options with real loan amount from application."""
-    loan_amount = 450000
-    if application_id:
-        db = get_db()
-        app = db["applications"].find_one(
-            {"application_id": application_id},
-            {"_id": 0, "loan_amount": 1},
-        )
-        if app:
-            loan_amount = app.get("loan_amount", 450000)
-    return {
-        "loan_amount": loan_amount,
-        "options": [
-            {
-                "name": "Fixed 3yr",
-                "rate": 5.49,
-                "term_years": 3,
-                "amort_years": 25,
-                "stress_test_rate": 7.49,
-                "recommended": False,
-            },
-            {
-                "name": "Fixed 5yr",
-                "rate": 4.99,
-                "term_years": 5,
-                "amort_years": 25,
-                "stress_test_rate": 6.99,
-                "recommended": True,
-            },
-            {
-                "name": "Variable",
-                "rate": 5.20,
-                "term_years": 5,
-                "amort_years": 25,
-                "stress_test_rate": 7.20,
-                "recommended": False,
-            },
-        ],
-    }
 
 
 def get_closing_timeline_data(application_id: str) -> dict:
@@ -338,14 +215,13 @@ def submit_intervention_response(
     except (InvalidId, TypeError):
         return {"error": "Invalid intervention ID format"}
 
-    db = get_db()
     query = {"_id": oid, "status": {"$in": ["pending", "active"]}}
     if application_id:
-        query["application_id"] = application_id
-    result = db["interventions"].update_one(
+        query[storage_key("interventions", "application_id")] = application_id
+    result = coll("interventions").update_one(
         query,
         {
-            "$set": {
+            "$set": to_storage("interventions", {
                 "status": "resolved",
                 "resolved_at": datetime.now(timezone.utc),
                 "resolution": {
@@ -353,7 +229,7 @@ def submit_intervention_response(
                     "documents_uploaded": documents_uploaded or [],
                     "resolved_by": "application_agent",
                 },
-            }
+            })
         },
     )
     if result.modified_count == 0:

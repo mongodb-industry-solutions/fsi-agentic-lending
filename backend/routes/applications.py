@@ -10,6 +10,24 @@ from fastapi.responses import StreamingResponse
 from models.schemas import ApplicationCreateRequest
 from services import application_service
 from db.mdb import get_db
+from db.mdb import coll
+from db.storage_mapping import from_storage, storage_filter, storage_key
+from services.application_service import read_loan
+
+
+def _k(runtime_path: str) -> str:
+    """Runtime field path -> storage path on the `loans` collection."""
+    return storage_key("applications", runtime_path)
+
+
+def _a(runtime_path: str) -> str:
+    """Runtime field path -> storage path on `lendingAgentActivity`."""
+    return storage_key("agent_activity", runtime_path)
+
+
+def _read_app(stored):
+    """None-safe read_loan, for the snapshot-then-stream paths."""
+    return read_loan(stored) if stored else None
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +41,55 @@ def _validate_app_id(app_id: str):
         raise HTTPException(status_code=400, detail=f"Invalid application ID format: {app_id}")
 
 
+def _borrower_decline_reason(status_detail: str) -> str:
+    """Map an internal decline detail to a borrower-safe, qualitative reason.
+
+    Internal decline text can embed raw ratios/scores; the borrower only ever
+    sees a plain-language explanation with no numbers. Classification is keyword
+    based against the known pipeline/officer decline messages, with a neutral
+    default for anything unrecognized.
+    """
+    detail = (status_detail or "").lower()
+    if "income" in detail:
+        return ("We were unable to verify sufficient income to support the "
+                "requested loan amount. A loan officer can discuss options with you.")
+    if "credit" in detail:
+        return ("We were unable to complete a credit assessment for this "
+                "application. A loan officer can help you resolve this.")
+    if "stress" in detail or "gds" in detail or "tds" in detail or "affordab" in detail:
+        return ("Based on our affordability assessment, this loan amount exceeds "
+                "what we're able to approve at this time. A loan officer can review "
+                "alternative options with you.")
+    if "officer" in detail:
+        return ("After review, a loan officer was unable to approve this "
+                "application. They can walk you through the details and next steps.")
+    return ("We're unable to approve this application at this time. A loan officer "
+            "can discuss the details and any next steps with you.")
+
+
+# Underwriting vocabulary that must never surface in the borrower activity feed.
+# When an activity detail mentions any of these, the raw text (which typically
+# embeds ratios/scores like "GDS 32%, Risk 25/100 (A)") is replaced with a
+# qualitative, number-free summary. Doc-verification/credit-pull steps that don't
+# mention these terms pass through unchanged.
+_UW_KEYWORDS_RE = re.compile(
+    r"\b(gds|tds|risk score|risk tier|stress|tier\s+[a-d]|ltv|credit score|debt service)\b",
+    re.IGNORECASE,
+)
+
+
+def _borrower_safe_activity_detail(agent: str, action: str, detail: str) -> str:
+    """Redact underwriting internals from a borrower-facing activity detail."""
+    if not detail or not _UW_KEYWORDS_RE.search(detail):
+        return detail
+    a = (agent or "").lower()
+    if "underwriter" in a:
+        return "Affordability and risk assessment step completed."
+    if "credit" in a:
+        return "Credit and income data reviewed."
+    return "Assessment step completed."
+
+
 @router.post("/applications")
 async def create_application(req: ApplicationCreateRequest):
     """Create a new loan application, or reset an existing session-isolated demo app."""
@@ -32,6 +99,22 @@ async def create_application(req: ApplicationCreateRequest):
             demo_session_id=req.demo_session_id,
             data=req.model_dump(),
         )
+        # The borrower just saw these documents on the apply page — a submit that
+        # cannot attach them is broken, not successful. Fail loudly instead of
+        # shipping an empty application the tracking pane cannot display. A silent
+        # zero-clone is how a wrong DATABASE_NAME / COLL_* mapping or an
+        # unreachable Mongo manifests as "No documents found" with no error.
+        if result.get("documents_attached", 0) == 0:
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Application was created but 0 documents could be attached from "
+                    f"seed profile '{req.profile_id}'. Verify DATABASE_NAME and the "
+                    "COLL_* collection mapping (README: 'Collection overrides'), that "
+                    "the seed application has documents, and that the backend can reach "
+                    "MongoDB."
+                ),
+            )
         return result
 
     app = application_service.create_application(req.model_dump())
@@ -67,14 +150,13 @@ async def portfolio_stats():
 
 @router.get("/portfolio/ews")
 async def portfolio_ews(loan_id: str = None):
-    """Early Warning System signals from payment time-series analysis."""
+    """Early Warning System signals from rolling-window payment analysis."""
     from services.dashboard_service import get_ews_signals
     if not loan_id:
-        db = get_db()
-        sample = db["payments"].find_one({}, {"loan_id": 1})
+        sample = coll("payments").find_one({}, {storage_key("payments", "loan_id"): 1})
         if not sample:
             return []
-        loan_id = sample["loan_id"]
+        loan_id = from_storage("payments", sample)["loan_id"]
     result = await asyncio.to_thread(get_ews_signals, loan_id)
     return result
 
@@ -127,7 +209,7 @@ async def stream_activity(app_id: str):
         db = get_db()
         yield f"data: {json.dumps({'type': 'connected', 'application_id': app_id})}\n\n"
 
-        pipeline = [{"$match": {"fullDocument.application_id": app_id}}]
+        pipeline = [{"$match": {f"fullDocument.{_a('application_id')}": app_id}}]
         stream = None
         last_resume_token = None
         resume_retries = 0
@@ -140,16 +222,16 @@ async def stream_activity(app_id: str):
         # Initial open; if the cluster can't serve change streams, degrade to polling
         try:
             stream = await asyncio.to_thread(
-                lambda: db["agent_activity"].watch(pipeline, full_document="updateLookup")
+                lambda: coll("agent_activity").watch(pipeline, full_document="updateLookup")
             )
         except Exception:
             use_polling = True
             # Seed polling high-water mark so we don't replay history every reconnect
             latest = await asyncio.to_thread(
                 lambda: list(
-                    db["agent_activity"]
-                    .find({"application_id": app_id})
-                    .sort("timestamp", -1)
+                    coll("agent_activity")
+                    .find(storage_filter("agent_activity", {"application_id": app_id}))
+                    .sort(_a("timestamp"), -1)
                     .limit(1)
                 )
             )
@@ -164,12 +246,12 @@ async def stream_activity(app_id: str):
         try:
             while True:
                 if use_polling:
-                    query = {"application_id": app_id}
+                    query = storage_filter("agent_activity", {"application_id": app_id})
                     if last_poll_ts is not None:
-                        query["timestamp"] = {"$gte": last_poll_ts}
+                        query[_a("timestamp")] = {"$gte": last_poll_ts}
                     new_docs = await asyncio.to_thread(
                         lambda q=query: list(
-                            db["agent_activity"].find(q).sort("timestamp", 1).limit(100)
+                            coll("agent_activity").find(q).sort(_a("timestamp"), 1).limit(100)
                         )
                     )
                     for doc in new_docs:
@@ -186,9 +268,13 @@ async def stream_activity(app_id: str):
                                 seen_poll_ids.add(doc_id)
                         event = {
                             "type": "activity",
-                            "agent": doc.get("agent", ""),
-                            "action": doc.get("action", ""),
-                            "detail": doc.get("detail", ""),
+                            # Borrower never sees backend agent identity/actions —
+                            # everything is attributed to the single assistant.
+                            "agent": "assistant",
+                            "action": "",
+                            "detail": _borrower_safe_activity_detail(
+                                doc.get("agent", ""), doc.get("action", ""), doc.get("detail", "")
+                            ),
                             "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else str(ts or ""),
                         }
                         yield f"data: {json.dumps(event)}\n\n"
@@ -209,9 +295,9 @@ async def stream_activity(app_id: str):
                         # Seed polling HWM so we don't replay history
                         latest = await asyncio.to_thread(
                             lambda: list(
-                                db["agent_activity"]
-                                .find({"application_id": app_id})
-                                .sort("timestamp", -1)
+                                coll("agent_activity")
+                                .find(storage_filter("agent_activity", {"application_id": app_id}))
+                                .sort(_a("timestamp"), -1)
                                 .limit(1)
                             )
                         )
@@ -222,7 +308,7 @@ async def stream_activity(app_id: str):
                         continue
                     try:
                         stream = await asyncio.to_thread(
-                            lambda: db["agent_activity"].watch(
+                            lambda: coll("agent_activity").watch(
                                 pipeline,
                                 full_document="updateLookup",
                                 resume_after=last_resume_token,
@@ -259,12 +345,16 @@ async def stream_activity(app_id: str):
                 if change:
                     resume_retries = 0
                     last_resume_token = change.get("_id")
-                    doc = change.get("fullDocument", {})
+                    doc = from_storage("agent_activity", change.get("fullDocument")) or {}
                     event = {
                         "type": "activity",
-                        "agent": doc.get("agent", ""),
-                        "action": doc.get("action", ""),
-                        "detail": doc.get("detail", ""),
+                        # Borrower never sees backend agent identity/actions —
+                        # everything is attributed to the single assistant.
+                        "agent": "assistant",
+                        "action": "",
+                        "detail": _borrower_safe_activity_detail(
+                            doc.get("agent", ""), doc.get("action", ""), doc.get("detail", "")
+                        ),
                         "timestamp": doc.get("timestamp", "").isoformat()
                         if hasattr(doc.get("timestamp", ""), "isoformat")
                         else str(doc.get("timestamp", "")),
@@ -320,15 +410,16 @@ async def stream_status(app_id: str):
 
         # Snapshot-on-connect: send current status first
         app = await asyncio.to_thread(
-            db["applications"].find_one, {"application_id": app_id}
+            coll("applications").find_one, {_k("application_id"): app_id}
         )
+        app = _read_app(app)
         if app:
             yield f"data: {json.dumps({'type': 'status', 'status': app.get('status', 'unknown'), 'status_detail': app.get('status_detail', '')})}\n\n"
 
         pipeline = [
             {
                 "$match": {
-                    "fullDocument.application_id": app_id,
+                    f"fullDocument.{_k('application_id')}": app_id,
                     "operationType": {"$in": ["update", "replace"]},
                 }
             }
@@ -344,7 +435,7 @@ async def stream_status(app_id: str):
 
         try:
             stream = await asyncio.to_thread(
-                lambda: db["applications"].watch(pipeline, full_document="updateLookup")
+                lambda: coll("applications").watch(pipeline, full_document="updateLookup")
             )
         except Exception:
             use_polling = True
@@ -352,9 +443,9 @@ async def stream_status(app_id: str):
         try:
             while True:
                 if use_polling:
-                    current = await asyncio.to_thread(
-                        db["applications"].find_one, {"application_id": app_id}
-                    )
+                    current = _read_app(await asyncio.to_thread(
+                        coll("applications").find_one, {_k("application_id"): app_id}
+                    ))
                     if current:
                         cur_status = current.get("status")
                         cur_updated = current.get("updated_at")
@@ -386,7 +477,7 @@ async def stream_status(app_id: str):
                         continue
                     try:
                         stream = await asyncio.to_thread(
-                            lambda: db["applications"].watch(
+                            lambda: coll("applications").watch(
                                 pipeline,
                                 full_document="updateLookup",
                                 resume_after=last_resume_token,
@@ -423,13 +514,21 @@ async def stream_status(app_id: str):
                 if change:
                     resume_retries = 0
                     last_resume_token = change.get("_id")
-                    doc = change.get("fullDocument", {})
+                    # A change stream hands back a raw STORAGE document, so it
+                    # has to cross the boundary like any other read. Without
+                    # _read_app: `status` is the BIAN projection (four in-flight
+                    # states collapse onto UNDER_REVIEW, so the UI sticks on
+                    # "in review"), and `status_detail` / `updated_at` are
+                    # stored as `assessment.statusDetail` / `updatedAt` and so
+                    # always read empty.
+                    doc = _read_app(change.get("fullDocument")) or {}
+                    updated_at = doc.get("updated_at", "")
                     event = {
                         "type": "status",
                         "status": doc.get("status", ""),
                         "status_detail": doc.get("status_detail", ""),
-                        "updated_at": doc.get("updated_at", "").isoformat()
-                        if hasattr(doc.get("updated_at", ""), "isoformat")
+                        "updated_at": updated_at.isoformat()
+                        if hasattr(updated_at, "isoformat")
                         else "",
                     }
                     yield f"data: {json.dumps(event)}\n\n"
@@ -474,23 +573,33 @@ async def get_timeline_context(app_id: str):
 
     db = get_db()
 
-    # Borrower-safe intervention data
+    # Borrower-safe intervention data. The projection speaks the BIAN storage
+    # shape, so each document is translated back to the runtime snake_case the
+    # borrower portal reads (borrowerContext -> borrower_context, and the nested
+    # actionRequired / documentTypesAccepted with it).
     interventions = await asyncio.to_thread(
-        lambda: list(
-            db["interventions"]
+        lambda: [
+            from_storage("interventions", i)
+            for i in coll("interventions")
             .find(
-                {"application_id": app_id},
-                {"_id": 0, "type": 1, "status": 1, "borrower_context": 1, "created_at": 1, "resolved_at": 1},
+                storage_filter("interventions", {"application_id": app_id}),
+                # _id is borrower-safe (the chat interventions endpoint already
+                # exposes it) and lets the borrower portal resolve an
+                # intervention after uploading the requested documents.
+                {"_id": 1, "type": 1, "status": 1,
+                 storage_key("interventions", "borrower_context"): 1,
+                 storage_key("interventions", "created_at"): 1,
+                 storage_key("interventions", "resolved_at"): 1},
             )
-            .sort("created_at", 1)
-        )
+            .sort(storage_key("interventions", "created_at"), 1)
+        ]
     )
 
     # Activity summary counts
     activity_counts = await asyncio.to_thread(
         lambda: list(
-            db["agent_activity"].aggregate([
-                {"$match": {"application_id": app_id}},
+            coll("agent_activity").aggregate([
+                {"$match": storage_filter("agent_activity", {"application_id": app_id})},
                 {"$group": {
                     "_id": None,
                     "total": {"$sum": 1},
@@ -511,22 +620,27 @@ async def get_timeline_context(app_id: str):
         summary["total_events"] = activity_counts[0].get("total", 0)
         summary["docs_verified"] = actions.count("verification")
 
-    # Borrower-safe app fields only
+    # Borrower-safe app fields only.
+    # Underwriting internals (risk_score, risk_tier, gds_ratio, tds_ratio,
+    # primary_credit_score, decision_reasoning) are intentionally EXCLUDED —
+    # the borrower sees a high-level, Amazon-style status only. All quantitative
+    # scoring detail stays on the loan officer side. Do not add them back here.
     safe_app = {
         "application_id": app.get("application_id"),
         "loan_amount": app.get("loan_amount"),
         "purchase_price": app.get("purchase_price"),
         "product": app.get("product"),
-        "risk_score": app.get("risk_score"),
-        "risk_tier": app.get("risk_tier"),
-        "gds_ratio": app.get("gds_ratio"),
-        "tds_ratio": app.get("tds_ratio"),
-        "primary_credit_score": app.get("primary_credit_score"),
-        "decision_reasoning": app.get("decision_reasoning"),
         "borrower_names": app.get("borrower_names", []),
         "status": app.get("status"),
         "doc_count": len(app.get("documents", [])),
     }
+
+    # Declined applications get a plain-language, qualitative reason only.
+    # The pipeline's status_detail / decision_reasoning can embed raw ratios and
+    # scores (e.g. "Stress GDS 68% ... limit 39%"), so we classify the underlying
+    # cause and emit a borrower-safe message with no numbers.
+    if app.get("status") == "declined":
+        safe_app["decline_reason"] = _borrower_decline_reason(app.get("status_detail", ""))
 
     # Compute loan term details only for approved applications
     if app.get("status") in ("approved", "closing", "funded", "active"):
@@ -548,14 +662,21 @@ async def get_timeline_context(app_id: str):
             else:
                 safe_app["monthly_payment"] = round(loan_amount / n_payments) if n_payments > 0 else 0
 
-    # Status history for stage timing
-    status_history = app.get("status_history", [])
-    for entry in status_history:
-        if hasattr(entry.get("timestamp"), "isoformat"):
-            entry["timestamp"] = entry["timestamp"].isoformat()
+    # Status history for stage timing — project to status + timestamp only.
+    # The per-entry `detail` can embed raw ratios/scores (e.g. the auto-approve
+    # detail "Auto-approved: GDS 32%, ...") so it is intentionally dropped here.
+    raw_history = app.get("status_history", [])
+    status_history = []
+    for entry in raw_history:
+        ts = entry.get("timestamp")
+        status_history.append({
+            "status": entry.get("status"),
+            "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else ts,
+        })
 
-    # Serialize intervention timestamps
+    # Serialize intervention ids + timestamps
     for intv in interventions:
+        intv["_id"] = str(intv["_id"])
         for key in ("created_at", "resolved_at"):
             if hasattr(intv.get(key), "isoformat"):
                 intv[key] = intv[key].isoformat()
@@ -670,7 +791,7 @@ async def applications_ws(websocket: WebSocket):
             # Initial open; degrade to polling if change streams are unavailable
             try:
                 stream = await asyncio.to_thread(
-                    lambda: db["applications"].watch(pipeline, full_document="updateLookup")
+                    lambda: coll("applications").watch(pipeline, full_document="updateLookup")
                 )
             except Exception:
                 stream = None
@@ -688,7 +809,7 @@ async def applications_ws(websocket: WebSocket):
                         break
                     try:
                         stream = await asyncio.to_thread(
-                            lambda: db["applications"].watch(
+                            lambda: coll("applications").watch(
                                 pipeline,
                                 full_document="updateLookup",
                                 resume_after=last_resume_token,
@@ -725,7 +846,7 @@ async def applications_ws(websocket: WebSocket):
                 if change:
                     resume_retries = 0
                     last_resume_token = change.get("_id")
-                    doc = change.get("fullDocument")
+                    doc = _read_app(change.get("fullDocument"))
                     if doc and not doc.get("seed_complete"):
                         serialized = application_service.serialize_doc(doc)
                         await enqueue({

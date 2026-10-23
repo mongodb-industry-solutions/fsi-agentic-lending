@@ -30,7 +30,8 @@ const BORROWER_PROFILES = [
     coApplicantIncome: '94200',
     propertyAddress: '4718 Coronation Drive SW, Calgary, AB T3E 4Y2',
     annualPropertyTax: '6815',
-    loanAmount: '875000',
+    purchasePrice: '875000',
+    loanAmount: '700000',
     loanPurpose: 'Purchase',
     propertyType: 'Detached Home',
     productType: '5yr Fixed (25yr Amort)',
@@ -59,7 +60,8 @@ const BORROWER_PROFILES = [
     coApplicantIncome: '70000',
     propertyAddress: '1438 Garden Terrace, Burnaby, BC V5A 3G2',
     annualPropertyTax: '3950',
-    loanAmount: '425000',
+    purchasePrice: '425000',
+    loanAmount: '340000',
     loanPurpose: 'Purchase',
     propertyType: 'Townhouse',
     productType: '5yr Fixed (25yr Amort)',
@@ -88,7 +90,8 @@ const BORROWER_PROFILES = [
     coApplicantIncome: '0',
     propertyAddress: '55 Bremner Blvd, Unit 3402, Toronto, ON M5J 0A6',
     annualPropertyTax: '4200',
-    loanAmount: '490000',
+    purchasePrice: '490000',
+    loanAmount: '392000',
     loanPurpose: 'Purchase',
     propertyType: 'Condo',
     productType: '5yr Fixed (25yr Amort)',
@@ -117,7 +120,8 @@ const BORROWER_PROFILES = [
     coApplicantIncome: '50000',
     propertyAddress: '27 Chartwell Crescent, Oakville, ON L6J 3Z8',
     annualPropertyTax: '9200',
-    loanAmount: '1200000',
+    purchasePrice: '1200000',
+    loanAmount: '960000',
     loanPurpose: 'Purchase',
     propertyType: 'Detached Home',
     productType: '5yr Fixed (25yr Amort)',
@@ -146,7 +150,8 @@ const BORROWER_PROFILES = [
     coApplicantIncome: '0',
     propertyAddress: '280 Metcalfe Street, Unit 801, Ottawa, ON K2P 1R7',
     annualPropertyTax: '3800',
-    loanAmount: '455000',
+    purchasePrice: '455000',
+    loanAmount: '364000',
     loanPurpose: 'Purchase',
     propertyType: 'Condo',
     productType: '5yr Fixed (25yr Amort)',
@@ -278,10 +283,13 @@ function ActiveCard({ profile, onClick, colors, submissionStatus }) {
       >
         <div style={{ textAlign: 'left' }}>
           <div style={{ fontSize: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-dim)', marginBottom: 2 }}>
-            Loan
+            Purchase
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>
-            ${Number(profile.loanAmount).toLocaleString('en-US')}
+            ${Number(profile.purchasePrice).toLocaleString('en-US')}
+          </div>
+          <div style={{ fontSize: 8, fontWeight: 600, color: 'var(--text-dim)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>
+            Loan ${Number(profile.loanAmount).toLocaleString('en-US')}
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>

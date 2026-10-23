@@ -1,38 +1,15 @@
-export const AGENT_COLORS = {
-  loan_app_agent: { color: 'var(--agent-cyan)', bg: 'var(--agent-cyan-dim)', label: 'Loan Agent' },
-  underwriter: { color: 'var(--hitl-amber)', bg: 'var(--hitl-amber-dim)', label: 'Underwriter' },
-  supervisor: { color: 'var(--voyage)', bg: 'var(--voyage-dim)', label: 'Supervisor' },
-  default: { color: 'var(--text-dim)', bg: 'var(--bg-raised)', label: 'Agent' },
-};
-
-export function getAgentStyle(agentName) {
-  return AGENT_COLORS[agentName] || AGENT_COLORS.default;
-}
-
-export const ACTION_TO_STAGE_MAP = {
-  document_ingestion: 1,
-  verification: 1,
-  risk_assessment: 4,
-  underwriting: 4,
-  decision: 5,
-  intervention: 6,
-  autonomy_gate: 6,
-  status_update: null,
-};
-
-export function mapEventToStageIdx(event, currentStageIdx) {
-  if (event.action && ACTION_TO_STAGE_MAP[event.action] !== undefined) {
-    return ACTION_TO_STAGE_MAP[event.action];
-  }
-  return currentStageIdx;
-}
-
 /**
- * Stage definitions — static skeleton with dynamic content generators.
+ * Borrower-facing status milestones — Amazon-style high-level tracking.
  *
- * Each stage has get* functions that receive a `ctx` object built from
- * real backend data (timeline-context endpoint + SSE events).
- * Functions return sensible defaults when ctx has no data.
+ * The borrower sees a small set of high-level milestones only. All internal
+ * pipeline stages (document verification, credit pull, underwriting, officer
+ * review, decision) roll up into a single "In Review" milestone — the borrower
+ * is never shown the multi-step machinery or the agents behind it. The only
+ * "agent" the borrower perceives is their Personal Lending Assistant (chat).
+ *
+ * Each stage exposes get* functions that receive a `ctx` built from the
+ * borrower-safe timeline-context endpoint. Wording is neutral / single-assistant;
+ * no agent names, no "AI pipeline", no "autonomous".
  */
 export const STAGES = [
   {
@@ -40,169 +17,82 @@ export const STAGES = [
     label: 'Application Received',
     icon: '1',
     getType: () => 'clean',
-    getDetail: (ctx) => `Your application ${ctx.appId || ''} has been received and queued for processing.`,
-    getAgentStatus: () => 'Our AI assistant is reviewing your submission...',
+    getDetail: (ctx) => `Your application${ctx.appId ? ` ${ctx.appId}` : ''} has been received.`,
+    getAgentStatus: () => 'Your application has been received and is queued for review.',
   },
   {
-    id: 'docs',
-    label: 'Document Verification',
+    id: 'in-review',
+    label: 'In Review',
     icon: '2',
-    getType: (ctx) => ctx.docInterventions?.length > 0 ? 'intervention' : 'clean',
+    getType: (ctx) => (ctx.pendingActions?.length > 0 ? 'action-required' : 'clean'),
     getDetail: (ctx) => {
-      const docs = ctx.docCount || 0;
-      const issues = ctx.docInterventions?.length || 0;
-      if (issues > 0) return `AI detected ${issues} issue${issues !== 1 ? 's' : ''} during document analysis and resolved ${issues === 1 ? 'it' : 'them'} automatically.`;
-      if (docs > 0) return `${docs} documents verified successfully.`;
-      return 'Verifying your documents...';
-    },
-    getInterventions: (ctx) => ctx.docInterventions || [],
-    getAgentStatus: (ctx) => (ctx.docInterventions?.length > 0)
-      ? 'AI assistant detected document issues — resolving automatically...'
-      : 'Our AI assistant is verifying your documents...',
-  },
-  {
-    id: 'action-required',
-    label: 'Additional Documents',
-    icon: '3',
-    getType: (ctx) => ctx.pendingInterventions?.length > 0 ? 'action-required' : 'clean',
-    getDetail: (ctx) => {
-      const pending = ctx.pendingInterventions || [];
-      if (pending.length > 0) return pending[0].borrower_context?.summary || 'Additional documentation may be required.';
-      return 'No additional documents needed.';
-    },
-    getInterventions: (ctx) => ctx.pendingInterventions || [],
-    getAgentStatus: (ctx) => (ctx.pendingInterventions?.length > 0)
-      ? 'Waiting for additional documentation...'
-      : 'All document requirements satisfied.',
-  },
-  {
-    id: 'credit',
-    label: 'Credit & Income Analysis',
-    icon: '4',
-    getType: (ctx) => ctx.creditInterventions?.length > 0 ? 'intervention' : 'clean',
-    getDetail: (ctx) => {
-      if (typeof ctx.creditScore === 'number') return `Credit score: ${ctx.creditScore}. Income verified against tax records.`;
-      if (ctx.creditInterventions?.length > 0) return `AI investigated ${ctx.creditInterventions.length} discrepanc${ctx.creditInterventions.length !== 1 ? 'ies' : 'y'} in your credit and income records.`;
-      return 'Analyzing your credit and income data...';
-    },
-    getInterventions: (ctx) => ctx.creditInterventions || [],
-    getAgentStatus: () => 'Our AI assistant is analyzing your credit and income data...',
-  },
-  {
-    id: 'underwriting',
-    label: 'Underwriting Risk Assessment',
-    icon: '5',
-    getType: (ctx) => ctx.riskInterventions?.length > 0 ? 'intervention' : 'clean',
-    getDetail: (ctx) => {
-      if (typeof ctx.riskScore === 'number') {
-        const parts = [`Risk score: ${ctx.riskScore}/100 (${ctx.riskTier || 'N/A'})`];
-        if (typeof ctx.gds === 'number') parts.push(`GDS: ${(ctx.gds * 100).toFixed(1)}%`);
-        if (typeof ctx.tds === 'number') parts.push(`TDS: ${(ctx.tds * 100).toFixed(1)}%`);
-        return parts.join('. ') + '.';
+      if (ctx.pendingActions?.length > 0) {
+        return ctx.pendingActions[0].borrower_context?.summary
+          || 'We need a little more information to continue your review.';
       }
-      return 'Running underwriting risk assessment...';
+      if (ctx.rawStatus === 'review') return 'A loan officer is reviewing your application.';
+      return 'We’re reviewing your documents, credit, and affordability.';
     },
-    getInterventions: (ctx) => ctx.riskInterventions || [],
-    getMetrics: (ctx) => {
-      if (typeof ctx.riskScore !== 'number') return null;
-      const metrics = [
-        { label: 'Risk Score', value: `${ctx.riskScore}/100` },
-        { label: 'Risk Tier', value: ctx.riskTier || 'N/A' },
-      ];
-      if (typeof ctx.gds === 'number') metrics.push({ label: 'GDS Ratio', value: `${(ctx.gds * 100).toFixed(1)}%` });
-      if (typeof ctx.tds === 'number') metrics.push({ label: 'TDS Ratio', value: `${(ctx.tds * 100).toFixed(1)}%` });
-      if (typeof ctx.creditScore === 'number') metrics.push({ label: 'Credit Score', value: String(ctx.creditScore) });
-      return metrics;
+    getInterventions: (ctx) => ctx.pendingActions || [],
+    getAgentStatus: (ctx) => {
+      if (ctx.pendingActions?.length > 0) return 'We need a little more information to continue your review.';
+      if (ctx.rawStatus === 'review') return 'A loan officer is reviewing your application.';
+      return 'We’re reviewing your application.';
     },
-    getAgentStatus: (ctx) => (ctx.riskInterventions?.length > 0)
-      ? 'AI assistant corrected a scoring issue — recalculating...'
-      : 'Our AI assistant is running the underwriting risk assessment...',
   },
   {
     id: 'decision',
-    label: 'Decision Ready',
-    icon: '6',
-    getType: () => 'clean',
-    getDetail: (ctx) => {
-      const resolved = ctx.totalResolved || 0;
-      if (typeof ctx.riskScore === 'number') {
-        let msg = `Underwriting complete. Risk score: ${ctx.riskScore}/100 (${ctx.riskTier || 'N/A'}).`;
-        if (ctx.riskScore <= 50 && typeof ctx.gds === 'number' && ctx.gds <= 0.36) {
-          msg += ' All metrics within auto-approval bounds.';
-        } else if (ctx.riskScore > 80) {
-          msg += ' Risk exceeds acceptable threshold.';
-        } else if (typeof ctx.gds === 'number' && ctx.gds > 0.36) {
-          msg += ' Debt service ratios require officer review.';
-        }
-        if (resolved > 0) msg += ` ${resolved} issue${resolved !== 1 ? 's' : ''} resolved by AI.`;
-        return msg;
-      }
-      return 'Preparing underwriting decision...';
-    },
-    getAgentStatus: () => 'Analysis complete — preparing your results...',
-  },
-  {
-    id: 'review',
-    label: 'Officer Review',
-    icon: '7',
-    getType: () => 'clean',
-    getDetail: () => 'A loan officer is reviewing your application and the AI assistant\'s work.',
-    getAgentStatus: () => 'A loan officer is reviewing your application...',
-  },
-  {
-    id: 'approved',
-    label: 'Approved',
-    icon: '8',
+    label: 'Decision',
+    icon: '3',
     getType: () => 'clean',
     getDetail: (ctx) => {
       if (ctx.isDeclined) {
-        return `Application declined.${ctx.decisionReasoning ? ' ' + ctx.decisionReasoning : ''}`;
+        return `Application not approved.${ctx.declineReason ? ' ' + ctx.declineReason : ''}`;
       }
-      const parts = ['Congratulations! Your mortgage has been approved.'];
+      const parts = ['Your mortgage has been approved.'];
       if (ctx.product) parts.push(`Product: ${ctx.product}.`);
-      if (typeof ctx.riskScore === 'number') {
-        parts.push(`Risk score: ${ctx.riskScore}/100 (${ctx.riskTier || 'N/A'}).`);
-      }
       return parts.join(' ');
     },
-    getAgentStatus: (ctx) => ctx.isDeclined
-      ? 'Your application has been declined.'
-      : 'Great news — your loan has been approved!',
+    getAgentStatus: (ctx) => (ctx.isDeclined
+      ? 'Your application was not approved.'
+      : 'Great news — your loan has been approved!'),
   },
   {
     id: 'closing',
-    label: 'Closing & Document Signing',
-    icon: '9',
+    label: 'Closing',
+    icon: '4',
     getType: () => 'clean',
     getDetail: () => 'Your loan documents are being prepared for signing.',
-    getAgentStatus: () => 'Preparing your closing documents...',
+    getAgentStatus: () => 'We’re preparing your closing documents.',
   },
   {
-    id: 'active',
-    label: 'Loan Active',
-    icon: '10',
+    id: 'funded',
+    label: 'Funded',
+    icon: '5',
     getType: () => 'clean',
-    getDetail: (ctx) => {
-      if (ctx.loanAmount) return `Your mortgage is now active. $${Number(ctx.loanAmount).toLocaleString()} disbursed.`;
-      return 'Your mortgage is now active.';
-    },
-    getAgentStatus: () => 'Your loan is now active and being monitored.',
+    getDetail: (ctx) => (ctx.loanAmount
+      ? `Your mortgage is now active. $${Number(ctx.loanAmount).toLocaleString()} disbursed.`
+      : 'Your mortgage is now active.'),
+    getAgentStatus: () => 'Your loan is now active.',
   },
 ];
 
+// Map every backend status to a high-level milestone. The internal working
+// statuses (processing / credit / underwriting / review / decision) all roll
+// up into "In Review" so the borrower never sees the pipeline granularity.
 export const STATUS_TO_STAGE = {
   submitted: 0,
   processing: 1,
-  action_required: 2,
-  credit: 3,
-  underwriting: 4,
-  decision: 5,
-  review: 6,
-  approved: 7,
-  declined: 7,
-  closing: 8,
-  funded: 9,
-  active: 9,
+  action_required: 1,
+  credit: 1,
+  underwriting: 1,
+  review: 1,
+  decision: 1,
+  approved: 2,
+  declined: 2,
+  closing: 3,
+  funded: 4,
+  active: 4,
   error: -1,
 };
 

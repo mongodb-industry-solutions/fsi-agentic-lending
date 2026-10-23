@@ -8,7 +8,6 @@ import DocumentUpload from './DocumentUpload';
 import StatusTracker from './StatusTracker';
 import DocumentContext from './DocumentContext';
 import ApplicationAgent from './ApplicationAgent';
-import TechnologyTheatre from './TechnologyTheatre';
 import NotificationToast, {
   useToasts,
 } from '../NotificationToast/NotificationToast';
@@ -28,69 +27,8 @@ function getDemoSessionId() {
 const SUBMIT_STEPS = [
   { label: 'Creating application...', done: 'Application created' },
   { label: 'Attaching documents...', done: 'Documents attached' },
-  { label: 'Launching AI agents...', done: 'AI agents running' },
+  { label: 'Submitting for review...', done: 'Submitted for review' },
 ];
-
-function FloatingChatDrawer({ open, onToggle }) {
-  return (
-    <>
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-label={open ? 'Close chat' : 'Ask your Lending Assistant'}
-        style={{
-          position: 'fixed',
-          bottom: 24,
-          right: 24,
-          zIndex: 400,
-          width: 48,
-          height: 48,
-          borderRadius: '50%',
-          background: open ? 'var(--text-dim)' : 'var(--mongo)',
-          color: '#fff',
-          border: 'none',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: 'var(--shadow-lg)',
-          fontSize: 20,
-          fontFamily: 'var(--font-display)',
-          fontWeight: 700,
-          transition: 'background 200ms ease, transform 100ms ease',
-        }}
-      >
-        {open ? '\u2715' : '\uD83D\uDCAC'}
-      </button>
-      {open && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 84,
-            right: 24,
-            zIndex: 400,
-            width: 360,
-            height: 460,
-            borderRadius: 'var(--radius-lg)',
-            border: '1px solid var(--border-dim)',
-            boxShadow: 'var(--shadow-xl)',
-            overflow: 'hidden',
-            animation:
-              'cardEnter 0.25s cubic-bezier(0.33, 1, 0.68, 1) both',
-            display: 'flex',
-            flexDirection: 'column',
-            background: 'var(--bg-base)',
-          }}
-        >
-          <ApplicationAgent
-            applicationId={null}
-            applicationStatus={null}
-          />
-        </div>
-      )}
-    </>
-  );
-}
 
 function SubmittingOverlay({ currentStep, applicationId }) {
   if (typeof document === 'undefined') return null;
@@ -264,9 +202,16 @@ export default function BorrowerPortal() {
   const [submitStep, setSubmitStep] = useState(0);
   const [applicationStatus, setApplicationStatus] =
     useState('submitted');
-  const [chatOpen, setChatOpen] = useState(false);
   const [submittedApps, setSubmittedApps] = useState({});
   const statusSourceRef = useRef(null);
+  const chatColumnRef = useRef(null);
+
+  // The chat column is always mounted in the tracking layout — "speak with
+  // the assistant" CTAs bring it into view (useful on narrow viewports where
+  // the columns overflow) instead of toggling state nothing consumed.
+  const handleOpenChat = useCallback(() => {
+    chatColumnRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+  }, []);
 
   // Restore session state after hydration (avoids SSR/client mismatch)
   useEffect(() => {
@@ -289,12 +234,6 @@ export default function BorrowerPortal() {
 
   // Trigger immediate DocumentContext refresh after InterventionCard uploads
   const [docRefreshTrigger, setDocRefreshTrigger] = useState(0);
-
-  // Tool activity state lifted from ApplicationAgent for TechnologyTheatre
-  const [toolActivity, setToolActivity] = useState({ active: [], history: [] });
-  const handleToolActivity = useCallback((active, completed) => {
-    setToolActivity({ active: active || [], history: completed || [] });
-  }, []);
 
   // Persist key state to sessionStorage for page refresh resilience
   useEffect(() => {
@@ -404,7 +343,7 @@ export default function BorrowerPortal() {
       setPhase('submitting');
       setSubmitStep(0);
 
-      const purchasePrice = parseFloat(formData.loanAmount) || 0;
+      const purchasePrice = parseFloat(formData.purchasePrice) || 0;
       const downPayment = parseFloat(formData.downPayment) || 0;
       const primaryIncome = parseFloat(formData.annualIncome) || 0;
       const coIncome = parseFloat(formData.coApplicantIncome) || 0;
@@ -563,23 +502,18 @@ export default function BorrowerPortal() {
           <StatusTracker
             applicationId={applicationId}
             applicationData={borrowerProfile}
-            onOpenChat={() => setChatOpen(true)}
-          />
-          <ApplicationAgent
-            applicationId={applicationId}
-            applicationStatus={applicationStatus}
-            onToolActivity={handleToolActivity}
-            borrowerProfile={borrowerProfile}
+            onOpenChat={handleOpenChat}
             onDocumentUploaded={() => setDocRefreshTrigger(p => p + 1)}
           />
+          <div ref={chatColumnRef} style={{ display: 'flex', flex: 1, minWidth: 0 }}>
+            <ApplicationAgent
+              applicationId={applicationId}
+              applicationStatus={applicationStatus}
+              borrowerProfile={borrowerProfile}
+              onDocumentUploaded={() => setDocRefreshTrigger(p => p + 1)}
+            />
+          </div>
         </div>
-
-        {/* Lower zone: Technology Theatre */}
-        <TechnologyTheatre
-          applicationId={applicationId}
-          activeTools={toolActivity.active}
-          toolHistory={toolActivity.history}
-        />
 
         <NotificationToast toasts={toasts} onDismiss={removeToast} />
       </div>

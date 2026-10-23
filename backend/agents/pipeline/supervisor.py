@@ -4,6 +4,9 @@ from langgraph.types import Send
 from agents.state import LendFlowState
 from agents.pipeline.tools import log_agent_activity
 from db.mdb import get_db as _get_db
+from db.collections_config import NAMES
+from db.mdb import coll
+from db.storage_mapping import storage_filter
 from services.application_service import update_application_status
 
 PARALLEL_GATHER_NODES = ("doc_verifier", "credit_puller")
@@ -29,11 +32,13 @@ def supervisor_node(state: LendFlowState, **kwargs) -> dict:
 
     # Check for blocking interventions — pipeline must pause until borrower resolves them
     try:
-        pending_blocking = _get_db()["interventions"].count_documents({
-            "application_id": app_id,
-            "internal_context.severity": "blocking",
-            "status": {"$in": ["pending", "active"]},
-        })
+        pending_blocking = coll("interventions").count_documents(
+            storage_filter("interventions", {
+                "application_id": app_id,
+                "internal_context.severity": "blocking",
+                "status": {"$in": ["pending", "active"]},
+            })
+        )
     except Exception:
         pending_blocking = 0  # DB unavailable — proceed without blocking
 

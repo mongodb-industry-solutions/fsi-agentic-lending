@@ -2,25 +2,72 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
+import Avatar from 'boring-avatars';
+import Modal from '@leafygreen-ui/modal';
 import ApplicationQueue from './ApplicationQueue';
 import AgentActivityLog from './AgentActivityLog';
-import IntentPreview from './IntentPreview';
 import ApplicationDetail from './ApplicationDetail';
 import DecisionSummary from './DecisionSummary';
 import WorkflowCanvas from '../DemoFlow/WorkflowCanvas';
 import NotificationToast, { useToasts } from '../NotificationToast/NotificationToast';
 import { WORKFLOW_STAGES } from './constants';
 import { getAppDisplayName } from './utils';
-import { ModifiedParamsBadge } from './ModifiedParamsBadge';
 import { PolicyBoundsIndicator } from './PolicyBoundsIndicator';
-import { ManualWorkspace } from './ManualWorkspace';
 import { HITLReviewCard } from './HITLReviewCard';
 import { PolicyExplorer } from './PolicyExplorer';
 import { PortfolioIntelligence } from './PortfolioIntelligence';
-import { LiveUnderwritingResults } from './LiveUnderwritingResults';
-import { StageProgressBar } from './StageProgressBar';
+import { PipelineStepTracker } from './PipelineStepTracker';
 import { useLoanOfficerWorkflow } from './useLoanOfficerWorkflow';
 import TechRail from './TechRail';
+import ApplicationTimingCard from './ApplicationTimingCard';
+import SeedApplicationDetail from './SeedApplicationDetail';
+import { getDemoSeedDetail } from '../../lib/data/seedDemoApps';
+
+const OFFICER_AVATAR_COLORS = ['#00684A', '#00ED64', '#0498EC', '#016BF8', '#B45AF2'];
+
+function OfficerIdentityCard({ officer }) {
+  const name = officer?.full_name || 'Loan Officer';
+  const title = officer?.title || 'Loan Officer';
+  const nmls = officer?.nmls_id;
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '10px 12px',
+      borderBottom: '1px solid var(--border-dim)',
+      background: 'var(--bg-surface)',
+      flexShrink: 0,
+    }}>
+      <Avatar size={34} name={officer?.avatar_seed || name} variant="beam" colors={OFFICER_AVATAR_COLORS} />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{
+          fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13,
+          color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
+          {name}
+        </div>
+        <div style={{
+          fontSize: 10, color: 'var(--text-secondary)', fontWeight: 600,
+          display: 'flex', alignItems: 'center', gap: 5, marginTop: 1,
+        }}>
+          <span>{title}</span>
+          {nmls && (
+            <>
+              <span style={{ color: 'var(--border-base)' }}>{'·'}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>NMLS #{nmls}</span>
+            </>
+          )}
+        </div>
+      </div>
+      <span style={{
+        fontSize: 7, fontWeight: 700, fontFamily: 'var(--font-mono)',
+        padding: '2px 6px', borderRadius: 3, textTransform: 'uppercase', letterSpacing: '0.5px',
+        background: 'var(--success-dim)', color: 'var(--success)', flexShrink: 0,
+      }}>
+        On shift
+      </span>
+    </div>
+  );
+}
 
 function AgentRailHeader({ agentStats, elapsedSeconds, hitlReached, applicationId }) {
   const isActive = applicationId && agentStats.totalReceived > 0;
@@ -104,6 +151,8 @@ export default function LoanOfficerDashboard({ active = true }) {
   const [lastCorrelatedEvent, setLastCorrelatedEvent] = useState(null);
   const [agentStats, setAgentStats] = useState({ totalReceived: 0 });
   const [canvasHighlightNode, setCanvasHighlightNode] = useState(null);
+  const [diagramOpen, setDiagramOpen] = useState(false);
+  const [showPipeline, setShowPipeline] = useState(false);
   const highlightTimerRef = useRef(null);
 
   // Cleanup highlight timer on unmount
@@ -115,16 +164,14 @@ export default function LoanOfficerDashboard({ active = true }) {
     selectedApp, setSelectedApp,
     workflowPhase, workflowStage,
     hitlReached, hitlStartTime, hitlResolutionTime, approved,
-    planSettings,
     approvalDetails,
     liveAgentOutput,
     elapsedSeconds,
     liveApplications,
     selectedAppDetail,
     dashboardStats,
+    officer,
     stageTimestamps,
-    handleProceed,
-    handleManual,
     handleApprove,
     handleDecline,
     handleAgentEvent,
@@ -137,15 +184,28 @@ export default function LoanOfficerDashboard({ active = true }) {
   const appName = getAppDisplayName(selectedAppDetail, selectedAppData);
   const currentWorkflow = WORKFLOW_STAGES[workflowStage] || WORKFLOW_STAGES[WORKFLOW_STAGES.length - 1];
   const selectedAppStatus = selectedAppData?.status;
+  // Decorative APP-DEMO-* selection: renders the hardcoded seed detail and skips
+  // the timing card (no backend record). `selectedAppData` resolves seeds because
+  // the hook exposes `applicationsForDisplay` (seeds merged) as `liveApplications`.
+  const isSeedSelection = !!selectedAppData?.demoSeed;
 
   const statusBadge = () => {
     if (!selectedApp) return null;
+    // Seeds badge by their own queue status so e.g. the funded seed reads
+    // "Funded" rather than the derived "Approved".
+    if (isSeedSelection) {
+      const seedBadges = {
+        processing: { label: 'Processing', bg: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' },
+        review: { label: 'Awaiting Review', bg: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)' },
+        funded: { label: 'Funded', bg: 'var(--success-dim)', color: 'var(--success)' },
+      };
+      return seedBadges[selectedAppStatus] || null;
+    }
     if (approved && approvalDetails?.mode === 'declined') return { label: 'Declined', bg: 'var(--danger-dim)', color: 'var(--danger)' };
     if (approved) return { label: 'Approved', bg: 'var(--success-dim)', color: 'var(--success)' };
     if (hitlReached) return { label: 'Awaiting Review', bg: 'var(--hitl-amber-dim)', color: 'var(--hitl-amber)' };
     if (selectedAppStatus === 'error') return { label: 'Error', bg: 'var(--danger-dim)', color: 'var(--danger)' };
     if (workflowPhase === 'preview') return { label: 'Plan Ready', bg: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' };
-    if (workflowPhase === 'manual') return { label: 'Manual Mode', bg: 'var(--bg-raised)', color: 'var(--text-secondary)' };
     if (workflowPhase === 'executing') return { label: `Processing: ${currentWorkflow.label}`, bg: 'var(--agent-cyan-dim)', color: 'var(--agent-cyan)' };
     return null;
   };
@@ -199,25 +259,16 @@ export default function LoanOfficerDashboard({ active = true }) {
           {/* App header */}
           <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-base)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' }}>
-              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14 }}>
+              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 17 }}>
                 {selectedApp ? (selectedAppData?.name || appName) : 'Select an application'}
               </span>
               {selectedApp && (
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)' }}>
                   {selectedApp}
                 </span>
               )}
-              <ModifiedParamsBadge settings={planSettings} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {workflowPhase === 'executing' && !approved && elapsedSeconds > 0 && (
-                <span style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
-                  color: 'var(--agent-cyan)',
-                }}>
-                  {Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, '0')}
-                </span>
-              )}
               {badge && (
                 <span style={{
                   fontSize: 10, fontWeight: 600, padding: '4px 10px', borderRadius: 12,
@@ -236,119 +287,53 @@ export default function LoanOfficerDashboard({ active = true }) {
             </div>
           )}
 
-          {/* Stage Progress Bar */}
-          {selectedApp && (workflowPhase === 'executing' || workflowPhase === 'preview') && (
-            <StageProgressBar
-              stage={workflowPhase === 'preview' ? -1 : workflowStage}
-              hitlReached={hitlReached}
+          {/* Persistent total-time card — pinned above the scroll region so it
+              survives decision and approval (unlike the old header timer) */}
+          {selectedApp && !isSeedSelection && (
+            <ApplicationTimingCard
+              applicationId={selectedApp}
+              detail={selectedAppDetail}
+              status={selectedAppStatus}
               approved={approved}
-              approvalDetails={approvalDetails}
-              stageTimestamps={stageTimestamps}
             />
           )}
 
           {/* Main scrollable content region */}
-          {selectedApp && workflowPhase === 'preview' ? (
+          {selectedApp && isSeedSelection ? (
+            <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg-base)' }}>
+              <SeedApplicationDetail
+                app={getDemoSeedDetail(selectedApp)}
+                officerName={officer?.full_name || 'Loan Officer'}
+              />
+            </div>
+          ) : selectedApp && workflowPhase === 'preview' ? (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto', background: 'var(--bg-base)' }}>
               {selectedAppDetail && (
                 <ApplicationDetail appDetail={selectedAppDetail} />
               )}
-              {/* Inline rail-mode canvas preview */}
-              <div style={{
-                position: 'relative',
-                height: 280,
-                margin: `${spacing[3]}px`,
-                borderRadius: 8,
-                border: '1px solid var(--border-dim)',
-                background: 'var(--bg-surface)',
-                overflow: 'hidden',
-                flexShrink: 0,
-              }}>
-                <WorkflowCanvas
-                  fit="rail"
-                  activeNodes={[]}
-                  activeEdges={[]}
-                  pulsingNodes={[]}
-                  currentScene="origination"
-                  highlightNode={canvasHighlightNode}
-                  liveAgentOutput={liveAgentOutput}
-                  hitlActive={false}
-                  hitlStartTime={null}
-                  hitlResolution={null}
-                  hitlResolutionTime={null}
-                />
-              </div>
-              <div style={{ padding: spacing[3] }}>
-                <IntentPreview applicationId={selectedApp} onProceed={handleProceed} onManual={handleManual} />
-              </div>
             </div>
           ) : selectedApp && workflowPhase === 'executing' ? (() => {
-            // When there's no HITL card and no DecisionSummary below, let the
-            // canvas flex-fill the region so we don't leave a dead band of
-            // empty surface mid-pipeline. When either is present, the canvas
-            // takes its natural height and the panel below scrolls.
-            const hasPanelBelow = (hitlReached && !approved) || approved;
+            // Action-first: once a decision is pending (HITL) or made (approved),
+            // that hero leads and the pipeline tracker collapses beneath it. While
+            // the pipeline is still running, the tracker is the main content.
+            const decided = (hitlReached && !approved) || approved;
+            const tracker = (
+              <PipelineStepTracker
+                stage={workflowStage}
+                hitlReached={hitlReached}
+                approved={approved}
+                approvalDetails={approvalDetails}
+                stageTimestamps={stageTimestamps}
+                liveAgentOutput={liveAgentOutput}
+                activityEvents={activityEvents}
+                onViewDiagram={() => setDiagramOpen(true)}
+              />
+            );
             return (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto', background: 'var(--bg-base)' }}>
-              {/* Inline rail-mode canvas — syncs to workflowStage */}
-              <div style={{
-                position: 'relative',
-                height: hasPanelBelow ? 320 : undefined,
-                minHeight: 320,
-                flex: hasPanelBelow ? '0 0 auto' : 1,
-                margin: `${spacing[2]}px ${spacing[3]}px`,
-                borderRadius: 8,
-                border: '1px solid var(--border-dim)',
-                background: 'var(--bg-surface)',
-                overflow: 'hidden',
-                flexShrink: 0,
-              }}>
-                <WorkflowCanvas
-                  fit="rail"
-                  activeNodes={currentWorkflow.activeNodes}
-                  activeEdges={currentWorkflow.activeEdges}
-                  pulsingNodes={hitlReached ? ['hitlGate'] : currentWorkflow.pulsingNodes}
-                  currentScene={currentWorkflow.currentScene}
-                  highlightNode={canvasHighlightNode}
-                  liveAgentOutput={liveAgentOutput}
-                  hitlActive={hitlReached && !approved}
-                  hitlStartTime={hitlStartTime}
-                  hitlResolution={approved && hitlReached ? (approvalDetails?.mode === 'declined' ? 'declined' : 'approved') : null}
-                  hitlResolutionTime={hitlResolutionTime}
-                />
-                <PolicyBoundsIndicator exceeded={hitlReached} />
-                <LiveUnderwritingResults data={liveAgentOutput} />
-                {/* Caption bar */}
-                <div style={{
-                  position: 'absolute', bottom: 8, left: 8, right: 8,
-                  padding: '6px 10px',
-                  background: 'var(--bg-overlay-alpha)',
-                  backdropFilter: 'blur(8px)',
-                  borderRadius: 6,
-                  border: '1px solid var(--border-dim)',
-                  fontSize: 10,
-                  color: 'var(--text-secondary)',
-                  display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-                }}>
-                  <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {hitlReached ? 'HITL Gate' : `Stage: ${currentWorkflow.label}`}
-                  </span>
-                  {(() => {
-                    const parts = [];
-                    if (liveAgentOutput.primary_credit_score) parts.push(`Credit ${liveAgentOutput.primary_credit_score}`);
-                    if (liveAgentOutput.document_count) parts.push(`${liveAgentOutput.document_count} docs`);
-                    if (liveAgentOutput.risk_score != null) parts.push(`Risk ${liveAgentOutput.risk_score}/100`);
-                    if (liveAgentOutput.gds_ratio != null) parts.push(`GDS ${(liveAgentOutput.gds_ratio * 100).toFixed(1)}%`);
-                    return parts.length > 0 ? (
-                      <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>{parts.join(' \u00b7 ')}</span>
-                    ) : null;
-                  })()}
-                </div>
-              </div>
-
-              {/* HITL Review panel — inside scroll container, no maxHeight clip */}
+              {/* Key action — top and center */}
               {hitlReached && !approved && (
-                <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)' }}>
+                <div style={{ padding: spacing[3] }}>
                   <HITLReviewCard
                     applicationId={selectedApp}
                     appDetail={selectedAppDetail}
@@ -360,26 +345,42 @@ export default function LoanOfficerDashboard({ active = true }) {
                   />
                 </div>
               )}
-
-              {/* Decision Summary */}
               {approved && (
-                <div style={{ padding: spacing[3], borderTop: '1px solid var(--border-dim)' }}>
+                <div style={{ padding: spacing[3] }}>
                   <DecisionSummary
                     applicationId={selectedApp}
                     appDetail={selectedAppDetail}
                     approvalDetails={approvalDetails}
                     appName={appName}
+                    officer={officer}
                     onClose={() => setSelectedApp(null)}
                   />
                 </div>
               )}
+
+              {/* Pipeline progress — primary while running, collapsed once decided */}
+              {decided ? (
+                <div style={{ padding: `0 ${spacing[3]}px ${spacing[3]}px` }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowPipeline((p) => !p)}
+                    aria-expanded={showPipeline}
+                    style={{
+                      width: '100%', padding: '8px 12px',
+                      background: 'var(--bg-raised)', border: '1px solid var(--border-dim)', borderRadius: 6,
+                      cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'var(--font-display)',
+                    }}
+                  >
+                    <span>Pipeline progress</span>
+                    <span style={{ transform: showPipeline ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s', display: 'inline-block' }}>{'▾'}</span>
+                  </button>
+                  {showPipeline && <div style={{ marginTop: spacing[2] }}>{tracker}</div>}
+                </div>
+              ) : tracker}
             </div>
             );
-          })() : selectedApp && workflowPhase === 'manual' ? (
-            <div style={{ flex: 1, overflow: 'hidden' }}>
-              <ManualWorkspace appDetail={selectedAppDetail} queueData={selectedAppData} onApprove={handleApprove} onDecline={handleDecline} addToast={addToast} />
-            </div>
-          ) : !selectedApp ? (
+          })() : !selectedApp ? (
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: spacing[4], flex: 1, minHeight: 0, overflowY: 'auto' }}>
               <div style={{
                 padding: spacing[4], maxWidth: 720, width: '100%',
@@ -454,7 +455,7 @@ export default function LoanOfficerDashboard({ active = true }) {
 
                 {/* Capability badges */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-                  {['6 Pipeline Agents', '1 Application Agent', '7 Intervention Types', '7 Generative UI Components', 'Atlas Vector Search', 'OSFI B-20 Compliance'].map((cap) => (
+                  {['6 Pipeline Agents', '1 Application Agent', '7 Intervention Types', '2 Generative UI Components', 'Atlas Vector Search', 'OSFI B-20 Compliance'].map((cap) => (
                     <span key={cap} style={{
                       fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-mono)',
                       padding: '2px 8px', borderRadius: 10,
@@ -501,6 +502,7 @@ export default function LoanOfficerDashboard({ active = true }) {
           borderLeft: `3px solid ${hitlReached && !approved ? 'var(--hitl-amber)' : 'var(--agent-cyan)'}`,
           transition: 'border-color 400ms ease',
         }}>
+          <OfficerIdentityCard officer={officer} />
           <AgentRailHeader
             agentStats={agentStats}
             elapsedSeconds={elapsedSeconds}
@@ -542,6 +544,39 @@ export default function LoanOfficerDashboard({ active = true }) {
           streamConnected={streamConnected}
         />
       </div>
+
+      {/* Pipeline diagram — full node graph, opened on demand from the step tracker */}
+      <Modal open={diagramOpen} setOpen={setDiagramOpen} size="large">
+        <div style={{
+          fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15,
+          color: 'var(--text-primary)', marginBottom: 4,
+        }}>
+          Pipeline Diagram
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
+          {selectedApp ? `Stage: ${currentWorkflow.label}` : 'LangGraph orchestration'}
+        </div>
+        <div style={{
+          position: 'relative', height: '62vh', minHeight: 360,
+          borderRadius: 8, border: '1px solid var(--border-dim)',
+          background: 'var(--bg-surface)', overflow: 'hidden',
+        }}>
+          <WorkflowCanvas
+            fit="rail"
+            activeNodes={currentWorkflow.activeNodes}
+            activeEdges={currentWorkflow.activeEdges}
+            pulsingNodes={hitlReached ? ['hitlGate'] : currentWorkflow.pulsingNodes}
+            currentScene={currentWorkflow.currentScene}
+            highlightNode={canvasHighlightNode}
+            liveAgentOutput={liveAgentOutput}
+            hitlActive={hitlReached && !approved}
+            hitlStartTime={hitlStartTime}
+            hitlResolution={approved && hitlReached ? (approvalDetails?.mode === 'declined' ? 'declined' : 'approved') : null}
+            hitlResolutionTime={hitlResolutionTime}
+          />
+          <PolicyBoundsIndicator exceeded={hitlReached} />
+        </div>
+      </Modal>
 
       <NotificationToast toasts={toasts} onDismiss={removeToast} />
     </div>

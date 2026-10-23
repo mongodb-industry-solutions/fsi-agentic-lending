@@ -16,6 +16,9 @@ from agents.pipeline.tool_schemas import UNDERWRITING_ANALYSIS_TOOL
 from agents.llm import get_llm
 from agents.helpers.interventions import create_intervention
 from db.mdb import get_db as _get_db
+from db.collections_config import NAMES
+from db.mdb import coll
+from db.storage_mapping import storage_key, to_storage
 
 logger = logging.getLogger(__name__)
 
@@ -407,42 +410,41 @@ Risk Tier: {risk_tier}
     log_agent_activity(app_id, "underwriter", "decision", decision_reasoning)
 
     # Persist underwriting results to application document for HITL context
-    _get_db()["applications"].update_one(
-        {"application_id": app_id},
-        {"$set": {
-            "risk_score": risk_score,
-            "risk_tier": risk_tier,
-            "gds_ratio": round(gds, 4),
-            "tds_ratio": round(tds, 4),
-            "stress_gds": round(stress["stress_gds"], 4),
-            "stress_tds": round(stress["stress_tds"], 4),
-            "primary_credit_score": primary_score,
-            "ltv": round(ltv, 2),
-            "decision_reasoning": decision_reasoning,
-        }}
+    _persist = {
+        "risk_score": risk_score,
+        "risk_tier": risk_tier,
+        "gds_ratio": round(gds, 4),
+        "tds_ratio": round(tds, 4),
+        "stress_gds": round(stress["stress_gds"], 4),
+        "stress_tds": round(stress["stress_tds"], 4),
+        "primary_credit_score": primary_score,
+        "ltv": round(ltv, 2),
+        "decision_reasoning": decision_reasoning,
+    }
+    # LLM recommendation for the reviewing officer (shown at the HITL decision gate).
+    if structured_analysis:
+        _persist["recommended_action"] = structured_analysis.get("recommended_action")
+        _persist["recommendation_reason"] = structured_analysis.get("recommendation_reason")
+        _persist["recommendation_confidence"] = structured_analysis.get("confidence")
+        _persist["recommended_conditions"] = structured_analysis.get("recommended_conditions", [])
+    coll("applications").update_one(
+        {storage_key("applications", "application_id"): app_id},
+        {"$set": to_storage("applications", _persist)},
     )
 
     if decision == "escalate":
         update_application_status(app_id, "review", f"Escalated to officer review — {decision_reasoning}")
-        borrower_reasons = []
-        if purchase_price > ESCALATE_PURCHASE_PRICE:
-            borrower_reasons.append("your property value requires additional review")
-        if effective_gds > ESCALATE_GDS or effective_tds > ESCALATE_TDS:
-            borrower_reasons.append("your debt-to-income ratios are being reviewed for accuracy")
-        if risk_tier in ("B", "C"):
-            borrower_reasons.append("additional verification is needed for your application profile")
+        # Advisory only — the borrower has nothing to do while an officer reviews.
+        # The message is deliberately reason-free (no ratios/scores/thresholds);
+        # the full reasoning stays officer-only via internal_extras.
         if create_intervention(
             app_id,
             intervention_type="additional_info_required",
             source_node="underwriter",
             risk_flag="escalation_review",
             severity="advisory",
-            borrower_summary="Your application has been escalated for a detailed review by a loan officer.",
-            action_required="No immediate action needed. " + (
-                "The review was triggered because " + " and ".join(borrower_reasons) + "."
-                if borrower_reasons else
-                "A loan officer will reach out if additional information is required."
-            ),
+            borrower_summary="A loan officer is reviewing your application.",
+            action_required="No action is needed from you right now — we'll reach out if we need anything else.",
             internal_extras={
                 "decision_reasoning": decision_reasoning,
                 "risk_score": risk_score,

@@ -1,46 +1,46 @@
 "use client";
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import OfficerChangeStreamConsole from './OfficerChangeStreamConsole';
 import AggregationPipelineVisualizer from './AggregationPipelineVisualizer';
 import OfficerDocModelInspector from './OfficerDocModelInspector';
 
 function CollapsedTechRail({ onExpand }) {
-  const icons = [
-    { id: 'stream', icon: '>\u2502', label: 'Change Streams' },
-    { id: 'pipeline', icon: '>>', label: 'Agg Pipeline' },
-    { id: 'doc', icon: '{ }', label: 'Document Model' },
-  ];
-
+  // Single expand toggle \u2014 reveals the MongoDB technology panels on demand.
   return (
     <div style={{
       width: 40, flexShrink: 0,
       borderLeft: '1px solid var(--border-dim)',
       background: 'var(--bg-base)',
       display: 'flex', flexDirection: 'column',
-      alignItems: 'center', paddingTop: spacing[2], gap: spacing[1],
+      alignItems: 'center', paddingTop: spacing[2],
     }}>
-      {icons.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          title={item.label}
-          onClick={onExpand}
-          style={{
-            width: 32, height: 32, borderRadius: 6,
-            border: '1px solid var(--border-dim)',
-            background: 'var(--bg-surface)',
-            color: 'var(--text-dim)',
-            fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'background 150ms ease, color 150ms ease',
-          }}
-        >
-          {item.icon}
-        </button>
-      ))}
+      <button
+        type="button"
+        title="Show MongoDB technology panels"
+        aria-label="Show MongoDB technology panels"
+        onClick={onExpand}
+        style={{
+          width: 32, flex: 1, maxHeight: 220, borderRadius: 6,
+          border: '1px solid var(--border-dim)',
+          background: 'var(--bg-surface)',
+          color: 'var(--text-secondary)',
+          cursor: 'pointer',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
+          gap: spacing[2], paddingTop: spacing[2],
+          transition: 'background 150ms ease, color 150ms ease',
+        }}
+      >
+        <span style={{ fontSize: 14, fontWeight: 700 }}>{'\u00ab'}</span>
+        <span style={{
+          writingMode: 'vertical-rl', transform: 'rotate(180deg)',
+          fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
+          textTransform: 'uppercase', fontFamily: 'var(--font-display)',
+        }}>
+          MongoDB
+        </span>
+      </button>
     </div>
   );
 }
@@ -86,12 +86,29 @@ function TechRailHeader({ onCollapse }) {
   );
 }
 
+const TECHRAIL_PREF_KEY = 'lendflow_techrail_expanded';
+
 export default function TechRail({ applicationId, liveAgentOutput, lastCorrelatedEvent, activityEvents, streamConnected }) {
-  const [expanded, setExpanded] = useState(true);
+  // Collapsed by default (keeps the MongoDB detail out of the way); the officer's
+  // choice persists so re-expanding sticks across app switches.
+  const [expanded, setExpanded] = useState(false);
+
+  // Restore the persisted preference after hydration — localStorage reads in a
+  // useState initializer would mismatch the server-rendered HTML (#418).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setExpanded(window.localStorage.getItem(TECHRAIL_PREF_KEY) === '1');
+  }, []);
   const [pipelineExpanded, setPipelineExpanded] = useState(false);
   const [docModelExpanded, setDocModelExpanded] = useState(false);
 
-  const handleToggle = useCallback(() => setExpanded((p) => !p), []);
+  const handleToggle = useCallback(() => setExpanded((p) => {
+    const next = !p;
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(TECHRAIL_PREF_KEY, next ? '1' : '0');
+    }
+    return next;
+  }), []);
   const handlePipelineToggle = useCallback(() => setPipelineExpanded((p) => !p), []);
   const handleDocToggle = useCallback(() => setDocModelExpanded((p) => !p), []);
 

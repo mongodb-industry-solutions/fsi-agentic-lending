@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { spacing } from '@leafygreen-ui/tokens';
 import Badge from '@leafygreen-ui/badge';
 import { apiGet, apiPost } from '../../lib/api';
+import { isSeedAppId, getSeedDocuments } from '../../lib/data/seedDocuments';
 import { formatCurrency, getRiskColor, GDS_LIMIT, TDS_LIMIT } from './utils';
 import PipelineExplorer from './PipelineExplorer';
 
@@ -132,6 +133,18 @@ function DocumentSearch({ applicationId }) {
 }
 
 export default function ApplicationDetail({ appDetail, compact = false }) {
+  // Hooks first (unconditional) so they run on every render — the seed-doc
+  // fallback must be declared before the early returns below.
+  const hasEmbedded = (appDetail?.documents?.length ?? 0) > 0;
+  const appId = appDetail?.application_id;
+  const [bundledDocs, setBundledDocs] = useState(null);
+  useEffect(() => {
+    if (hasEmbedded || !isSeedAppId(appId)) { setBundledDocs(null); return; }
+    let alive = true;
+    getSeedDocuments(appId).then((list) => { if (alive) setBundledDocs(list); });
+    return () => { alive = false; };
+  }, [appId, hasEmbedded]);
+
   if (!appDetail) return null;
 
   const {
@@ -139,6 +152,11 @@ export default function ApplicationDetail({ appDetail, compact = false }) {
     product, property, income_summary, documents, credit_reports,
     risk_score, risk_tier, gds_ratio, tds_ratio,
   } = appDetail;
+
+  // Seed applications ship their documents as a bundled snapshot; when the
+  // backend document list is empty (unseeded database) the officer detail falls
+  // back to the bundle so the Documents section still shows all 14.
+  const docList = (documents && documents.length ? documents : (bundledDocs || []));
 
   const primaryCredit = credit_reports?.[0];
   const coCredit = credit_reports?.[1];
@@ -155,7 +173,7 @@ export default function ApplicationDetail({ appDetail, compact = false }) {
         {risk_score != null && <MetricBox label="Risk" value={`${risk_score} (${risk_tier})`} color={getRiskColor(risk_score)} />}
         {primaryCredit && <MetricBox label="Credit" value={primaryCredit.score} />}
         {gds_ratio != null && <MetricBox label="GDS" value={`${(gds_ratio * 100).toFixed(1)}%`} />}
-        <MetricBox label="Docs" value={documents?.length ?? 0} />
+        <MetricBox label="Docs" value={docList.length} />
       </div>
     );
   }
@@ -246,10 +264,10 @@ export default function ApplicationDetail({ appDetail, compact = false }) {
           border: '1px solid var(--border-dim)',
         }}>
           <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: spacing[2] }}>
-            Documents ({documents.length})
+            Documents ({docList.length})
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {documents.map((doc, i) => (
+            {docList.map((doc, i) => (
               <div key={i} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '4px 8px', background: 'var(--bg-raised)', borderRadius: 4,

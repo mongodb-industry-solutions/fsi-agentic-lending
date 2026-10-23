@@ -52,6 +52,7 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
     tier: app.risk_tier ?? app.tier ?? null,
     submitted: app.created_at ? new Date(app.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
     createdAt: app.created_at ? new Date(app.created_at).getTime() : 0,
+    demoSeed: !!app.demoSeed,
   })), [applications]);
 
   const reviewCount = useMemo(() => formatted.filter((a) => isReviewStatus(a.status)).length, [formatted]);
@@ -174,6 +175,9 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
           </div>
         )}
         {filteredSorted.map((app) => {
+          // Seed apps ARE selectable — they render a hardcoded detail view in
+          // the center column. Selection is handled normally; the hook gates the
+          // real network calls off when the selected id is a seed.
           const isSelected = app.id === selectedId;
           const needsReview = isReviewStatus(app.status);
           return (

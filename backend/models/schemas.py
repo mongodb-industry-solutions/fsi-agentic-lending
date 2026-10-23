@@ -20,6 +20,50 @@ class ApplicationStatus(str, Enum):
     hitl_error = "hitl_error"
 
 
+# BIAN `ConsumerLoanApexStatus` (spec v4_34) allows only these 7 values.
+# The 12-state machine above is the operational source of truth and is stored
+# unchanged in `loans.statusSource`; `loans.status` is a derived projection for
+# BIAN reporting. **Application code reads statusSource, never status.**
+#
+# The mapping is lossy in one direction: 4 in-flight states collapse onto
+# UNDER_REVIEW, and 4 states have no BIAN home at all —
+#   funded / active     : ConsumerLoanApexStatus has no post-approval
+#                         lifecycle state (disbursed / servicing).
+#   error / hitl_error  : operational, not a business status.
+# Those 4 fall back to the nearest defensible business meaning. Raised with
+# Doina as a spec gap alongside the assessment / loanRepayments proposals.
+_BIAN_STATUS = {
+    "submitted": "SUBMITTED",
+    "processing": "UNDER_REVIEW",
+    "action_required": "UNDER_REVIEW",
+    "underwriting": "UNDER_REVIEW",
+    "review": "UNDER_REVIEW",
+    "approved": "APPROVED",
+    "closing": "APPROVED",
+    "declined": "REJECTED",
+    "funded": "APPROVED",
+    "active": "APPROVED",
+    "error": "UNDER_REVIEW",
+    "hitl_error": "UNDER_REVIEW",
+}
+
+# States whose BIAN projection loses information. Kept explicit so the
+# statusSource round-trip can be asserted in tests.
+LOSSY_STATUSES = frozenset(
+    s for s in _BIAN_STATUS
+    if sum(1 for o in _BIAN_STATUS.values() if o == _BIAN_STATUS[s]) > 1
+)
+
+
+def to_bian_status(status: str) -> str:
+    """Project an operational status onto ConsumerLoanApexStatus.
+
+    Unknown values map to DRAFT rather than raising — a status this function
+    does not know about must not break a write path.
+    """
+    return _BIAN_STATUS.get((status or "").strip().lower(), "DRAFT")
+
+
 class ApplicationCreateRequest(BaseModel):
     primary_name: str
     co_applicant_name: Optional[str] = None
@@ -46,6 +90,9 @@ class ApplicationResponse(BaseModel):
     product: str
     status: str
     property: dict
+    # income_summary keys: combined_gross, primary, co_applicant (stored on the
+    # loan) plus primary_employment, co_applicant_gross, co_applicant_employment
+    # (enriched from the shared `customers` directory in get_application()).
     income_summary: dict
     created_at: datetime
     documents: list[dict] = []

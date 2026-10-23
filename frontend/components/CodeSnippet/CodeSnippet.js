@@ -4,7 +4,7 @@ import Code from '@leafygreen-ui/code';
 export default function CodeSnippet({ code, language = 'javascript' }) {
   if (!code) return null;
   return (
-    <Code language={language} copyable={true}>
+    <Code language={language} copyButtonAppearance="hover">
       {code}
     </Code>
   );

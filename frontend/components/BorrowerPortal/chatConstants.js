@@ -13,19 +13,6 @@ export const CATEGORY_COLORS = {
 // and the capabilities info panel.
 export const COMPONENTS_CATALOG = [
   {
-    key: 'affordability_calculator',
-    label: 'Calculator',
-    longLabel: 'Affordability Calculator',
-    color: 'var(--mongo)',
-    iconType: 'calculator',
-    welcomeSublabel: 'Interactive sliders',
-    quickSublabel: 'Interactive tool',
-    description: 'Sliders for rate, term, and down payment',
-    message: 'Show me an affordability calculator for my application',
-    triggerKeywords: ['afford', 'monthly payment', 'calculator'],
-    surfaces: ['welcome', 'quickAction', 'preAppWelcome'],
-  },
-  {
     key: 'document_checklist',
     label: 'Documents',
     longLabel: 'Document Checklist',
@@ -39,59 +26,6 @@ export const COMPONENTS_CATALOG = [
     surfaces: ['welcome', 'quickAction', 'preAppWelcome'],
   },
   {
-    key: 'application_strength',
-    label: 'My Application',
-    longLabel: 'Application Strength',
-    color: 'var(--agent-cyan)',
-    iconType: 'application',
-    welcomeSublabel: 'Strength meter',
-    quickSublabel: 'Strength meter',
-    description: 'Qualitative assessment of your profile',
-    message: 'How strong is my application looking?',
-    triggerKeywords: ['strong', 'strength', 'how am i doing'],
-    surfaces: ['quickAction'],
-    minStatus: 'underwriting',
-  },
-  {
-    key: 'rate_comparison',
-    label: 'Rates',
-    longLabel: 'Rate Comparison',
-    color: 'var(--voyage)',
-    iconType: 'rates',
-    welcomeSublabel: 'Side-by-side rates',
-    quickSublabel: 'Compare options',
-    description: 'Compare fixed, variable, and hybrid rates',
-    message: 'Compare the available rate options for me',
-    triggerKeywords: ['rate', 'compare rate', 'interest rate'],
-    surfaces: ['welcome', 'quickAction'],
-  },
-  {
-    key: 'payment_schedule',
-    label: 'Schedule',
-    longLabel: 'Payment Schedule',
-    color: 'var(--mongo)',
-    iconType: 'schedule',
-    welcomeSublabel: 'Amortization view',
-    quickSublabel: 'Amortization',
-    description: 'Monthly amortization breakdown',
-    message: 'Show me my payment schedule and amortization breakdown',
-    triggerKeywords: ['amortization', 'schedule', 'payment breakdown'],
-    surfaces: ['welcome'],
-  },
-  {
-    key: 'scenario_comparison',
-    label: 'Scenarios',
-    longLabel: 'Scenario Comparison',
-    color: 'var(--mongo)',
-    iconType: 'calculator',
-    welcomeSublabel: 'What-if tool',
-    quickSublabel: 'What-if tool',
-    description: 'Compare different down payment amounts',
-    message: 'Compare different down payment scenarios',
-    triggerKeywords: ['what if i put', 'compare down', 'scenario'],
-    surfaces: [],
-  },
-  {
     key: 'closing_timeline',
     label: 'Closing',
     longLabel: 'Closing Timeline',
@@ -102,7 +36,7 @@ export const COMPONENTS_CATALOG = [
     description: 'Steps from approval to keys',
     message: 'Show me the closing timeline',
     triggerKeywords: ['closing', 'next steps after approval'],
-    surfaces: [],
+    surfaces: ['welcome', 'quickAction'],
     minStatus: 'approved',
   },
 ];
@@ -198,9 +132,9 @@ export const STATUS_SUGGESTIONS = {
     { text: 'What happens during document verification?', category: 'status' },
   ],
   underwriting: [
-    { text: 'What is the mortgage stress test?', category: 'financial' },
-    { text: 'How is my risk score calculated?', category: 'financial' },
-    { text: 'What are the GDS and TDS ratios?', category: 'financial' },
+    { text: 'How long does the review take?', category: 'status' },
+    { text: 'What happens during the review?', category: 'status' },
+    { text: 'Can I provide additional documents?', category: 'documents' },
   ],
   review: [
     { text: 'What does officer review mean?', category: 'status' },
@@ -359,7 +293,7 @@ export function getProactiveComponentSuggestion(lastMessage, status) {
 export function getPlaceholder(status, interventions) {
   if (interventions?.some(i => !i._resolved)) return 'Ask about your pending action items...';
   if (status === 'approved') return 'Ask about next steps or closing...';
-  if (status === 'underwriting') return 'Ask about your risk assessment...';
+  if (status === 'underwriting') return 'Ask about your application review...';
   if (status === 'review') return 'Ask about the review process...';
   return 'Ask about your application...';
 }

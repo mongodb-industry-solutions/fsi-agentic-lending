@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { apiPost, apiGet, apiSSE, apiWebSocket } from '../../lib/api';
 import { agentToStageIdx, WORKFLOW_STAGES } from './constants';
+import { SEED_DEMO_APPS, getDemoSeedDetail, isDemoSeed } from '../../lib/data/seedDemoApps';
 
 const MAX_ACTIVITY_EVENTS = 200;
 
@@ -102,14 +103,12 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
   const [hitlStartTime, setHitlStartTime] = useState(null);
   const [hitlResolutionTime, setHitlResolutionTime] = useState(null);
   const [approved, setApproved] = useState(false);
-  const [planSettings, setPlanSettings] = useState(null);
   const [approvalDetails, setApprovalDetails] = useState(null);
   const [liveAgentOutput, setLiveAgentOutput] = useState({});
   const [activityEvents, setActivityEvents] = useState([]);
   const [streamConnected, setStreamConnected] = useState(false);
   const [streamError, setStreamError] = useState(false);
   const activitySSERef = useRef(null);
-  const runStreamSSERef = useRef(null);
   const stageTimestampsRef = useRef({});
   const [stageTimestamps, setStageTimestamps] = useState({});
   // Mirror of workflowStage for synchronous reads inside event handlers so
@@ -119,9 +118,27 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
   const executingStartRef = useRef(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [liveApplications, setLiveApplications] = useState([]);
+  // Decorative seed apps carry module-load `Date.now()` timestamps, so rendering
+  // them into SSR HTML would mismatch the client (React hydration error #418).
+  // Merge them only after the component has mounted.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const [selectedAppDetail, setSelectedAppDetail] = useState(null);
   const [portfolioStats, setPortfolioStats] = useState(null);
+  const [officer, setOfficer] = useState(null);
   const prevStatsRef = useRef({});
+
+  // Fetch the reviewing loan officer once (seeded singleton). Used for header
+  // identity and to attribute HITL decisions.
+  useEffect(() => {
+    let ignore = false;
+    apiGet('/officers/current')
+      .then((data) => { if (!ignore && data) setOfficer(data); })
+      .catch(() => {});
+    return () => { ignore = true; };
+  }, []);
 
   const snapshotReceived = useRef(false);
   const selectedAppRef = useRef(selectedApp);
@@ -130,6 +147,12 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
   liveApplicationsRef.current = liveApplications;
   // Keep currentStageRef aligned with the committed state.
   currentStageRef.current = workflowStage;
+
+  // Decorative APP-DEMO-* selection? These have no backend record, so the
+  // per-app detail fetch + activity SSE must never fire for them. Module lookup
+  // is used instead of a find on `applicationsForDisplay`, which is declared
+  // later in the hook (TDZ).
+  const isSeedSelection = isDemoSeed(selectedApp);
 
   // Advance the stage pointer and record its entry timestamp. All side
   // effects happen outside setState updaters to stay StrictMode-safe.
@@ -245,17 +268,40 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       setSelectedAppDetail(null);
       return;
     }
+    // Seed selections resolve their detail from the hardcoded module instead
+    // of a backend fetch (which would 404 — the records don't exist).
+    if (isSeedSelection) {
+      setSelectedAppDetail(getDemoSeedDetail(selectedApp));
+      return;
+    }
     apiGet(`/applications/${selectedApp}`).then((data) => {
       setSelectedAppDetail(data);
     });
-  }, [selectedApp]);
+  }, [selectedApp, isSeedSelection]);
+
+  // Merge the decorative seed apps ahead of the real queue for display + stats.
+  // Kept separate from `liveApplications` so internal selection/WS-matching logic
+  // (which only ever deals with real backend IDs) is untouched.
+  const applicationsForDisplay = useMemo(
+    () => (mounted ? [...SEED_DEMO_APPS, ...liveApplications] : liveApplications),
+    [liveApplications, mounted]
+  );
 
   const dashboardStats = useMemo(() => {
-    const pendingCount = liveApplications.filter(
+    const pendingCount = applicationsForDisplay.filter(
       (a) => ['review', 'pending_review'].includes(a.status)
     ).length;
-    const approvedCount = liveApplications.filter((a) => a.status === 'approved').length;
-    const processingCount = liveApplications.filter((a) => a.status === 'processing' || a.status === 'underwriting').length;
+    const approvedCount = applicationsForDisplay.filter((a) => a.status === 'approved').length;
+    const processingCount = applicationsForDisplay.filter((a) => a.status === 'processing' || a.status === 'underwriting').length;
+
+    // Average agentic decision time across apps that report one (seed apps carry
+    // `decision_ms`; real apps expose it via `decision_ms` when the pipeline persists it).
+    const decisionTimes = applicationsForDisplay
+      .map((a) => a.decision_ms)
+      .filter((ms) => typeof ms === 'number' && ms > 0);
+    const avgDecisionMs = decisionTimes.length
+      ? decisionTimes.reduce((sum, ms) => sum + ms, 0) / decisionTimes.length
+      : null;
 
     const prev = prevStatsRef.current;
     const trend = (key, current) => {
@@ -267,11 +313,19 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     };
 
     const stats = [
-      { label: 'Applications', value: String(liveApplications.length), color: 'var(--mongo)', trend: trend('total', liveApplications.length) },
+      { label: 'Applications', value: String(applicationsForDisplay.length), color: 'var(--mongo)', trend: trend('total', applicationsForDisplay.length) },
       { label: 'Processing', value: String(processingCount), color: 'var(--agent-cyan)', trend: trend('processing', processingCount) },
       { label: 'Approved', value: String(approvedCount), color: 'var(--success)', trend: trend('approved', approvedCount) },
       { label: 'Pending Reviews', value: String(pendingCount), color: 'var(--hitl-amber)', trend: trend('pending', pendingCount) },
     ];
+
+    if (avgDecisionMs != null) {
+      stats.push({
+        label: 'Avg Decision Time',
+        value: `${(avgDecisionMs / 1000).toFixed(1)}s`,
+        color: 'var(--tool-blue)',
+      });
+    }
 
     if (portfolioStats) {
       if (portfolioStats.total_portfolio_value) {
@@ -283,23 +337,14 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     }
 
     return stats;
-  }, [liveApplications, portfolioStats]);
+  }, [applicationsForDisplay, portfolioStats]);
 
   useEffect(() => {
-    const processingCount = liveApplications.filter((a) => a.status === 'processing' || a.status === 'underwriting').length;
-    const approvedCount = liveApplications.filter((a) => a.status === 'approved').length;
-    const pendingCount = liveApplications.filter((a) => ['review', 'pending_review'].includes(a.status)).length;
-    prevStatsRef.current = { total: liveApplications.length, processing: processingCount, approved: approvedCount, pending: pendingCount };
-  }, [liveApplications]);
-
-  // Cleanup on unmount. activitySSERef is managed by its per-app effect
-  // (closed + nulled in that effect's teardown) — only runStreamSSERef
-  // needs an unmount-scoped close here.
-  useEffect(() => {
-    return () => {
-      if (runStreamSSERef.current) { runStreamSSERef.current.close(); runStreamSSERef.current = null; }
-    };
-  }, []);
+    const processingCount = applicationsForDisplay.filter((a) => a.status === 'processing' || a.status === 'underwriting').length;
+    const approvedCount = applicationsForDisplay.filter((a) => a.status === 'approved').length;
+    const pendingCount = applicationsForDisplay.filter((a) => ['review', 'pending_review'].includes(a.status)).length;
+    prevStatsRef.current = { total: applicationsForDisplay.length, processing: processingCount, approved: approvedCount, pending: pendingCount };
+  }, [applicationsForDisplay]);
 
   // ── Single persistent activity SSE per selected app ────────────────────
   useEffect(() => {
@@ -308,7 +353,9 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     setStreamConnected(false);
     setStreamError(false);
 
-    if (!selectedApp) return;
+    // Seeds have no backend agent stream — skip (the close + resets above still
+    // clear any state from a previously-selected real app).
+    if (!selectedApp || isSeedSelection) return;
 
     const handle = apiSSE(
       `/agent/${selectedApp}/stream`,
@@ -351,7 +398,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       if (handle) handle.close();
       activitySSERef.current = null;
     };
-  }, [selectedApp, appendActivityEvents, advanceStage]);
+  }, [selectedApp, isSeedSelection, appendActivityEvents, advanceStage]);
 
   // ── Reset everything when selected app changes ─────────────────────────
   useEffect(() => {
@@ -360,7 +407,6 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     currentStageRef.current = 0;
     setHitlReached(false); setHitlStartTime(null); setHitlResolutionTime(null);
     setApproved(false);
-    setPlanSettings(null);
     setApprovalDetails(null);
     setLiveAgentOutput({});
     setActivityEvents([]);
@@ -372,7 +418,12 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       return;
     }
 
-    const queueApp = liveApplicationsRef.current.find((a) => a.application_id === selectedApp);
+    // Seeds live in the hardcoded module, not in `liveApplications` (raw state),
+    // so resolve their status from the module. Keeps hitlReached/approved phase
+    // consistent for the Agent Rail when a seed is selected.
+    const queueApp = isSeedSelection
+      ? getDemoSeedDetail(selectedApp)
+      : liveApplicationsRef.current.find((a) => a.application_id === selectedApp);
     const status = queueApp?.status || 'submitted';
     const derived = deriveWorkflowStateFromStatus(status);
 
@@ -395,7 +446,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       setHitlResolutionTime(Date.now());
       setApprovalDetails({ mode: derived.approvalMode });
     }
-  }, [selectedApp]);
+  }, [selectedApp, isSeedSelection]);
 
   // ── Phase follows live queue status transitions ────────────────────────
   // When the WS pushes a status change for the already-selected app (e.g.
@@ -411,7 +462,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       return;
     }
 
-    setWorkflowPhase((prev) => (prev === 'manual' ? 'manual' : derived.phase));
+    setWorkflowPhase(derived.phase);
     advanceStage(derived.stage);
     if (derived.hitl) {
       setHitlReached(true);
@@ -426,7 +477,8 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
 
   // Elapsed processing timer
   useEffect(() => {
-    if (workflowPhase !== 'executing' || approved) {
+    // Seeds show no live pipeline, so never start a wall-clock timer for them.
+    if (workflowPhase !== 'executing' || approved || isSeedSelection) {
       setElapsedSeconds(0);
       executingStartRef.current = null;
       return;
@@ -438,85 +490,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [workflowPhase, approved, selectedApp]);
-
-  // SSE-driven workflow run via run-stream endpoint ("Proceed" action)
-  const startWorkflowSSE = useCallback((appId) => {
-    if (runStreamSSERef.current) runStreamSSERef.current.close();
-
-    setWorkflowStage(0);
-    currentStageRef.current = 0;
-    setHitlReached(false); setHitlStartTime(null); setHitlResolutionTime(null);
-    setApproved(false);
-    setWorkflowPhase('executing');
-    setLiveAgentOutput({});
-    stageTimestampsRef.current = { 0: Date.now() };
-    setStageTimestamps({ ...stageTimestampsRef.current });
-
-    const handle = apiSSE(
-      `/agent/${appId}/run-stream?autonomy_level=bounded`,
-      (event) => {
-        // Synthesize an activity log entry from each pipeline event so the
-        // Activity Log shows graph transitions even before any agent_activity
-        // document is written.
-        const entry = activityFromSseEvent(event, 'run');
-        if (entry) appendActivityEvents([entry]);
-
-        if (event.type === 'node_start') {
-          const agentName = event.agent || event.name || '';
-          const stageIdx = agentToStageIdx(agentName);
-          if (stageIdx != null) advanceStage(stageIdx);
-        }
-
-        if (event.type === 'node_complete') {
-          const agentName = event.agent || '';
-          const stageIdx = agentToStageIdx(agentName);
-          if (stageIdx != null) advanceStage(stageIdx, /* markNext */ true);
-
-          if (event.output && typeof event.output === 'object') {
-            setLiveAgentOutput((prev) => ({ ...prev, ...event.output }));
-          }
-
-          if (agentName === 'hitl_gate') {
-            setHitlReached(true); setHitlStartTime((prev) => prev || Date.now());
-            addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
-          }
-        }
-
-        if (event.type === 'hitl_waiting') {
-          setHitlReached(true); setHitlStartTime((prev) => prev || Date.now());
-          advanceStage(2);
-          addToast({ type: 'warning', title: 'HITL Review Required', message: `${appId} awaiting your decision.` });
-        }
-
-        if (event.type === 'complete') {
-          setApproved(true);
-          advanceStage(WORKFLOW_STAGES.length - 1);
-          setHitlResolutionTime(Date.now());
-          setApprovalDetails((prev) => prev || { mode: 'auto' });
-          addToast({ type: 'success', title: 'Pipeline Complete', message: `Agent pipeline completed for ${appId}.` });
-        }
-      },
-      {
-        autoCloseOn: ['complete', 'error', 'hitl_waiting'],
-        onError: () => {},
-      },
-    );
-
-    runStreamSSERef.current = handle;
-  }, [addToast, appendActivityEvents, advanceStage]);
-
-  const handleProceed = useCallback((settings) => {
-    if (!selectedApp) return;
-    setPlanSettings(settings || null);
-    startWorkflowSSE(selectedApp);
-    addToast({ type: 'info', title: 'Workflow Started', message: `Processing ${selectedApp} with bounded autonomy.` });
-  }, [selectedApp, addToast, startWorkflowSSE]);
-
-  const handleManual = useCallback(() => {
-    setWorkflowPhase('manual');
-    addToast({ type: 'info', title: 'Manual Mode', message: 'Agent bypassed. You are handling this application directly.' });
-  }, [addToast]);
+  }, [workflowPhase, approved, selectedApp, isSeedSelection]);
 
   const selectedAppData = liveApplications.find((a) => a.application_id === selectedApp);
 
@@ -556,7 +530,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     const result = await apiPost(`/hitl/${selectedApp}/decision`, {
       action: 'approve',
       officer_notes: details?.conditions || 'Approved after manual review',
-      officer_id: 'officer-demo',
+      officer_id: officer?.officer_id || 'officer-001',
       conditions: details?.conditions ? [details.conditions] : [],
       overrides: {
         ...(details?.rate ? { rate: parseFloat(details.rate) } : {}),
@@ -574,7 +548,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     } else {
       addToast({ type: 'error', title: 'Approval Failed', message: 'Could not process approval. Please try again.' });
     }
-  }, [addToast, selectedApp, selectedAppDetail, selectedAppData]);
+  }, [addToast, selectedApp, selectedAppDetail, selectedAppData, officer]);
 
   const handleDecline = useCallback(async () => {
     const appName = selectedAppDetail?.borrower_names?.length
@@ -586,7 +560,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       const result = await apiPost(`/hitl/${selectedApp}/decision`, {
         action: 'decline',
         officer_notes: 'Declined after manual review',
-        officer_id: 'officer-demo',
+        officer_id: officer?.officer_id || 'officer-001',
         conditions: [],
         overrides: {},
       });
@@ -602,7 +576,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
         addToast({ type: 'error', title: 'Decline Failed', message: 'Could not process decline. Please try again.' });
       }
     }
-  }, [addToast, selectedApp, selectedAppDetail, selectedAppData]);
+  }, [addToast, selectedApp, selectedAppDetail, selectedAppData, officer]);
 
   // Compatibility shim — LoanOfficerDashboard calls this on each activity entry
   // render. Stage progression is now handled in the hoisted SSE effect, so this
@@ -624,22 +598,21 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
     hitlStartTime,
     hitlResolutionTime,
     approved,
-    planSettings,
-    setPlanSettings,
     approvalDetails,
     liveAgentOutput,
     elapsedSeconds,
-    liveApplications,
+    // Exposed with the decorative seed apps merged in, so the queue + counts look
+    // populated. Internal selection/WS logic uses the raw `liveApplications` state.
+    liveApplications: applicationsForDisplay,
     selectedAppDetail,
     portfolioStats,
     dashboardStats,
+    officer,
     stageTimestamps,
     activityEvents,
     streamConnected,
     streamError,
 
-    handleProceed,
-    handleManual,
     handleApprove,
     handleDecline,
     handleAgentEvent,

@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from db.mdb import get_db as _get_db
+from db.mdb import coll
+from db.storage_mapping import from_storage, storage_filter, storage_key
 from services import application_service
 from services.pipeline_lock import acquire_pipeline_lock as _acquire_pipeline_lock, release_pipeline_lock as _release_pipeline_lock
 from agents.graph import get_graph
@@ -53,8 +55,8 @@ async def run_agent(app_id: str, autonomy_level: str = "bounded"):
 
     # Clean stale pending interventions from previous runs
     db = _get_db()
-    db["interventions"].update_many(
-        {"application_id": app_id, "status": "pending"},
+    coll("interventions").update_many(
+        storage_filter("interventions", {"application_id": app_id, "status": "pending"}),
         {"$set": {"status": "superseded"}},
     )
 
@@ -123,7 +125,10 @@ async def stream_agent(app_id: str, after: str | None = None):
         db = _get_db()
 
         # Check application exists
-        app = await asyncio.to_thread(db["applications"].find_one, {"application_id": app_id})
+        app = await asyncio.to_thread(
+            coll("applications").find_one,
+            {storage_key("applications", "application_id"): app_id},
+        )
         if not app:
             yield f"data: {json.dumps({'type': 'error', 'message': 'Application not found'})}\n\n"
             return
@@ -144,9 +149,9 @@ async def stream_agent(app_id: str, after: str | None = None):
             # as newer docs when using $gte).
             backlog = await asyncio.to_thread(
                 lambda: list(
-                    db["agent_activity"]
-                    .find({"application_id": app_id})
-                    .sort("timestamp", -1)
+                    coll("agent_activity")
+                    .find(storage_filter("agent_activity", {"application_id": app_id}))
+                    .sort(storage_key("agent_activity", "timestamp"), -1)
                     .limit(50)
                 )
             )
@@ -177,11 +182,16 @@ async def stream_agent(app_id: str, after: str | None = None):
 
         # Try MongoDB Change Stream first; fall back to polling if unavailable
         # (e.g. standalone Mongo without replica set → OperationFailure).
-        pipeline = [{"$match": {"fullDocument.application_id": app_id}}]
+        # The filter path must be the STORAGE key. `fullDocument.application_id`
+        # matches no document (it is stored as `applicationId`), so the stream
+        # silently yielded nothing — no error, no log.
+        pipeline = [{"$match": {
+            f"fullDocument.{storage_key('agent_activity', 'application_id')}": app_id
+        }}]
         stream = None
         try:
             stream = await asyncio.to_thread(
-                lambda: db["agent_activity"].watch(pipeline, full_document="updateLookup")
+                lambda: coll("agent_activity").watch(pipeline, full_document="updateLookup")
             )
         except Exception:
             stream = None  # Fall through to polling
@@ -206,7 +216,7 @@ async def stream_agent(app_id: str, after: str | None = None):
                             break
                         try:
                             stream = await asyncio.to_thread(
-                                lambda: db["agent_activity"].watch(
+                                lambda: coll("agent_activity").watch(
                                     pipeline,
                                     full_document="updateLookup",
                                     resume_after=last_resume_token,
@@ -243,7 +253,7 @@ async def stream_agent(app_id: str, after: str | None = None):
                     if change:
                         resume_retries = 0
                         last_resume_token = change.get("_id")
-                        doc = change.get("fullDocument", {})
+                        doc = from_storage("agent_activity", change.get("fullDocument")) or {}
                         event_counter += 1
                         resume_token = str(change.get("_id", {}).get("_data", event_counter))
                         ts = doc.get("timestamp", "")
@@ -273,14 +283,14 @@ async def stream_agent(app_id: str, after: str | None = None):
                 # ties-at-millisecond are picked up; seen_ids prevents re-emission
                 # of rows already yielded from backlog or a prior poll tick.
                 while True:
-                    query = {"application_id": app_id}
+                    query = storage_filter("agent_activity", {"application_id": app_id})
                     if last_timestamp is not None:
-                        query["timestamp"] = {"$gte": last_timestamp}
+                        query[storage_key("agent_activity", "timestamp")] = {"$gte": last_timestamp}
                     new_docs = await asyncio.to_thread(
                         lambda q=query: list(
-                            db["agent_activity"]
+                            coll("agent_activity")
                             .find(q)
-                            .sort("timestamp", 1)
+                            .sort(storage_key("agent_activity", "timestamp"), 1)
                             .limit(100)
                         )
                     )
@@ -366,8 +376,8 @@ async def run_and_stream(app_id: str, autonomy_level: str = "bounded"):
 
     # Clean stale pending interventions from previous runs
     db = _get_db()
-    db["interventions"].update_many(
-        {"application_id": app_id, "status": "pending"},
+    coll("interventions").update_many(
+        storage_filter("interventions", {"application_id": app_id, "status": "pending"}),
         {"$set": {"status": "superseded"}},
     )
 
@@ -484,8 +494,8 @@ async def re_evaluate(app_id: str, autonomy_level: str = "bounded"):
 
     db = _get_db()
     pending_blocking = await asyncio.to_thread(
-        db["interventions"].count_documents,
-        {"application_id": app_id, "internal_context.severity": "blocking", "status": {"$in": ["pending", "active"]}},
+        coll("interventions").count_documents,
+        storage_filter("interventions", {"application_id": app_id, "internal_context.severity": "blocking", "status": {"$in": ["pending", "active"]}}),
     )
     if pending_blocking > 0:
         raise HTTPException(

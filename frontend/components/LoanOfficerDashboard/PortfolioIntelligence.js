@@ -88,7 +88,7 @@ export function PortfolioIntelligence() {
               padding: '1px 4px', borderRadius: 3,
               background: 'var(--tool-blue-dim)', color: 'var(--tool-blue)',
             }}>
-              TIME-SERIES
+              PAYMENTS
             </span>
           </div>
           {/* Collapsed preview */}
@@ -137,7 +137,7 @@ export function PortfolioIntelligence() {
                   padding: '1px 4px', borderRadius: 2,
                   background: 'var(--tool-blue-dim)', color: 'var(--tool-blue)',
                 }}>
-                  Time-Series Collection
+                  $setWindowFields
                 </span>
               </div>
               <div style={{ position: 'relative', height: 40 }}>

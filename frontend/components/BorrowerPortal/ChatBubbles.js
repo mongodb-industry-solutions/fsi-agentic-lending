@@ -324,7 +324,7 @@ export function WelcomeCard({ onAction, hasApplication, onDismiss }) {
           fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)',
           marginBottom: 8, letterSpacing: '0.02em',
         }}>
-          Powered by MongoDB Atlas + AI Agents
+          Powered by MongoDB Atlas
         </div>
         <div style={{
           fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5,
