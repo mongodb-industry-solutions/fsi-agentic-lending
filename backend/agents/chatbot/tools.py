@@ -30,7 +30,13 @@ def search_policies_borrower(query: str, limit: int = 5) -> list[dict]:
 
 
 def get_document_requirements(loan_type: str = "standard") -> list[dict]:
-    """Return list of required documents for the loan type."""
+    """Return list of required documents for the loan type.
+
+    The `type` keys must stay in lockstep with DOC_TYPES in
+    scripts/ingest_pdfs.py — the checklist is built by looking up each
+    requirement against the documents actually on file, so any type that
+    is seeded but missing here would be invisible to the borrower.
+    """
     requirements = [
         {
             "type": "government_id",
@@ -69,10 +75,46 @@ def get_document_requirements(loan_type: str = "standard") -> list[dict]:
             "description": "Signed Agreement of Purchase and Sale",
         },
         {
+            "type": "mortgage_application",
+            "label": "Mortgage Application",
+            "required": True,
+            "description": "Completed and signed mortgage application form",
+        },
+        {
+            "type": "investment_statements",
+            "label": "Investment Statements",
+            "required": False,
+            "description": "RRSP, TFSA, or non-registered account statements supporting your down payment",
+        },
+        {
+            "type": "other_property_docs",
+            "label": "Existing Property Docs",
+            "required": False,
+            "description": "Mortgage statements and tax notices for any property you already own",
+        },
+        {
+            "type": "utility_bills",
+            "label": "Utility Bills",
+            "required": False,
+            "description": "Recent utility bill used to confirm your current address",
+        },
+        {
             "type": "credit_report",
             "label": "Credit Report",
             "required": False,
             "description": "Pulled automatically by the system -- no action needed from you",
+        },
+        {
+            "type": "car_loan_statement",
+            "label": "Car Loan Statement",
+            "required": False,
+            "description": "Current auto loan or lease statement, if you carry one",
+        },
+        {
+            "type": "property_tax",
+            "label": "Property Tax Notice",
+            "required": False,
+            "description": "Most recent municipal property tax assessment for the subject property",
         },
         {
             "type": "property_inspection",

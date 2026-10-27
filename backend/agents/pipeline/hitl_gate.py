@@ -64,13 +64,24 @@ def hitl_gate(state: LendFlowState, **kwargs) -> dict:
             state_updates["risk_tier"] = overrides["risk_tier"]
         else:
             log_agent_activity(app_id, "hitl_gate", "invalid_override", f"Invalid risk_tier override: {overrides['risk_tier']}")
+    _adjustments = []
     if overrides.get("loan_amount") is not None and isinstance(overrides["loan_amount"], (int, float)) and overrides["loan_amount"] > 0:
-        state_updates["decision_reasoning"] = f"Re-underwriting: officer adjusted loan to ${overrides['loan_amount']:,.0f}"
+        _adjustments.append(f"loan to ${overrides['loan_amount']:,.0f}")
         from db.mdb import coll
         from db.storage_mapping import storage_key
         coll("applications").update_one(
             {storage_key("applications", "application_id"): app_id},
             {"$set": {storage_key("applications", "loan_amount"): overrides["loan_amount"]}},
+        )
+    # The rate has no column on `applications` — it is quoted per-decision, so
+    # it is recorded in the reasoning and activity trail for audit instead.
+    if overrides.get("rate") is not None and isinstance(overrides["rate"], (int, float)) and overrides["rate"] > 0:
+        _adjustments.append(f"rate to {overrides['rate']:.3f}%")
+        log_agent_activity(app_id, "hitl_gate", "rate_override",
+                           f"Officer set the quoted rate to {overrides['rate']:.3f}%.")
+    if _adjustments:
+        state_updates["decision_reasoning"] = (
+            f"Re-underwriting: officer adjusted {' and '.join(_adjustments)}"
         )
 
     officer_id = decision.get("officer_id", "unknown")

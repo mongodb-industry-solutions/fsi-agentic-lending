@@ -1,18 +1,20 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { Fragment, useState, useEffect, useRef, useCallback } from 'react';
 import { palette } from '@leafygreen-ui/palette';
 import { spacing } from '@leafygreen-ui/tokens';
 import Icon from '@leafygreen-ui/icon';
 import { apiPost } from '../../lib/api';
 import styles from './Header.module.css';
 
+// `dividerBefore` renders a vertical rule ahead of the pill, separating the
+// standalone Risk Assessor tool from the main application-journey screens.
 const SCREENS = [
   { id: "borrower", label: "Borrower Portal", shortLabel: "Borrower" },
   { id: "officer", label: "Loan Officer", shortLabel: "Officer" },
-  { id: "risk", label: "Risk Assessor", shortLabel: "Risk" },
   { id: "renewal", label: "Renewal", shortLabel: "Renewal" },
   { id: "demo", label: "Demo Flow", shortLabel: "Demo" },
+  { id: "risk", label: "Risk Assessor", shortLabel: "Risk", dividerBefore: true },
 ];
 
 export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
@@ -145,8 +147,20 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
         {SCREENS.map((screen) => {
           const isActive = activeScreen === screen.id;
           return (
+            <Fragment key={screen.id}>
+            {screen.dividerBefore && (
+              <div
+                aria-hidden="true"
+                style={{
+                  width: 1,
+                  height: 20,
+                  margin: `0 ${spacing[1]}px`,
+                  background: "rgba(255,255,255,0.18)",
+                  flexShrink: 0,
+                }}
+              />
+            )}
             <button
-              key={screen.id}
               type="button"
               className={styles.navPill}
               aria-current={isActive ? "page" : undefined}
@@ -176,6 +190,7 @@ export default function Header({ activeScreen, onScreenChange, onInfoOpen }) {
             >
               {compact ? screen.shortLabel : screen.label}
             </button>
+            </Fragment>
           );
         })}
       </nav>

@@ -104,6 +104,9 @@ class ApplicationResponse(BaseModel):
 class HITLOverrides(BaseModel):
     risk_tier: Optional[str] = Field(None, pattern=r"^(A|B\+|B|C|D)$")
     loan_amount: Optional[float] = Field(None, gt=0)
+    # Annual percentage rate the officer dialled in on the HITL card. Bounds
+    # match the rate slider range in HITLReviewCard.
+    rate: Optional[float] = Field(None, gt=0, le=100)
 
 
 class HITLDecisionRequest(BaseModel):
