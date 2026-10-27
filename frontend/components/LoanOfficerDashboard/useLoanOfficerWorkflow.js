@@ -505,6 +505,7 @@ export function useLoanOfficerWorkflow(addToast, active = true) {
       const modResult = await apiPost(`/hitl/${selectedApp}/decision`, {
         action: 'modify_and_continue',
         officer_notes: details.conditions || 'Modified terms',
+        officer_id: officer?.officer_id || 'officer-001',
         conditions: details.conditions ? [details.conditions] : [],
         overrides: {
           ...(details.rate ? { rate: parseFloat(details.rate) } : {}),
