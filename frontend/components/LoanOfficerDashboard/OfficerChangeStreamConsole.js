@@ -253,9 +253,11 @@ export default function OfficerChangeStreamConsole({
           const isCorrelated = correlatedTs && Math.abs(new Date(evt.timestamp).getTime() - correlatedTs) < 500;
           return (
             <div key={evt.id} style={{
-              padding: '3px 0', borderBottom: '1px solid var(--border-dim)',
+              padding: '5px 0 6px', borderBottom: '1px solid var(--border-dim)',
               borderLeft: isCorrelated ? '2px solid var(--agent-cyan)' : '2px solid transparent',
               paddingLeft: 4,
+              // Guards against a wrapped detail line bleeding into the row below.
+              overflow: 'hidden',
               animation: 'eventSlideIn 220ms cubic-bezier(0.33, 1, 0.68, 1) both',
               transition: 'border-left-color 1.5s ease-out',
             }}>
@@ -281,7 +283,10 @@ export default function OfficerChangeStreamConsole({
               </div>
               {evt.detail && (
                 <div style={{
-                  paddingLeft: 74, fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginTop: 1,
+                  // 74 = timestamp column (minWidth 70) + the 4px flex gap above,
+                  // so the detail line hangs under the summary, not the clock.
+                  paddingLeft: 74, fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginTop: 2,
+                  lineHeight: 1.45,
                   wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap', maxWidth: '100%',
                 }}>
                   {evt.detail}

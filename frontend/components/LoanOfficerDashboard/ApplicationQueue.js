@@ -37,6 +37,54 @@ function isReviewStatus(s) { return s === 'review' || s === 'pending_review'; }
 function isProcessingStatus(s) { return s === 'processing' || s === 'underwriting' || s === 'submitted' || s === 'closing'; }
 function isCompletedStatus(s) { return s === 'approved' || s === 'declined' || s === 'funded' || s === 'active'; }
 
+// Seed apps ARE selectable — they render a hardcoded detail view in the center
+// column. Selection is handled normally; the hook gates the real network calls
+// off when the selected id is a seed.
+function QueueRow({ app, selectedId, onSelect }) {
+  const isSelected = app.id === selectedId;
+  const needsReview = isReviewStatus(app.status);
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(app.id)}
+      style={{
+        all: 'unset',
+        display: 'block',
+        width: '100%',
+        padding: '10px 16px',
+        borderBottom: '1px solid var(--border-dim)',
+        borderLeft: needsReview ? '3px solid var(--hitl-amber)' : '3px solid transparent',
+        background: isSelected ? 'var(--mongo-dim)' : needsReview ? 'rgba(255, 180, 0, 0.04)' : 'transparent',
+        cursor: 'pointer',
+        boxSizing: 'border-box',
+        transition: 'background 0.15s',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+        <span style={{ fontWeight: 600, fontSize: 12, color: isSelected ? 'var(--mongo)' : 'var(--text-primary)' }}>
+          {app.name}
+        </span>
+        <Badge variant={getStatusVariant(app.status)}>
+          {app.statusLabel}
+        </Badge>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)' }}>
+          {app.id}
+        </span>
+        <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
+          {app.amount}
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 3, fontSize: 9, color: 'var(--text-dim)' }}>
+        <span>{app.product}</span>
+        {app.score != null && <span>· Score: {app.score} ({app.tier})</span>}
+        <span style={{ marginLeft: 'auto' }}>{app.submitted}</span>
+      </div>
+    </button>
+  );
+}
+
 export default function ApplicationQueue({ selectedId, onSelect, applications = [] }) {
   const [activeFilter, setActiveFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
@@ -57,25 +105,32 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
 
   const reviewCount = useMemo(() => formatted.filter((a) => isReviewStatus(a.status)).length, [formatted]);
 
-  const filteredSorted = useMemo(() => {
+  // Live (change-stream driven) rows always sort above the hardcoded demo
+  // seeds, so a freshly-submitted application never buries itself among them.
+  // Each group is sorted independently with the same comparator.
+  const { liveRows, seedRows } = useMemo(() => {
     let list = formatted;
     if (activeFilter === 'review') list = list.filter((a) => isReviewStatus(a.status));
     else if (activeFilter === 'processing') list = list.filter((a) => isProcessingStatus(a.status));
     else if (activeFilter === 'completed') list = list.filter((a) => isCompletedStatus(a.status));
 
-    if (sortBy === 'attention') {
-      list = [...list].sort((a, b) => {
+    const comparator = sortBy === 'attention'
+      ? (a, b) => {
         const aPri = isReviewStatus(a.status) ? 0 : isProcessingStatus(a.status) ? 1 : 2;
         const bPri = isReviewStatus(b.status) ? 0 : isProcessingStatus(b.status) ? 1 : 2;
         if (aPri !== bPri) return aPri - bPri;
         if ((a.score ?? 999) !== (b.score ?? 999)) return (a.score ?? 999) - (b.score ?? 999);
         return b.createdAt - a.createdAt;
-      });
-    } else {
-      list = [...list].sort((a, b) => b.createdAt - a.createdAt);
-    }
-    return list;
+      }
+      : (a, b) => b.createdAt - a.createdAt;
+
+    return {
+      liveRows: list.filter((a) => !a.demoSeed).sort(comparator),
+      seedRows: list.filter((a) => a.demoSeed).sort(comparator),
+    };
   }, [formatted, activeFilter, sortBy]);
+
+  const totalVisible = liveRows.length + seedRows.length;
 
   return (
     <div style={{
@@ -152,7 +207,7 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        {filteredSorted.length === 0 && (
+        {totalVisible === 0 && (
           <div style={{
             margin: spacing[3], padding: spacing[4], textAlign: 'center',
             border: '2px dashed var(--border-dim)', borderRadius: 8,
@@ -174,54 +229,31 @@ export default function ApplicationQueue({ selectedId, onSelect, applications = 
             </div>
           </div>
         )}
-        {filteredSorted.map((app) => {
-          // Seed apps ARE selectable — they render a hardcoded detail view in
-          // the center column. Selection is handled normally; the hook gates the
-          // real network calls off when the selected id is a seed.
-          const isSelected = app.id === selectedId;
-          const needsReview = isReviewStatus(app.status);
-          return (
-            <button
-              key={app.id}
-              type="button"
-              onClick={() => onSelect(app.id)}
-              style={{
-                all: 'unset',
-                display: 'block',
-                width: '100%',
-                padding: '10px 16px',
-                borderBottom: '1px solid var(--border-dim)',
-                borderLeft: needsReview ? '3px solid var(--hitl-amber)' : '3px solid transparent',
-                background: isSelected ? 'var(--mongo-dim)' : needsReview ? 'rgba(255, 180, 0, 0.04)' : 'transparent',
-                cursor: 'pointer',
-                boxSizing: 'border-box',
-                transition: 'background 0.15s',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                <span style={{ fontWeight: 600, fontSize: 12, color: isSelected ? 'var(--mongo)' : 'var(--text-primary)' }}>
-                  {app.name}
-                </span>
-                <Badge variant={getStatusVariant(app.status)}>
-                  {app.statusLabel}
-                </Badge>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)' }}>
-                  {app.id}
-                </span>
-                <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
-                  {app.amount}
-                </span>
-              </div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 3, fontSize: 9, color: 'var(--text-dim)' }}>
-                <span>{app.product}</span>
-                {app.score != null && <span>· Score: {app.score} ({app.tier})</span>}
-                <span style={{ marginLeft: 'auto' }}>{app.submitted}</span>
-              </div>
-            </button>
-          );
-        })}
+        {liveRows.map((app) => (
+          <QueueRow key={app.id} app={app} selectedId={selectedId} onSelect={onSelect} />
+        ))}
+
+        {/* Section break — only drawn once live workflows are streaming in, so
+            the separation reads as meaningful rather than decorative chrome. */}
+        {seedRows.length > 0 && (
+          <div style={{
+            padding: '10px 16px 4px',
+            borderTop: liveRows.length > 0 ? '1px solid var(--border-base)' : 'none',
+            marginTop: liveRows.length > 0 ? 6 : 0,
+          }}>
+            <div style={{
+              fontSize: 9, fontWeight: 700, color: 'var(--text-dim)',
+              textTransform: 'uppercase', letterSpacing: '0.08em',
+              fontFamily: 'var(--font-display)',
+            }}>
+              Static Workflows
+            </div>
+          </div>
+        )}
+
+        {seedRows.map((app) => (
+          <QueueRow key={app.id} app={app} selectedId={selectedId} onSelect={onSelect} />
+        ))}
       </div>
     </div>
   );
