@@ -1,3 +1,4 @@
+import logging
 import os
 import threading
 from pymongo import MongoClient
